@@ -13,6 +13,8 @@ block name:
 			println("destructed");
 		int func get()
 			return x;
+
+        // TODO Missing implementation
 		matrix operator*(matrix lhs, matrix rhs);
 		matrix operator*(matrix lhs, int rhs);
 		matrix operator!(matrix lhs);		
@@ -54,13 +56,15 @@ int func main():
     swap(xr, yr);
     
     if x > 80:
-	println("x maior que 80");
+	    println("x maior que 80");
     else if x > 40:
-	println("x maior que 40");
+	    println("x maior que 40");
     else:
-	println("x menor que 40");
+	    println("x menor que 40");
 	
 
     while x > 80:
-	x--;
+	    x--;
 
+    for int i = 0; i < 5; ++i:
+	    print(i);
