@@ -1,0 +1,66 @@
+// This is an example of a program in the language 
+
+import matrix;
+import "../meu_outro_arquivo.";
+
+const int x = 4;
+
+block name:
+	public:
+		name():
+			x = 4;
+		~name():
+			println("destructed");
+		int func get()
+			return x;
+		matrix operator*(matrix lhs, matrix rhs);
+		matrix operator*(matrix lhs, int rhs);
+		matrix operator!(matrix lhs);		
+
+	private:	
+		int x;
+
+enum DAY:
+	SEGUNDA,
+	TERCA,
+	QUARTA,
+	QUINTA,
+	SEXTA,
+	SABADO,
+	DOMINGO,
+
+// Procedure to swap two values 
+func swap(ref(int) a, ref(int) b)
+    int tmp;
+
+    matrix a, b;
+    matrix c = a * b;
+
+    tmp = deref(a);
+    deref(a) = deref(b);
+    deref(b) = tmp;
+
+// Testing swap procedure
+int func main():
+    int x;
+    int y;
+    ref(int) xr;
+    ref(int) yr;
+
+    x = 42;
+    y = 84;
+    xr = ref(x);
+    yr = ref(y);
+    swap(xr, yr);
+    
+    if x > 80:
+	println("x maior que 80");
+    else if x > 40:
+	println("x maior que 40");
+    else:
+	println("x menor que 40");
+	
+
+    while x > 80:
+	x--;
+
