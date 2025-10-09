@@ -32,7 +32,7 @@ enum DAY:
 	DOMINGO,
 
 // Procedure to swap two values 
-func swap(ref(int) a, ref(int) b)
+func swap(ref(int) a, ref(int) b):
     int tmp;
 
     matrix a, b;
