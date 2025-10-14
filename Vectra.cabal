@@ -1,0 +1,22 @@
+cabal-version:      3.0
+name:               Vectra
+version:            1.0.0
+synopsis:           A interpreter for the Vectra programming language 
+homepage:           https://github.com/enfmarinho/Vectra.git
+license:            MIT
+license-file:       LICENSE
+author:             enfmarinho
+maintainer:         eduardonestormarinho228@gmail.com
+category:           Language
+build-type:         Simple
+
+common warnings
+    ghc-options: -Wall
+
+executable Vectra
+    import:           warnings
+    main-is:          Main.hs
+    -- other-modules:
+    build-depends:    base ^>=4.18.2.1
+    hs-source-dirs:   app
+    default-language: GHC2021
