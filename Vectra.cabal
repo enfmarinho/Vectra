@@ -16,7 +16,15 @@ common warnings
 executable Vectra
     import:           warnings
     main-is:          Main.hs
-    -- other-modules:
-    build-depends:    base ^>=4.18.2.1
+    other-modules:    SymbolTable
+                      Types
+                      Parser
+                      Scanner
+                      TerminalTokens
+    build-depends:    base ^>=4.18.2.1,
+                      hashtables,
+                      mtl,
+                      parsec,
+                      array,
     hs-source-dirs:   app
     default-language: GHC2021

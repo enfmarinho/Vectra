@@ -1,0 +1,41 @@
+module SymbolTable
+  ( SymbolType
+  , SymbolTableType
+  , SymbolTableStackType
+  , StateType
+  , openScope
+  , closeScope
+  , updateSymbol
+  ) where
+
+import qualified Data.HashTable.IO as H
+import Types
+import Text.Parsec
+import Scanner
+import Control.Monad.State.Lazy
+
+type SymbolType = (String, Type)
+type SymbolTableType = H.BasicHashTable String Type
+type SymbolTableStackType = [SymbolTableType]
+type SymbolTableStackState = StateT SymbolTableStackType IO
+type StateType = ParsecT [Token] SymbolTableStackType IO
+
+openScope :: SymbolTableStackState () 
+openScope = do
+    stack <- get
+    table <- liftIO H.new
+    put (table : stack)
+
+closeScope :: SymbolTableStackState ()
+closeScope = do
+    (_ : stack) <- get
+    put stack
+
+updateSymbol :: SymbolType -> StateType ()
+updateSymbol (symbol_id, symbol_type) = do
+    stack <- getState
+    case stack of
+        [] -> fail "No open scope"
+        (table : rest) -> do
+            liftIO $ H.insert table symbol_id symbol_type
+            putState (table : rest)
