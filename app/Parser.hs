@@ -1,5 +1,7 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Redundant return" #-}
 module Parser
-  ( parser
+  ( --parser
   ) where
 
 import SymbolTable
@@ -28,17 +30,69 @@ import Text.Parsec
 -- remaining_stmts = (do a <- semiColonToken
 --                       b <- assign
 --                       return (a:b)) <|> (return [])
+--
+--
 
--- assignStmt :: Parsec [Token] st [Token]
--- assignStmt :: ParserType [Token]
-assignStmt :: StateType [Token]
-assignStmt = do
-          a <- TT.id
-          b <- TT.kwAssingment
-          c <- TT.intLiteral
-          updateSymbol ("a", IntType 1)
-          return (a:b:[c])
+-- stmtList :: StateType [Token]
+-- stmtList = many stmtWithSemi
+--   where
+--     stmtWithSemi = do
+--       s <- stmt
+--       _ <- TT.kwSemicolumn
+--       return s
 
-parser :: [Token] -> SymbolTableStackType -> IO (Either ParseError [Token])
-parser token_list table_stack = do
-    runParserT assignStmt table_stack "Error message" token_list 
+-- TODO this is incomplete
+-- expStmt :: StateType [Token]
+-- expStmt = do
+--     t <- literal
+--       <|> (:[]) <$> TT.kwReturn -- TODO this is wrong
+--     return t
+--
+--
+-- literal :: StateType [Token]
+-- literal = do
+--     t <- TT.intLiteral 
+--       <|> TT.floatLiteral
+--       <|> TT.stringLiteral
+--       <|> TT.kwTrue
+--       <|> TT.kwFalse
+--     return [t]
+
+
+-- ifStmt :: StateType [Token]
+-- ifStmt = do
+--     a <- TT.kwIf
+--     b <- expStmt
+--     c <- TT.kwColumn
+--     -- _ <- TT.indent
+--     d <- stmtList
+--     -- _ <- TT.dedent
+--     return ([a] ++ b ++ [c] ++ d)
+--
+--
+-- assignStmt :: StateType [Token]
+-- assignStmt = do
+--           a <- TT.id
+--           b <- TT.kwAssingment
+--           c <- expStmt
+--           -- TODO update symbol table
+--           return (a:b:c)
+--
+--
+-- stmt :: StateType [Token]
+-- stmt = do
+--     t <- expStmt
+--       <|> assignStmt
+--       <|> ifStmt
+--     return t
+--
+--
+-- stmtList :: StateType [Token]
+-- stmtList = do
+--     concat <$> (stmt `sepEndBy1` TT.newLine)
+
+
+-- parser :: [Token] -> SymbolTableStackType -> IO (Either ParseError [Token])
+-- parser token_list table_stack = do
+--     putStrLn "parsing..."
+--     runParserT stmtList table_stack "Error message" token_list 
