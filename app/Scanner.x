@@ -133,15 +133,15 @@ popIndentationLevel = do
 alexEOF :: Alex (Maybe Token)
 alexEOF = do
   stack <- getIndentationLevelStack
-  dedents <- emitDedents stack
-  return $ Just (EOF dedents)
+  unindents <- emitUnindents stack
+  return $ Just (EOF unindents)
   where
-    emitDedents :: [Int] -> Alex [Token]
-    emitDedents [] = return []
-    emitDedents [_] = return []  -- mantém o nível base
-    emitDedents (_:rest) = do
-      more <- emitDedents rest
-      return (DEDENT : more)
+    emitUnindents :: [Int] -> Alex [Token]
+    emitUnindents [] = return []
+    emitUnindents [_] = return []  -- mantém o nível base
+    emitUnindents (_:rest) = do
+      more <- emitUnindents rest
+      return (UNINDENT : more)
 
 alexPos :: AlexInput -> AlexPosn
 alexPos (pos, _, _, _) = pos
@@ -165,22 +165,22 @@ handleIndentation token = do
         return $ SPECIAL_CASE [INDENT, token]
     else if pastIndentationLevel > currIndentationLevel then do
         popIndentationLevel
-        tokens <- dedentLoop pastIndentationLevel currIndentationLevel
+        tokens <- unindentLoop pastIndentationLevel currIndentationLevel
         return $ SPECIAL_CASE (tokens ++ [token])
     else
         return token
 
     where
-      dedentLoop :: Int -> Int -> Alex [Token]
-      dedentLoop past curr =
+      unindentLoop :: Int -> Int -> Alex [Token]
+      unindentLoop past curr =
         case compare past curr of
           LT -> alexError "Indentation error: unindent does not match any outer indentation level"
           EQ -> return []
           GT -> do
             popIndentationLevel
             t <- topIndentationLevelStack
-            rest <- dedentLoop t curr
-            return (DEDENT : rest)
+            rest <- unindentLoop t curr
+            return (UNINDENT : rest)
 
 
 data Token =
@@ -206,7 +206,7 @@ data Token =
   OPEN_BRACKET AlexPosn |
   CLOSE_BRACKET AlexPosn |
   INDENT |
-  DEDENT |
+  UNINDENT |
   KW_IF AlexPosn |
   KW_INT AlexPosn |
   KW_FLOAT AlexPosn |
