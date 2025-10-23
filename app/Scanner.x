@@ -155,7 +155,7 @@ handleIndentation token = do
         return token
     else if pastIndentationLevel < currIndentationLevel then do
         pushIndentationLevel currIndentationLevel
-        return $ SPECIAL_CASE [INDENT posn, NEWLINE posn, token] -- This is a workaround
+        return $ SPECIAL_CASE [INDENT posn, token]
     else if pastIndentationLevel > currIndentationLevel then do
         unindents <- unindentLoop pastIndentationLevel currIndentationLevel posn
         return $ SPECIAL_CASE (unindents ++ [NEWLINE posn, token]) -- This is a workaround
