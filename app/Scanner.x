@@ -16,7 +16,7 @@ $LETTER = [a-zA-Z]
 tokens :-
     "//".*       { \_ _ -> return Nothing }
     [\ \t]+      { \_ len -> do setCurrIndentationLevel len; return Nothing }
-    [\n]+        { \aInp _ -> do setBeginLine True; setCurrIndentationLevel 0; return $ Just (NEWLINE (alexPos aInp)) }
+    [\n]+        { \aInp _ -> do setBeginLine True; setCurrIndentationLevel 0; return $ Just NEWLINE }
 
     -- Punctuation and operators
     ";"          { \aInp _ -> do t <- handleIndentation (KW_SEMICOLUMN (alexPos aInp)); return $ Just t }
@@ -151,10 +151,10 @@ handleIndentation token = do
         return token
     else if pastIndentationLevel < currIndentationLevel then do
         pushIndentationLevel currIndentationLevel
-        return $ SPECIAL_CASE [INDENT, token]
+        return $ SPECIAL_CASE [INDENT, NEWLINE, token] -- This is a workaround
     else if pastIndentationLevel > currIndentationLevel then do
-        tokens <- unindentLoop pastIndentationLevel currIndentationLevel
-        return $ SPECIAL_CASE (tokens ++ [token])
+        unindents <- unindentLoop pastIndentationLevel currIndentationLevel
+        return $ SPECIAL_CASE (unindents ++ [NEWLINE, token]) -- This is a workaround
     else
         return token
 
@@ -185,7 +185,6 @@ data Token =
   OP_OR AlexPosn |
   OP_ADD AlexPosn |
   OP_SUB AlexPosn |
-  Ignore |
   OP_MULT AlexPosn |
   OP_DIV AlexPosn |
   OP_COMPARE AlexPosn String |
