@@ -16,7 +16,7 @@ $LETTER = [a-zA-Z]
 tokens :-
     "//".*       { \_ _ -> return Nothing }
     [\ \t]+      { \_ len -> do setCurrIndentationLevel len; return Nothing }
-    [\n]+        { \_ _ -> do setBeginLine True; setCurrIndentationLevel 0; return Nothing }
+    [\n]+        { \aInp _ -> do setBeginLine True; setCurrIndentationLevel 0; return $ Just (NEWLINE (alexPos aInp)) }
 
     -- Punctuation and operators
     ";"          { \aInp _ -> do t <- handleIndentation (KW_SEMICOLUMN (alexPos aInp)); return $ Just t }
@@ -193,8 +193,8 @@ data Token =
   CLOSE_PAREN AlexPosn |
   OPEN_BRACKET AlexPosn |
   CLOSE_BRACKET AlexPosn |
-  INDENT |
-  UNINDENT |
+  INDENT | -- TODO probably needs an AlexPosn
+  UNINDENT | -- TODO probably needs an AlexPosn
   KW_IF AlexPosn |
   KW_INT AlexPosn |
   KW_FLOAT AlexPosn |
@@ -215,6 +215,7 @@ data Token =
   KW_IMPORT AlexPosn |
   KW_PUBLIC AlexPosn |
   KW_PRIVATE AlexPosn |
+  NEWLINE AlexPosn |
   SPECIAL_CASE [Token] |
   EOF [Token] |
   KW_TIL AlexPosn 
