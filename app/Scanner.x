@@ -14,69 +14,74 @@ $NUMBER = 0-9
 $LETTER = [a-zA-Z]
 
 tokens :-
-  "//".*                                  { \_ _ -> return Nothing }
-  [\ \t]+                                 { \_ len -> do
-                                                        setCurrIndentationLevel len
-                                                        return Nothing }
-  [\n]+                                   { \_ _ -> do
-                                                        setBeginLine True
-                                                        setCurrIndentationLevel 0
-                                                        return Nothing }
-  ";"                                     { \aInp _ -> return $ Just (KW_SEMICOLUMN (alexPos aInp)) }
-  ":"                                     { \aInp _ -> return $ Just (KW_COLUMN (alexPos aInp)) } 
-  ","                                     { \aInp _ -> return $ Just (KW_COMMA (alexPos aInp)) }
-  "="                                     { \aInp _ -> return $ Just (KW_ASSIGNMENT (alexPos aInp)) }
-  "!"                                     { \aInp _ -> return $ Just (OP_NOT (alexPos aInp)) }
-  "&&"                                    { \aInp _ -> return $ Just (OP_AND (alexPos aInp)) }
-  "||"                                    { \aInp _ -> return $ Just (OP_OR (alexPos aInp)) }
-  [\< \> \>= \>= == !=]                   { \aInp len -> return $ Just (OP_COMPARE (alexPos aInp) (take len (alexInputStr aInp))) }
-  "("                                     { \aInp _ -> return $ Just (OPEN_PAREN (alexPos aInp)) }
-  ")"                                     { \aInp _ -> return $ Just (CLOSE_PAREN (alexPos aInp)) }
-  "["                                     { \aInp _ -> return $ Just (OPEN_BRACKET (alexPos aInp)) }
-  "]"                                     { \aInp _ -> return $ Just (CLOSE_BRACKET (alexPos aInp)) }
-  "+"                                     { \aInp _ -> return $ Just (OP_ADD (alexPos aInp)) }
-  "-"                                     { \aInp _ -> return $ Just (OP_SUB (alexPos aInp)) }
-  "*"                                     { \aInp _ -> return $ Just (OP_MULT (alexPos aInp)) }
-  "/"                                     { \aInp _ -> return $ Just (OP_DIV (alexPos aInp)) }
-  "~"                                     { \aInp _ -> return $ Just (KW_TIL (alexPos aInp)) }
-  $NUMBER+                                { \aInp len -> return $ Just (INT_LITERAL (alexPos aInp) (read (take len (alexInputStr aInp)))) }
-  $NUMBER+\.$NUMBER*                      { \aInp len -> return $ Just (FLOAT_LITERAL (alexPos aInp) (read (take len (alexInputStr aInp)))) }
-  \".*\"                                  { \aInp len -> return $ Just (STRING_LITERAL (alexPos aInp) (take len (alexInputStr aInp))) }
-  const                                   { \aInp _ -> return $ Just (KW_CONST (alexPos aInp)) }
-  int                                     { \aInp _ -> return $ Just (KW_INT (alexPos aInp)) }
-  float                                   { \aInp _ -> return $ Just (KW_FLOAT (alexPos aInp)) }
-  string                                  { \aInp _ -> return $ Just (KW_STRING (alexPos aInp)) }
-  bool                                    { \aInp _ -> return $ Just (KW_BOOL (alexPos aInp)) }
-  ref                                     { \aInp _ -> return $ Just (KW_REF (alexPos aInp)) }
-  enum                                    { \aInp _ -> return $ Just (KW_ENUM (alexPos aInp)) }
-  if                                      { \aInp _ -> return $ Just (KW_IF (alexPos aInp)) }
-  else                                    { \aInp _ -> return $ Just (KW_ELSE (alexPos aInp)) }
-  while                                   { \aInp _ -> return $ Just (KW_WHILE (alexPos aInp)) }
-  for                                     { \aInp _ -> return $ Just (KW_FOR (alexPos aInp)) }
-  block                                   { \aInp _ -> return $ Just (KW_BLOCK (alexPos aInp)) }
-  public                                  { \aInp _ -> return $ Just (KW_PUBLIC (alexPos aInp)) }
-  private                                 { \aInp _ -> return $ Just (KW_PRIVATE (alexPos aInp)) }
-  func                                    { \aInp _ -> return $ Just (KW_FUNC (alexPos aInp)) }
-  return                                  { \aInp _ -> return $ Just (KW_RETURN (alexPos aInp)) }
-  deref                                   { \aInp _ -> return $ Just (KW_DEREF (alexPos aInp)) }
-  import                                  { \aInp _ -> return $ Just (KW_IMPORT (alexPos aInp)) }
-  false                                   { \aInp _ -> return $ Just (KW_FALSE (alexPos aInp)) }
-  true                                    { \aInp _ -> return $ Just (KW_TRUE (alexPos aInp)) }
-  $LETTER [$LETTER $NUMBER \_]*	          { 
-      \aInp len -> do 
-        t <- handleIndentation (ID (alexPos aInp) (take len(alexInputStr aInp)))
+    "//".*       { \_ _ -> return Nothing }
+    [\ \t]+      { \_ len -> do setCurrIndentationLevel len; return Nothing }
+    [\n]+        { \_ _ -> do setBeginLine True; setCurrIndentationLevel 0; return Nothing }
+
+    -- Punctuation and operators
+    ";"          { \aInp _ -> do t <- handleIndentation (KW_SEMICOLUMN (alexPos aInp)); return $ Just t }
+    ":"          { \aInp _ -> do t <- handleIndentation (KW_COLUMN (alexPos aInp)); return $ Just t }
+    ","          { \aInp _ -> do t <- handleIndentation (KW_COMMA (alexPos aInp)); return $ Just t }
+    "="          { \aInp _ -> do t <- handleIndentation (KW_ASSIGNMENT (alexPos aInp)); return $ Just t }
+    "!"          { \aInp _ -> do t <- handleIndentation (OP_NOT (alexPos aInp)); return $ Just t }
+    "&&"         { \aInp _ -> do t <- handleIndentation (OP_AND (alexPos aInp)); return $ Just t }
+    "||"         { \aInp _ -> do t <- handleIndentation (OP_OR (alexPos aInp)); return $ Just t }
+    [\< \> \>= \>= == !=] { \aInp len -> do t <- handleIndentation (OP_COMPARE (alexPos aInp) (take len (alexInputStr aInp))); return $ Just t }
+    "("          { \aInp _ -> do t <- handleIndentation (OPEN_PAREN (alexPos aInp)); return $ Just t }
+    ")"          { \aInp _ -> do t <- handleIndentation (CLOSE_PAREN (alexPos aInp)); return $ Just t }
+    "["          { \aInp _ -> do t <- handleIndentation (OPEN_BRACKET (alexPos aInp)); return $ Just t }
+    "]"          { \aInp _ -> do t <- handleIndentation (CLOSE_BRACKET (alexPos aInp)); return $ Just t }
+    "+"          { \aInp _ -> do t <- handleIndentation (OP_ADD (alexPos aInp)); return $ Just t }
+    "-"          { \aInp _ -> do t <- handleIndentation (OP_SUB (alexPos aInp)); return $ Just t }
+    "*"          { \aInp _ -> do t <- handleIndentation (OP_MULT (alexPos aInp)); return $ Just t }
+    "/"          { \aInp _ -> do t <- handleIndentation (OP_DIV (alexPos aInp)); return $ Just t }
+    "~"          { \aInp _ -> do t <- handleIndentation (KW_TIL (alexPos aInp)); return $ Just t }
+
+    -- Literals
+    $NUMBER+     { \aInp len -> do t <- handleIndentation (INT_LITERAL (alexPos aInp) (read (take len (alexInputStr aInp)))); return $ Just t }
+    $NUMBER+\.$NUMBER* { \aInp len -> do t <- handleIndentation (FLOAT_LITERAL (alexPos aInp) (read (take len (alexInputStr aInp)))); return $ Just t }
+    \".*\"       { \aInp len -> do t <- handleIndentation (STRING_LITERAL (alexPos aInp) (take len (alexInputStr aInp))); return $ Just t }
+
+    -- Keywords
+    const        { \aInp _ -> do t <- handleIndentation (KW_CONST (alexPos aInp)); return $ Just t }
+    int          { \aInp _ -> do t <- handleIndentation (KW_INT (alexPos aInp)); return $ Just t }
+    float        { \aInp _ -> do t <- handleIndentation (KW_FLOAT (alexPos aInp)); return $ Just t }
+    string       { \aInp _ -> do t <- handleIndentation (KW_STRING (alexPos aInp)); return $ Just t }
+    bool         { \aInp _ -> do t <- handleIndentation (KW_BOOL (alexPos aInp)); return $ Just t }
+    ref          { \aInp _ -> do t <- handleIndentation (KW_REF (alexPos aInp)); return $ Just t }
+    enum         { \aInp _ -> do t <- handleIndentation (KW_ENUM (alexPos aInp)); return $ Just t }
+    if           { \aInp _ -> do t <- handleIndentation (KW_IF (alexPos aInp)); return $ Just t }
+    else         { \aInp _ -> do t <- handleIndentation (KW_ELSE (alexPos aInp)); return $ Just t }
+    while        { \aInp _ -> do t <- handleIndentation (KW_WHILE (alexPos aInp)); return $ Just t }
+    for          { \aInp _ -> do t <- handleIndentation (KW_FOR (alexPos aInp)); return $ Just t }
+    block        { \aInp _ -> do t <- handleIndentation (KW_BLOCK (alexPos aInp)); return $ Just t }
+    public       { \aInp _ -> do t <- handleIndentation (KW_PUBLIC (alexPos aInp)); return $ Just t }
+    private      { \aInp _ -> do t <- handleIndentation (KW_PRIVATE (alexPos aInp)); return $ Just t }
+    func         { \aInp _ -> do t <- handleIndentation (KW_FUNC (alexPos aInp)); return $ Just t }
+    return       { \aInp _ -> do t <- handleIndentation (KW_RETURN (alexPos aInp)); return $ Just t }
+    deref        { \aInp _ -> do t <- handleIndentation (KW_DEREF (alexPos aInp)); return $ Just t }
+    import       { \aInp _ -> do t <- handleIndentation (KW_IMPORT (alexPos aInp)); return $ Just t }
+    false        { \aInp _ -> do t <- handleIndentation (KW_FALSE (alexPos aInp)); return $ Just t }
+    true         { \aInp _ -> do t <- handleIndentation (KW_TRUE (alexPos aInp)); return $ Just t }
+
+    -- IDs
+    $LETTER [$LETTER $NUMBER _]* { \aInp len -> do
+        t <- handleIndentation (ID (alexPos aInp) (take len (alexInputStr aInp)))
         return (Just t)
-      }
+    }
+
 {
 
+-- TODO pastIndentationLevel in redundant, topIndentationLevelStack can be used in it's place
 data AlexUserState = AlexUserState
   { pastIndentationLevel :: Int
   , currIndentationLevel :: Int
   , beginLine :: Bool
+  , indentationLevelStack :: [Int]
   }
 
 alexInitUserState :: AlexUserState
-alexInitUserState = AlexUserState { pastIndentationLevel = 0, currIndentationLevel = 0, beginLine = True }
+alexInitUserState = AlexUserState { pastIndentationLevel = 0, currIndentationLevel = 0, beginLine = True, indentationLevelStack = [0] }
 
 getPastIndentationLevel :: Alex Int
 getPastIndentationLevel = pastIndentationLevel <$> alexGetUserState
@@ -102,8 +107,41 @@ setBeginLine b = do
   ust <- alexGetUserState
   alexSetUserState ust{ beginLine = b }
 
+getIndentationLevelStack :: Alex [Int]
+getIndentationLevelStack = indentationLevelStack <$> alexGetUserState
+
+topIndentationLevelStack :: Alex Int 
+topIndentationLevelStack = do
+  stack <- getIndentationLevelStack
+  case stack of
+    (x:_) -> return x
+    []    -> alexError "TODO write this error message"
+
+pushIndentationLevel :: Int -> Alex ()
+pushIndentationLevel lvl = do
+  ust <- alexGetUserState
+  let newStack = lvl : indentationLevelStack ust
+  alexSetUserState ust { indentationLevelStack = newStack }
+
+popIndentationLevel :: Alex ()
+popIndentationLevel = do
+  ust <- alexGetUserState
+  case indentationLevelStack ust of
+    (_:rest) -> alexSetUserState ust { indentationLevelStack = rest }
+    []       -> alexError "TODO write this error message"
+
 alexEOF :: Alex (Maybe Token)
-alexEOF = return $ Just (EOF)
+alexEOF = do
+  stack <- getIndentationLevelStack
+  dedents <- emitDedents stack
+  return $ Just (EOF dedents)
+  where
+    emitDedents :: [Int] -> Alex [Token]
+    emitDedents [] = return []
+    emitDedents [_] = return []  -- mantém o nível base
+    emitDedents (_:rest) = do
+      more <- emitDedents rest
+      return (DEDENT : more)
 
 alexPos :: AlexInput -> AlexPosn
 alexPos (pos, _, _, _) = pos
@@ -117,17 +155,32 @@ handleIndentation token = do
     currIndentationLevel <- getCurrIndentationLevel
     setPastIndentationLevel currIndentationLevel
 
-    let _ = trace ("pastIndentationLevel = " ++ show pastIndentationLevel) ()
-
     beginLine <- getBeginLine
-    if beginLine then
+    setBeginLine False
+
+    if not beginLine then
         return token
-    else do
-        setBeginLine False
-        return $ case compare pastIndentationLevel currIndentationLevel of
-            LT -> SPECIAL_CASE [INDENT, token]
-            GT -> SPECIAL_CASE [DEDENT, token]
-            EQ -> token
+    else if pastIndentationLevel < currIndentationLevel then do
+        pushIndentationLevel currIndentationLevel
+        return $ SPECIAL_CASE [INDENT, token]
+    else if pastIndentationLevel > currIndentationLevel then do
+        popIndentationLevel
+        tokens <- dedentLoop pastIndentationLevel currIndentationLevel
+        return $ SPECIAL_CASE (tokens ++ [token])
+    else
+        return token
+
+    where
+      dedentLoop :: Int -> Int -> Alex [Token]
+      dedentLoop past curr =
+        case compare past curr of
+          LT -> alexError "Indentation error: unindent does not match any outer indentation level"
+          EQ -> return []
+          GT -> do
+            popIndentationLevel
+            t <- topIndentationLevelStack
+            rest <- dedentLoop t curr
+            return (DEDENT : rest)
 
 
 data Token =
@@ -175,7 +228,7 @@ data Token =
   KW_PUBLIC AlexPosn |
   KW_PRIVATE AlexPosn |
   SPECIAL_CASE [Token] |
-  EOF |
+  EOF [Token] |
   KW_TIL AlexPosn 
   deriving (Eq,Show)
 
@@ -189,9 +242,10 @@ getTokens fn = do
       mtok <- alexMonadScan
       case mtok of
         Nothing -> loop (acc)
-        Just t  -> case t of 
-                     EOF -> return (reverse acc)
-                     _ -> loop (t:acc)
+        Just t  -> case t of
+                     EOF ts -> return (reverse (ts ++ acc))
+                     SPECIAL_CASE ts -> loop (reverse ts ++ acc)
+                     _ -> loop (t : acc)
 
 
 }
