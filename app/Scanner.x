@@ -16,7 +16,7 @@ $LETTER = [a-zA-Z]
 tokens :-
     "//".*       { \_ _ -> return Nothing }
     [\ \t]+      { \_ len -> do setCurrIndentationLevel len; return Nothing }
-    [\n]+        { \aInp _ -> do setBeginLine True; setCurrIndentationLevel 0; return $ Just NEWLINE }
+    [\n]+        { \aInp _ -> do setBeginLine True; setCurrIndentationLevel 0; return $ Just (NEWLINE (alexPos aInp))}
 
     -- Punctuation and operators
     ";"          { \aInp _ -> do t <- handleIndentation (KW_SEMICOLUMN (alexPos aInp)); return $ Just t }
@@ -122,16 +122,18 @@ popIndentationLevel = do
 
 alexEOF :: Alex (Maybe Token)
 alexEOF = do
+  inp <- alexGetInput
+  let posn = alexPos inp
   stack <- getIndentationLevelStack
-  unindents <- emitUnindents stack
+  unindents <- emitUnindents stack posn
   return $ Just (EOF unindents)
   where
-    emitUnindents :: [Int] -> Alex [Token]
-    emitUnindents [] = return []
-    emitUnindents [_] = return []  -- mantém o nível base
-    emitUnindents (_:rest) = do
-      more <- emitUnindents rest
-      return (UNINDENT : more)
+    emitUnindents :: [Int] -> AlexPosn -> Alex [Token]
+    emitUnindents [] _ = return []
+    emitUnindents [_] _ = return []  -- mantém o nível base
+    emitUnindents (_:rest) posn = do
+        more <- emitUnindents rest posn
+        return ((UNINDENT posn): more)
 
 alexPos :: AlexInput -> AlexPosn
 alexPos (pos, _, _, _) = pos
@@ -147,28 +149,30 @@ handleIndentation token = do
     beginLine <- getBeginLine
     setBeginLine False
 
+    inp <- alexGetInput
+    let posn = alexPos inp
     if not beginLine then
         return token
     else if pastIndentationLevel < currIndentationLevel then do
         pushIndentationLevel currIndentationLevel
-        return $ SPECIAL_CASE [INDENT, NEWLINE, token] -- This is a workaround
+        return $ SPECIAL_CASE [INDENT posn, NEWLINE posn, token] -- This is a workaround
     else if pastIndentationLevel > currIndentationLevel then do
-        unindents <- unindentLoop pastIndentationLevel currIndentationLevel
-        return $ SPECIAL_CASE (unindents ++ [NEWLINE, token]) -- This is a workaround
+        unindents <- unindentLoop pastIndentationLevel currIndentationLevel posn
+        return $ SPECIAL_CASE (unindents ++ [NEWLINE posn, token]) -- This is a workaround
     else
         return token
 
     where
-      unindentLoop :: Int -> Int -> Alex [Token]
-      unindentLoop past curr =
+      unindentLoop :: Int -> Int -> AlexPosn -> Alex [Token]
+      unindentLoop past curr posn =
         case compare past curr of
           LT -> alexError "Indentation error: unindent does not match any outer indentation level"
           EQ -> return []
           GT -> do
             popIndentationLevel
             t <- topIndentationLevelStack
-            rest <- unindentLoop t curr
-            return (UNINDENT : rest)
+            rest <- unindentLoop t curr posn
+            return ((UNINDENT posn): rest)
 
 
 data Token =
@@ -192,8 +196,8 @@ data Token =
   CLOSE_PAREN AlexPosn |
   OPEN_BRACKET AlexPosn |
   CLOSE_BRACKET AlexPosn |
-  INDENT | -- TODO probably needs an AlexPosn
-  UNINDENT | -- TODO probably needs an AlexPosn
+  INDENT AlexPosn |
+  UNINDENT AlexPosn |
   KW_IF AlexPosn |
   KW_INT AlexPosn |
   KW_FLOAT AlexPosn |

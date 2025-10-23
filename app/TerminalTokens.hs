@@ -107,12 +107,12 @@ closeBracket = tokenPrim show update_pos get_token where
 
 indent :: StateType Token
 indent = tokenPrim show update_pos get_token where
-  get_token INDENT = Just INDENT
+  get_token (INDENT posn) = Just (INDENT posn)
   get_token _       = Nothing
 
 unindent :: StateType Token
 unindent = tokenPrim show update_pos get_token where
-  get_token UNINDENT = Just UNINDENT
+  get_token (UNINDENT posn) = Just (UNINDENT posn)
   get_token _       = Nothing
 
 newLine :: StateType Token
