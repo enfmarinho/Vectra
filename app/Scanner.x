@@ -151,7 +151,7 @@ alexInputStr (_, _, _, str) = str
 
 handleIndentation :: Token -> Alex Token
 handleIndentation token = do
-    pastIndentationLevel <- getPastIndentationLevel
+    pastIndentationLevel <- topIndentationLevelStack
     currIndentationLevel <- getCurrIndentationLevel
     setPastIndentationLevel currIndentationLevel
 
