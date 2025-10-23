@@ -38,4 +38,11 @@ updateSymbol (symbol_id, symbol_type) = do
         [] -> fail "No open scope"
         (table : rest) -> do
             liftIO $ H.insert table symbol_id symbol_type
-            putState (table : rest)
+            modifyState (\_ -> table : rest)
+
+consultSymbol :: String -> StateType (Maybe Type)
+consultSymbol symbol = do
+    stack <- getState
+    case stack of
+        [] -> return Nothing
+        (table : _) -> liftIO $ H.lookup table symbol
