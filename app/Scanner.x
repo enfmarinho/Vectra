@@ -164,7 +164,6 @@ handleIndentation token = do
         pushIndentationLevel currIndentationLevel
         return $ SPECIAL_CASE [INDENT, token]
     else if pastIndentationLevel > currIndentationLevel then do
-        popIndentationLevel
         tokens <- unindentLoop pastIndentationLevel currIndentationLevel
         return $ SPECIAL_CASE (tokens ++ [token])
     else
