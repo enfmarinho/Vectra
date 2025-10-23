@@ -72,24 +72,14 @@ tokens :-
 
 {
 
--- TODO pastIndentationLevel in redundant, topIndentationLevelStack can be used in it's place
 data AlexUserState = AlexUserState
-  { pastIndentationLevel :: Int
-  , currIndentationLevel :: Int
+  { currIndentationLevel :: Int
   , beginLine :: Bool
   , indentationLevelStack :: [Int]
   }
 
 alexInitUserState :: AlexUserState
-alexInitUserState = AlexUserState { pastIndentationLevel = 0, currIndentationLevel = 0, beginLine = True, indentationLevelStack = [0] }
-
-getPastIndentationLevel :: Alex Int
-getPastIndentationLevel = pastIndentationLevel <$> alexGetUserState
-
-setPastIndentationLevel :: Int -> Alex ()
-setPastIndentationLevel lvl = do
-  ust <- alexGetUserState
-  alexSetUserState ust{ pastIndentationLevel = lvl }
+alexInitUserState = AlexUserState { currIndentationLevel = 0, beginLine = True, indentationLevelStack = [0] }
 
 getCurrIndentationLevel :: Alex Int
 getCurrIndentationLevel = currIndentationLevel <$> alexGetUserState
@@ -153,7 +143,6 @@ handleIndentation :: Token -> Alex Token
 handleIndentation token = do
     pastIndentationLevel <- topIndentationLevelStack
     currIndentationLevel <- getCurrIndentationLevel
-    setPastIndentationLevel currIndentationLevel
 
     beginLine <- getBeginLine
     setBeginLine False
