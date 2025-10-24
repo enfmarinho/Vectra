@@ -10,35 +10,6 @@ import Scanner
 import Data.Maybe
 import Text.Parsec
 
--- program :: Parsec [Token] st [Token]
--- program = do
---             a <- programToken 
---             b <- idToken 
---             c <- beginToken 
---             d <- stmts
---             e <- endToken
---             eof
---             return (a:b:[c] ++ d ++ [e])
---
--- stmts :: Parsec [Token] st [Token]
--- stmts = do
---           first <- assign
---           next <- remaining_stmts
---           return (first ++ next)
---
--- remainingStmts :: Parsec [Token] st [Token]
--- remainingStmts = (do a <- semiColonToken
---                      b <- assign
---                      return (a:b)) <|> return []
---
--- stmtList :: StateType [Token]
--- stmtList = many stmtWithSemi
---   where
---     stmtWithSemi = do
---       s <- stmt
---       _ <- TT.kwSemicolumn
---       return s
-
 
 paramList :: StateType [Token]
 paramList = do
