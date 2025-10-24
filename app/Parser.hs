@@ -152,18 +152,18 @@ varDeclStmt = do
 forStmt :: StateType [Token]
 forStmt = do
     a <- TT.kwFor
-    b <- varDeclStmt
+    b <- optionMaybe varDeclStmt
     _ <- TT.kwSemicolumn
-    c <- expDecl
+    c <- optionMaybe expDecl
     _ <- TT.kwSemicolumn
-    d <- expDecl
+    d <- optionMaybe expDecl
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
     e <- stmtList
     _ <- TT.unindent
 
-    return (a : b ++ c ++ d ++ e)
+    return (a : fromMaybe [] b ++ fromMaybe [] c ++ fromMaybe [] d ++ e)
 
 -- TODO incomplete: missing some unimplemented stmt rules
 stmt :: StateType [Token]
