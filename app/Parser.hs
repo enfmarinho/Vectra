@@ -7,8 +7,10 @@ module Parser
 import SymbolTable
 import TerminalTokens as TT
 import Scanner
+import Data.Maybe
 import Types
 import Text.Parsec
+import qualified Text.Parsec as TT
 
 -- program :: Parsec [Token] st [Token]
 -- program = do
@@ -43,13 +45,12 @@ import Text.Parsec
 expStmt :: StateType [Token]
 expStmt = do
     t <- literal
-      <|> (:[]) <$> TT.kwReturn -- TODO this is wrong, just be an example of usage
     return t
 
 
 literal :: StateType [Token]
 literal = do
-    t <- TT.intLiteral 
+    t <- TT.intLiteral
       <|> TT.floatLiteral
       <|> TT.stringLiteral
       <|> TT.kwTrue
@@ -66,15 +67,30 @@ ifStmt = do
     _ <- TT.indent
     d <- stmtList
     _ <- TT.unindent
-    return ([a] ++ b ++ [c] ++ d)
+    e <- optionMaybe elseStmt
+    return $ [a] ++ b ++ [c] ++ d ++ fromMaybe [] e
 
+elseStmt :: StateType [Token]
+elseStmt = do
+    _ <- TT.newLine
+    a <- TT.kwElse
+    b <- ifStmt
+      <|> do
+            c <- TT.kwColumn
+            _ <- TT.newLine
+            _ <- TT.indent
+            d <- stmtList
+            _ <- TT.unindent
+            return $ c:d
+
+    return $ a : b
 
 assignStmt :: StateType [Token]
 assignStmt = do
           a <- TT.id
           b <- TT.kwAssingment
           c <- expStmt
-          -- TODO update symbol table
+          -- updateSymbol ("id lexema", IntType 1) -- TODO actually update the symbol table correctly
           return (a:b:c)
 
 
@@ -86,6 +102,7 @@ stmt = do
     return t
 
 
+-- TODO ignore TT.newLine in the begging
 stmtList :: StateType [Token]
 stmtList = do
     concat <$> (stmt `sepEndBy1` TT.newLine)
@@ -94,4 +111,4 @@ stmtList = do
 parser :: [Token] -> SymbolTableStackType -> IO (Either ParseError [Token])
 parser token_list table_stack = do
     -- TODO improve error message
-    runParserT stmtList table_stack "Error message" token_list 
+    runParserT stmtList table_stack "Error message" token_list
