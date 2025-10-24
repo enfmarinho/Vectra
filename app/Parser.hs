@@ -8,9 +8,7 @@ import SymbolTable
 import TerminalTokens as TT
 import Scanner
 import Data.Maybe
-import Types
 import Text.Parsec
-import qualified Text.Parsec as TT
 
 -- program :: Parsec [Token] st [Token]
 -- program = do
@@ -44,7 +42,8 @@ import qualified Text.Parsec as TT
 -- TODO this is incomplete
 expStmt :: StateType [Token]
 expStmt = do
-    t <- literal
+    t <- literal 
+        <|> typeDecl
     return t
 
 
@@ -93,18 +92,79 @@ assignStmt = do
           -- updateSymbol ("id lexema", IntType 1) -- TODO actually update the symbol table correctly
           return (a:b:c)
 
+whileStmt :: StateType [Token]
+whileStmt = do
+    a <- TT.kwWhile
+    b <- expStmt
+    _ <- TT.kwColumn
+    _ <- TT.newLine
+    _ <- TT.indent
+    c <- stmtList
+    _ <- TT.unindent
+    return (a:b ++ c)
 
+
+-- TODO better name this ?
+typeDecl :: StateType [Token]
+typeDecl = do
+    a <- (:[]) <$> TT.kwInt
+        <|> (:[]) <$> TT.kwFloat
+        <|> (:[]) <$> TT.kwBool
+        <|> (:[]) <$> TT.kwString
+        <|> do
+            a <- TT.kwRef
+            _ <- TT.openParen
+            b <- typeDecl
+            _ <- TT.closeParen
+            return (a : b)
+        <|> do
+            a <- TT.id
+            -- TODO check if id is a valid type, i.e. if there is a block declaration that matches id in the symbol table
+            return [a]
+    return a
+
+
+varDeclStmt :: StateType [Token]
+varDeclStmt = do
+    a <- typeDecl
+    -- TODO will this cause problems considering that assignStmt also consumes a TT.id at first ? 
+    -- maybe one of those shift-reduce errors ? I don't think it will, since i believe it will go down the route that 
+    -- consumes more tokens but I'm unsure about it
+    b <- assignStmt
+      <|> (:[]) <$> TT.id
+
+    return $ a ++ b
+
+forStmt :: StateType [Token]
+forStmt = do
+    a <- TT.kwFor
+    b <- varDeclStmt
+    _ <- TT.kwSemicolumn
+    c <- expStmt
+    _ <- TT.kwSemicolumn
+    d <- expStmt
+    _ <- TT.kwColumn
+    _ <- TT.newLine
+    _ <- TT.indent
+    e <- stmtList
+    _ <- TT.unindent
+
+    return (a : b ++ c ++ d ++ e)
+
+-- TODO SHIFT REDUCE BUGS 😭😭😭😭😭 assignStmt and expStmt matches ID, easy to fix bug annoying 
 stmt :: StateType [Token]
 stmt = do
-    t <- expStmt
-      <|> assignStmt
+    t <- assignStmt
+      <|> expStmt
       <|> ifStmt
+      <|> whileStmt
+      <|> forStmt
     return t
-
 
 -- TODO ignore TT.newLine in the begging
 stmtList :: StateType [Token]
 stmtList = do
+    _ <- optionMaybe TT.newLine
     concat <$> (stmt `sepEndBy1` TT.newLine)
 
 
