@@ -54,6 +54,8 @@ tokens :-
     else         { \aInp _ -> do t <- handleIndentation (KW_ELSE (alexPos aInp)); return $ Just t }
     while        { \aInp _ -> do t <- handleIndentation (KW_WHILE (alexPos aInp)); return $ Just t }
     for          { \aInp _ -> do t <- handleIndentation (KW_FOR (alexPos aInp)); return $ Just t }
+    break        { \aInp _ -> do t <- handleIndentation (KW_BREAK (alexPos aInp)); return $ Just t }
+    continue     { \aInp _ -> do t <- handleIndentation (KW_CONTINUE (alexPos aInp)); return $ Just t }
     block        { \aInp _ -> do t <- handleIndentation (KW_BLOCK (alexPos aInp)); return $ Just t }
     public       { \aInp _ -> do t <- handleIndentation (KW_PUBLIC (alexPos aInp)); return $ Just t }
     private      { \aInp _ -> do t <- handleIndentation (KW_PRIVATE (alexPos aInp)); return $ Just t }
@@ -205,6 +207,8 @@ data Token =
   KW_BOOL AlexPosn |
   KW_FOR AlexPosn |
   KW_WHILE AlexPosn |
+  KW_BREAK AlexPosn |
+  KW_CONTINUE AlexPosn |
   KW_REF AlexPosn |
   KW_DEREF AlexPosn |
   KW_FUNC AlexPosn |

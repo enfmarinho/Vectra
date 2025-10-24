@@ -155,6 +155,16 @@ kwWhile = tokenPrim show update_pos get_token where
   get_token (KW_WHILE pos) = Just (KW_WHILE pos)
   get_token _       = Nothing
 
+kwBreak :: StateType Token
+kwBreak = tokenPrim show update_pos get_token where
+  get_token (KW_BREAK pos) = Just (KW_BREAK pos)
+  get_token _       = Nothing
+
+kwContinue :: StateType Token
+kwContinue = tokenPrim show update_pos get_token where
+  get_token (KW_CONTINUE pos) = Just (KW_CONTINUE pos)
+  get_token _       = Nothing
+
 kwRef :: StateType Token
 kwRef = tokenPrim show update_pos get_token where
   get_token (KW_REF pos) = Just (KW_REF pos)
