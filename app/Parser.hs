@@ -39,9 +39,20 @@ import Text.Parsec
 --       _ <- TT.kwSemicolumn
 --       return s
 
--- TODO this is incomplete
-expStmt :: StateType [Token]
-expStmt = do
+
+paramList :: StateType [Token]
+paramList = do
+    concat <$> (varDeclStmt `sepEndBy1` TT.kwComma)
+
+callStmt :: StateType [Token]
+callStmt = do
+    a <- TT.id
+    _ <- TT.openParen
+    b <- paramList
+    _ <- TT.closeParen
+    -- TODO assure that exists a function called id and that there is no type error
+    return $ a:b
+
     t <- literal 
         <|> typeDecl
     return t
@@ -111,13 +122,13 @@ typeDecl = do
         <|> (:[]) <$> TT.kwFloat
         <|> (:[]) <$> TT.kwBool
         <|> (:[]) <$> TT.kwString
-        <|> do
+        <|> do -- refType
             a <- TT.kwRef
             _ <- TT.openParen
             b <- typeDecl
             _ <- TT.closeParen
             return (a : b)
-        <|> do
+        <|> do -- customType
             a <- TT.id
             -- TODO check if id is a valid type, i.e. if there is a block declaration that matches id in the symbol table
             return [a]
@@ -151,17 +162,15 @@ forStmt = do
 
     return (a : b ++ c ++ d ++ e)
 
--- TODO SHIFT REDUCE BUGS 😭😭😭😭😭 assignStmt and expStmt matches ID, easy to fix bug annoying 
+-- TODO incomplete: missing some unimplemented stmt rules
 stmt :: StateType [Token]
 stmt = do
     t <- assignStmt
-      <|> expStmt
       <|> ifStmt
       <|> whileStmt
       <|> forStmt
     return t
 
--- TODO ignore TT.newLine in the begging
 stmtList :: StateType [Token]
 stmtList = do
     _ <- optionMaybe TT.newLine
