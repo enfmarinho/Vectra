@@ -26,7 +26,12 @@ tokens :-
     "!"          { \aInp _ -> do t <- handleIndentation (OP_NOT (alexPos aInp)); return $ Just t }
     "&&"         { \aInp _ -> do t <- handleIndentation (OP_AND (alexPos aInp)); return $ Just t }
     "||"         { \aInp _ -> do t <- handleIndentation (OP_OR (alexPos aInp)); return $ Just t }
-    [\< \> \>= \>= == !=] { \aInp len -> do t <- handleIndentation (OP_COMPARE (alexPos aInp) (take len (alexInputStr aInp))); return $ Just t }
+    \<           { \aInp _ -> do t <- handleIndentation (OP_SMALLER (alexPos aInp)); return $ Just t }
+    \>           { \aInp _ -> do t <- handleIndentation (OP_GREATER (alexPos aInp)); return $ Just t }
+    \<=          { \aInp _ -> do t <- handleIndentation (OP_SMALLER_EQ (alexPos aInp)); return $ Just t }
+    \>=          { \aInp _ -> do t <- handleIndentation (OP_GREATER_EQ (alexPos aInp)); return $ Just t }
+    ==           { \aInp _ -> do t <- handleIndentation (OP_EQ (alexPos aInp)); return $ Just t }
+    !=           { \aInp _ -> do t <- handleIndentation (OP_NOT_EQ (alexPos aInp)); return $ Just t }
     "("          { \aInp _ -> do t <- handleIndentation (OPEN_PAREN (alexPos aInp)); return $ Just t }
     ")"          { \aInp _ -> do t <- handleIndentation (CLOSE_PAREN (alexPos aInp)); return $ Just t }
     "["          { \aInp _ -> do t <- handleIndentation (OPEN_BRACKET (alexPos aInp)); return $ Just t }
@@ -193,7 +198,12 @@ data Token =
   OP_SUB AlexPosn |
   OP_MULT AlexPosn |
   OP_DIV AlexPosn |
-  OP_COMPARE AlexPosn String |
+  OP_SMALLER AlexPosn |
+  OP_GREATER AlexPosn |
+  OP_SMALLER_EQ AlexPosn |
+  OP_GREATER_EQ AlexPosn |
+  OP_EQ AlexPosn |
+  OP_NOT_EQ AlexPosn |
   OPEN_PAREN AlexPosn |
   CLOSE_PAREN AlexPosn |
   OPEN_BRACKET AlexPosn |

@@ -79,10 +79,34 @@ opDiv = tokenPrim show update_pos get_token where
   get_token (OP_DIV pos) = Just (OP_DIV pos)
   get_token _       = Nothing
 
--- TODO: maybe not a string associated to it but a specific TOKEN for every possible comparison?
-opCompare :: StateType Token
-opCompare = tokenPrim show update_pos get_token where
-  get_token (OP_COMPARE pos s) = Just (OP_COMPARE pos s)
+opSmaller :: StateType Token
+opSmaller = tokenPrim show update_pos get_token where
+  get_token (OP_SMALLER pos) = Just (OP_SMALLER pos)
+  get_token _       = Nothing
+
+opGreater :: StateType Token
+opGreater = tokenPrim show update_pos get_token where
+  get_token (OP_GREATER pos) = Just (OP_GREATER pos)
+  get_token _       = Nothing
+
+opSmallerEq :: StateType Token
+opSmallerEq = tokenPrim show update_pos get_token where
+  get_token (OP_SMALLER_EQ pos) = Just (OP_SMALLER_EQ pos)
+  get_token _       = Nothing
+
+opGreaterEq :: StateType Token
+opGreaterEq = tokenPrim show update_pos get_token where
+  get_token (OP_GREATER_EQ pos) = Just (OP_GREATER_EQ pos)
+  get_token _       = Nothing
+
+opEq :: StateType Token
+opEq = tokenPrim show update_pos get_token where
+  get_token (OP_EQ pos) = Just (OP_EQ pos)
+  get_token _       = Nothing
+
+opNotEq :: StateType Token
+opNotEq = tokenPrim show update_pos get_token where
+  get_token (OP_NOT_EQ pos) = Just (OP_NOT_EQ pos)
   get_token _       = Nothing
 
 openParen :: StateType Token
