@@ -59,6 +59,7 @@ tokens :-
     else         { \aInp _ -> do t <- handleIndentation (KW_ELSE (alexPos aInp)); return $ Just t }
     while        { \aInp _ -> do t <- handleIndentation (KW_WHILE (alexPos aInp)); return $ Just t }
     for          { \aInp _ -> do t <- handleIndentation (KW_FOR (alexPos aInp)); return $ Just t }
+    foreach      { \aInp _ -> do t <- handleIndentation (KW_FOREACH (alexPos aInp)); return $ Just t }
     break        { \aInp _ -> do t <- handleIndentation (KW_BREAK (alexPos aInp)); return $ Just t }
     continue     { \aInp _ -> do t <- handleIndentation (KW_CONTINUE (alexPos aInp)); return $ Just t }
     block        { \aInp _ -> do t <- handleIndentation (KW_BLOCK (alexPos aInp)); return $ Just t }
@@ -216,6 +217,7 @@ data Token =
   KW_STRING AlexPosn |
   KW_BOOL AlexPosn |
   KW_FOR AlexPosn |
+  KW_FOREACH AlexPosn |
   KW_WHILE AlexPosn |
   KW_BREAK AlexPosn |
   KW_CONTINUE AlexPosn |
