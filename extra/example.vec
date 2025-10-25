@@ -1,26 +1,46 @@
 // This is an example of a program in the language 
 
-import matrix
-import "../meu_outro_arquivo."
+import Vector
+import assert
+import "../other_file.vec"
 
 const int x = 4
 
-block name:
-	public:
-		name():
-			x = 4
-		~name():
-			println("destructed")
-		int func get(): 
-			return x
+block Matrix:
+    public Matrix(int h, int w):
+        height = h
+        width = w
+        m.resize(h)
+        foreach l in m:
+            l.resize(w)
 
-        // TODO Missing implementation
-		matrix operator*(matrix lhs, matrix rhs)
-		matrix operator*(matrix lhs, int rhs)
-		matrix operator!(matrix lhs)
+    public ~Matrix():
+        println("destructed")
 
-	private:	
-		int x
+    public func operator[](int i) -> Vector:
+        return m[i]
+    public func at(int i, int j) -> int:  
+        return m[i][j]
+
+    public matrix operator+(matrix lhs, matrix rhs):
+        assert(lhs.width() == rhs.width())
+        assert(lhs.height() == rhs.height())
+
+        matrix r(lhs.height(), lhs.width());
+        for int i = 0; i < lhs.height(); i += 1:
+            for int j = 0; j < lhs.width(); j += 1:
+                r = lhs.at(i, j) + rhs.at(i, j)
+
+        return r
+
+    public matrix operator*(matrix lhs, int rhs):
+        foreach l in m:
+            foreach e in l:
+                e *= rhs
+
+    private Vector<Vector<int>> m;
+    private int height;
+    private int widht;
 
 enum DAY:
 	SEGUNDA,
@@ -31,29 +51,29 @@ enum DAY:
 	SABADO,
 	DOMINGO,
 
-// Procedure to swap two values 
-func swap(ref(int) a, ref(int) b):
-    int tmp
-
-    matrix a, b
-    matrix c = a * b
-
-    tmp = deref(a)
+// Procedure to swap two values, marking its return type as void is optional
+func swap(ref(int) a, ref(int) b) -> void:
+    int tmp = deref(a)
     deref(a) = deref(b)
     deref(b) = tmp
 
+func swap_xor(ref(int) a, ref(int) b) -> void:
+    deref(a) = deref(a) ^ deref(b)
+    deref(b) = deref(a) ^ deref(b)
+    deref(a) = deref(a) ^ deref(b)
+
 // Testing swap procedure
-int func main():
+func main() -> int:
     int x
     int y
-    ref(int) xr
-    ref(int) yr
+    ref(int) xr = ref(x)
+    ref(int) yr = ref(y)
 
     x = 42
     y = 84
-    xr = ref(x)
-    yr = ref(y)
     swap(xr, yr)
+
+    matrix m(x, y)
     
     if x > 80:
 	    println("x maior que 80")
@@ -64,7 +84,7 @@ int func main():
 	
 
     while x > 80:
-	    x--
+	    x -= 1
 
-    for int i = 0 i < 5 ++i:
+    for int i = 0; i < 5; i += 1:
 	    print(i)
