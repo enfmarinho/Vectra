@@ -64,8 +64,16 @@ blockList = do
     concat <$> (blockStmt `sepEndBy1` TT.kwComma)
     where
         blockStmt = do
-            -- TODO
-            return []
+            _isPublic <- do
+                        _ <- TT.kwPrivate 
+                        return False
+                    <|> do
+                        _ <- TT.kwPublic 
+                        return True
+                    <|> return True
+            a <- funcDecl <|> varDecl
+            -- TODO insert symbol to symbolTable
+            return a
 
 blockDecl :: StateType [Token]
 blockDecl = do
