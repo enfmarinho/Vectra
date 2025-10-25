@@ -83,6 +83,7 @@ blockDecl = do
     _ <- TT.indent
     b <- blockList
     _ <- TT.unindent
+    -- TODO insert symbol to symbolTable
     return $ a :b
 
 
@@ -94,6 +95,7 @@ enumDecl = do
     _ <- TT.newLine
     _ <- TT.indent 
     b <- idList
+    -- TODO insert symbol to symbolTable
     return $ a:b
 
 paramList :: StateType [Token]
@@ -244,6 +246,20 @@ optVarDeclList :: StateType [Token]
 optVarDeclList = do
     concat <$> (varDecl `sepBy` TT.kwComma)
 
+foreachStmt :: StateType [Token]
+foreachStmt = do
+    a <- TT.kwForeach
+    b <- TT.id
+    c <- TT.kwIn
+    d <- TT.id
+    _ <- TT.kwColumn
+    _ <- TT.newLine
+    _ <- TT.indent
+    e <- stmtList
+    _ <- TT.unindent
+
+    return $ [a] ++ [b] ++ [c] ++ [d] ++ e
+
 forStmt :: StateType [Token]
 forStmt = do
     a <- TT.kwFor
@@ -267,6 +283,7 @@ stmt = do
       <|> ifStmt
       <|> whileStmt
       <|> forStmt
+      <|> foreachStmt
     return t
 
 stmtList :: StateType [Token]
