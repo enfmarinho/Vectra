@@ -62,7 +62,7 @@ enumDecl = do
 
 paramList :: StateType [Token]
 paramList = do
-    concat <$> (varDeclStmt `sepEndBy1` TT.kwComma)
+    concat <$> (varDecl `sepEndBy1` TT.kwComma)
 
 callStmt :: StateType [Token]
 callStmt = do
@@ -186,8 +186,8 @@ typeDecl = do
     return a
 
 
-varDeclStmt :: StateType [Token]
-varDeclStmt = do
+varDecl :: StateType [Token]
+varDecl = do
     a <- typeDecl
     -- TODO will this cause problems considering that assignStmt also consumes a TT.id at first ? 
     -- maybe one of those shift-reduce errors ? I don't think it will, since i believe it will go down the route that 
@@ -200,7 +200,7 @@ varDeclStmt = do
 forStmt :: StateType [Token]
 forStmt = do
     a <- TT.kwFor
-    b <- optionMaybe varDeclStmt
+    b <- optionMaybe varDecl
     _ <- TT.kwSemicolumn
     c <- optionMaybe expDecl
     _ <- TT.kwSemicolumn
