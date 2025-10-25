@@ -10,6 +10,55 @@ import Scanner
 import Data.Maybe
 import Text.Parsec
 
+importCommand :: StateType [Token]
+importCommand = do
+    a <- TT.kwImport
+    b <- TT.id 
+        <|> TT.stringLiteral
+    return $ a:[b]
+
+
+idList :: StateType [Token]
+idList = do
+    concat <$> ids `sepEndBy1` TT.newLine
+    where 
+    ids = do
+        a <- TT.id
+        return [a]
+
+funcDecl :: StateType [Token]
+funcDecl = do
+    -- TODO
+    return []
+
+blockList :: StateType [Token]
+blockList = do
+    concat <$> (blockStmt `sepEndBy1` TT.kwComma)
+    where
+        blockStmt = do
+            -- TODO
+            return []
+
+blockDecl :: StateType [Token]
+blockDecl = do
+    _ <- TT.kwBlock
+    a <- TT.id
+    _ <- TT.kwColumn
+    _ <- TT.indent
+    b <- blockList
+    _ <- TT.unindent
+    return $ a :b
+
+
+enumDecl :: StateType [Token]
+enumDecl = do
+    _ <- TT.kwEnum
+    a <- TT.id
+    _ <- TT.kwColumn
+    _ <- TT.newLine
+    _ <- TT.indent 
+    b <- idList
+    return $ a:b
 
 paramList :: StateType [Token]
 paramList = do
@@ -19,7 +68,7 @@ callStmt :: StateType [Token]
 callStmt = do
     a <- TT.id
     _ <- TT.openParen
-    b <- paramList
+    b <- idList
     _ <- TT.closeParen
     -- TODO assure that exists a function called id and that there is no type error
     return $ a:b
@@ -29,6 +78,34 @@ expDecl :: StateType [Token]
 expDecl = do
     t <- literal 
         <|> typeDecl
+        -- <|> do -- ComparisonExp
+        --     a <- expDecl
+        --     b <- TT.opCompare
+        --     c <- expDecl
+        --     return (a ++ [b] ++ c)
+        -- <|> do -- refVarExp
+        --     a <- TT.kwRef
+        --     _ <- TT.openParen
+        --     b <- TT.id
+        --     _ <- TT.closeParen
+        --     return $ a:[b] 
+        -- <|> do -- derefVarExp
+        --     a <- TT.kwRef
+        --     _ <- TT.openParen
+        --     b <- TT.id
+        --     _ <- TT.closeParen
+        --     return $ a:[b] 
+        -- <|> do -- varExp
+        --     -- TODO
+        --     return []
+        -- <|> do -- (exp)
+        --     _ <- TT.openParen
+        --     a <- expDecl
+        --     _ <- TT.closeParen
+        --     return a
+        -- <|> callStmt
+            
+            
     return t
 
 
@@ -84,7 +161,7 @@ whileStmt = do
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
-    c <- stmtList
+    c <- stmtList -- TODO this also has to include 'continue' and 'break' so... maybe a stmtListLoop to include those kws? 
     _ <- TT.unindent
     return (a:b ++ c)
 
@@ -131,7 +208,7 @@ forStmt = do
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
-    e <- stmtList
+    e <- stmtList -- TODO this also has to include 'continue' and 'break' so... maybe a stmtListLoop to include those kws? 
     _ <- TT.unindent
 
     return (a : fromMaybe [] b ++ fromMaybe [] c ++ fromMaybe [] d ++ e)
