@@ -20,7 +20,7 @@ importCommand = do
 
 idList :: StateType [Token]
 idList = do
-    concat <$> ids `sepEndBy1` TT.newLine
+    concat <$> (ids `sepEndBy1` TT.newLine)
     where 
     ids = do
         a <- TT.id
@@ -28,7 +28,7 @@ idList = do
 
 globalDeclList :: StateType [Token]
 globalDeclList = do
-    concat <$> globalDecl `sepEndBy` TT.newLine
+    concat <$> (globalDecl `sepEndBy` TT.newLine)
     where 
         globalDecl = do
             a <- blockDecl
@@ -40,8 +40,24 @@ globalDeclList = do
 
 funcDecl :: StateType [Token]
 funcDecl = do
-    -- TODO
-    return []
+    a <- TT.kwFunc
+    b <- TT.id
+    _ <- TT.openParen
+    c <- optVarDeclList
+    _ <- TT.closeParen
+    d <- optionMaybe returnDecl
+    _ <- TT.kwColumn
+    _ <- TT.newLine
+    _ <- TT.indent
+    e <- stmtList
+    _ <- TT.unindent
+    return $ [a] ++ [b] ++ c ++ fromMaybe [] d ++ e
+    where
+        returnDecl = do
+            _ <- TT.opSub
+            _ <- TT.opGreater
+            a <- typeDecl
+            return a
 
 blockList :: StateType [Token]
 blockList = do
@@ -215,6 +231,10 @@ varDecl = do
       <|> (:[]) <$> TT.id
 
     return $ a ++ b
+
+optVarDeclList :: StateType [Token]
+optVarDeclList = do
+    concat <$> (varDecl `sepBy` TT.kwComma)
 
 forStmt :: StateType [Token]
 forStmt = do
