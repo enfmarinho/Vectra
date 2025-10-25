@@ -26,6 +26,18 @@ idList = do
         a <- TT.id
         return [a]
 
+globalDeclList :: StateType [Token]
+globalDeclList = do
+    concat <$> globalDecl `sepEndBy` TT.newLine
+    where 
+        globalDecl = do
+            a <- blockDecl
+                <|> enumDecl
+                <|> funcDecl
+                <|> varDecl
+            return a 
+
+
 funcDecl :: StateType [Token]
 funcDecl = do
     -- TODO
