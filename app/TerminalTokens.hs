@@ -179,6 +179,11 @@ kwForeach = tokenPrim show update_pos get_token where
   get_token (KW_FOREACH pos) = Just (KW_FOREACH pos)
   get_token _       = Nothing
 
+kwIn :: StateType Token
+kwIn = tokenPrim show update_pos get_token where
+  get_token (KW_IN pos) = Just (KW_IN pos)
+  get_token _       = Nothing
+
 kwWhile :: StateType Token
 kwWhile = tokenPrim show update_pos get_token where
   get_token (KW_WHILE pos) = Just (KW_WHILE pos)
