@@ -188,7 +188,14 @@ typeDecl = do
 
 varDecl :: StateType [Token]
 varDecl = do
-    a <- typeDecl
+    a <- do 
+            b <- TT.kwConst
+            c <- typeDecl
+            return $ b:c
+        <|> do
+             b <- typeDecl
+             return b
+
     -- TODO will this cause problems considering that assignStmt also consumes a TT.id at first ? 
     -- maybe one of those shift-reduce errors ? I don't think it will, since i believe it will go down the route that 
     -- consumes more tokens but I'm unsure about it
