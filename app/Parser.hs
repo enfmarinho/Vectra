@@ -10,6 +10,12 @@ import Scanner
 import Data.Maybe
 import Text.Parsec
 
+vectraLanguage :: StateType [Token]
+vectraLanguage = do
+    a <- concat <$> importCommand `sepEndBy` TT.newLine
+    b <- optionMaybe globalDeclList
+    return $ a ++ fromMaybe [] b
+
 importCommand :: StateType [Token]
 importCommand = do
     a <- TT.kwImport
