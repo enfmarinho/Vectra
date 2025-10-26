@@ -226,11 +226,14 @@ varDecl :: StateType [Token]
 varDecl = do
     _a <- optionMaybe TT.kwConst
     b <- typeDecl
+    c <- TT.id
+    d <- do
+            e <- TT.kwAssingment
+            f <- expDecl
+            return $ e:f
+        <|> return []
 
-    c <- try assignStmt
-      <|> (:[]) <$> TT.id
-
-    return $ b ++ c
+    return $ b ++ [c] ++ d
 
 optVarDeclList :: StateType [Token]
 optVarDeclList = do
