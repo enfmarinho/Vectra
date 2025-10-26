@@ -22,6 +22,7 @@ tokens :-
     ";"          { \aInp _ -> do t <- handleIndentation (KW_SEMICOLUMN (alexPos aInp)); return $ Just t }
     ":"          { \aInp _ -> do t <- handleIndentation (KW_COLUMN (alexPos aInp)); return $ Just t }
     ","          { \aInp _ -> do t <- handleIndentation (KW_COMMA (alexPos aInp)); return $ Just t }
+    "."          { \aInp _ -> do t <- handleIndentation (KW_DOT (alexPos aInp)); return $ Just t }
     "="          { \aInp _ -> do t <- handleIndentation (KW_ASSIGNMENT (alexPos aInp)); return $ Just t }
     "!"          { \aInp _ -> do t <- handleIndentation (OP_NOT (alexPos aInp)); return $ Just t }
     "&&"         { \aInp _ -> do t <- handleIndentation (OP_AND (alexPos aInp)); return $ Just t }
@@ -192,6 +193,7 @@ data Token =
   KW_SEMICOLUMN AlexPosn |
   KW_COLUMN AlexPosn |
   KW_COMMA AlexPosn |
+  KW_DOT AlexPosn |
   KW_ASSIGNMENT AlexPosn |
   OP_NOT AlexPosn |
   OP_AND AlexPosn |

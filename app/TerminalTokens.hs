@@ -39,6 +39,11 @@ kwComma = tokenPrim show update_pos get_token where
   get_token (KW_COMMA pos) = Just (KW_COMMA pos)
   get_token _       = Nothing
 
+kwDot :: StateType Token
+kwDot = tokenPrim show update_pos get_token where
+  get_token (KW_DOT pos) = Just (KW_DOT pos)
+  get_token _       = Nothing
+
 kwAssingment :: StateType Token
 kwAssingment = tokenPrim show update_pos get_token where
   get_token (KW_ASSIGNMENT pos) = Just (KW_ASSIGNMENT pos)
