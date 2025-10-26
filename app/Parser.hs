@@ -227,10 +227,7 @@ varDecl = do
     _a <- optionMaybe TT.kwConst
     b <- typeDecl
 
-    -- TODO will this cause problems considering that assignStmt also consumes a TT.id at first ? 
-    -- maybe one of those shift-reduce errors ? I don't think it will, since i believe it will go down the route that 
-    -- consumes more tokens but I'm unsure about it
-    c <- assignStmt
+    c <- try assignStmt
       <|> (:[]) <$> TT.id
 
     return $ b ++ c
