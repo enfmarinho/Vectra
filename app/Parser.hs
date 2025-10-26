@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Redundant return" #-}
 module Parser
   ( parser
   ) where
@@ -19,7 +18,7 @@ vectraLanguage = do
 importCommand :: StateType [Token]
 importCommand = do
     a <- TT.kwImport
-    b <- TT.id 
+    b <- TT.id
         <|> TT.stringLiteral
     return $ a:[b]
 
@@ -27,7 +26,7 @@ importCommand = do
 idList :: StateType [Token]
 idList = do
     concat <$> (ids `sepEndBy1` TT.newLine)
-    where 
+    where
     ids = do
         a <- TT.id
         return [a]
@@ -35,13 +34,12 @@ idList = do
 globalDeclList :: StateType [Token]
 globalDeclList = do
     concat <$> (globalDecl `sepEndBy` TT.newLine)
-    where 
+    where
         globalDecl = do
-            a <- blockDecl
-                <|> enumDecl
-                <|> funcDecl
-                <|> varDecl
-            return a 
+            blockDecl
+            <|> enumDecl
+            <|> funcDecl
+            <|> varDecl
 
 
 funcDecl :: StateType [Token]
@@ -62,8 +60,7 @@ funcDecl = do
         returnDecl = do
             _ <- TT.opSub
             _ <- TT.opGreater
-            a <- typeDecl
-            return a
+            typeDecl
 
 blockList :: StateType [Token]
 blockList = do
@@ -71,15 +68,14 @@ blockList = do
     where
         blockStmt = do
             _isPublic <- do
-                        _ <- TT.kwPrivate 
+                        _ <- TT.kwPrivate
                         return False
                     <|> do
-                        _ <- TT.kwPublic 
+                        _ <- TT.kwPublic
                         return True
                     <|> return True
-            a <- funcDecl <|> varDecl
+            funcDecl <|> varDecl
             -- TODO insert symbol to symbolTable
-            return a
 
 blockDecl :: StateType [Token]
 blockDecl = do
@@ -99,7 +95,7 @@ enumDecl = do
     a <- TT.id
     _ <- TT.kwColumn
     _ <- TT.newLine
-    _ <- TT.indent 
+    _ <- TT.indent
     b <- idList
     -- TODO insert symbol to symbolTable
     return $ a:b
@@ -120,37 +116,34 @@ callStmt = do
 -- TODO better name this ? 
 expDecl :: StateType [Token]
 expDecl = do
-    t <- literal 
-        <|> typeDecl
-        -- <|> do -- ComparisonExp
-        --     a <- expDecl
-        --     b <- TT.opCompare
-        --     c <- expDecl
-        --     return (a ++ [b] ++ c)
-        -- <|> do -- refVarExp
-        --     a <- TT.kwRef
-        --     _ <- TT.openParen
-        --     b <- TT.id
-        --     _ <- TT.closeParen
-        --     return $ a:[b] 
-        -- <|> do -- derefVarExp
-        --     a <- TT.kwRef
-        --     _ <- TT.openParen
-        --     b <- TT.id
-        --     _ <- TT.closeParen
-        --     return $ a:[b] 
-        -- <|> do -- varExp
-        --     -- TODO
-        --     return []
-        -- <|> do -- (exp)
-        --     _ <- TT.openParen
-        --     a <- expDecl
-        --     _ <- TT.closeParen
-        --     return a
-        -- <|> callStmt
-            
-            
-    return t
+    literal
+    <|> typeDecl
+    -- <|> do -- ComparisonExp
+    --     a <- expDecl
+    --     b <- TT.opCompare
+    --     c <- expDecl
+    --     return (a ++ [b] ++ c)
+    -- <|> do -- refVarExp
+    --     a <- TT.kwRef
+    --     _ <- TT.openParen
+    --     b <- TT.id
+    --     _ <- TT.closeParen
+    --     return $ a:[b] 
+    -- <|> do -- derefVarExp
+    --     a <- TT.kwRef
+    --     _ <- TT.openParen
+    --     b <- TT.id
+    --     _ <- TT.closeParen
+    --     return $ a:[b] 
+    -- <|> do -- varExp
+    --     -- TODO
+    --     return []
+    -- <|> do -- (exp)
+    --     _ <- TT.openParen
+    --     a <- expDecl
+    --     _ <- TT.closeParen
+    --     return a
+    -- <|> callStmt
 
 
 literal :: StateType [Token]
@@ -213,40 +206,34 @@ whileStmt = do
 -- TODO better name this ?
 typeDecl :: StateType [Token]
 typeDecl = do
-    a <- (:[]) <$> TT.kwInt
-        <|> (:[]) <$> TT.kwFloat
-        <|> (:[]) <$> TT.kwBool
-        <|> (:[]) <$> TT.kwString
-        <|> do -- refType
-            a <- TT.kwRef
-            _ <- TT.openParen
-            b <- typeDecl
-            _ <- TT.closeParen
-            return (a : b)
-        <|> do -- customType
-            a <- TT.id
-            -- TODO check if id is a valid type, i.e. if there is a block declaration that matches id in the symbol table
-            return [a]
-    return a
+    (:[]) <$> TT.kwInt
+    <|> (:[]) <$> TT.kwFloat
+    <|> (:[]) <$> TT.kwBool
+    <|> (:[]) <$> TT.kwString
+    <|> do -- refType
+        a <- TT.kwRef
+        _ <- TT.openParen
+        b <- typeDecl
+        _ <- TT.closeParen
+        return (a : b)
+    <|> do -- customType
+        a <- TT.id
+        -- TODO check if id is a valid type, i.e. if there is a block declaration that matches id in the symbol table
+        return [a]
 
 
 varDecl :: StateType [Token]
 varDecl = do
-    a <- do 
-            b <- TT.kwConst
-            c <- typeDecl
-            return $ b:c
-        <|> do
-             b <- typeDecl
-             return b
+    _a <- optionMaybe TT.kwConst
+    b <- typeDecl
 
     -- TODO will this cause problems considering that assignStmt also consumes a TT.id at first ? 
     -- maybe one of those shift-reduce errors ? I don't think it will, since i believe it will go down the route that 
     -- consumes more tokens but I'm unsure about it
-    b <- assignStmt
+    c <- assignStmt
       <|> (:[]) <$> TT.id
 
-    return $ a ++ b
+    return $ b ++ c
 
 optVarDeclList :: StateType [Token]
 optVarDeclList = do
@@ -285,12 +272,11 @@ forStmt = do
 -- TODO incomplete: missing some unimplemented stmt rules
 stmt :: StateType [Token]
 stmt = do
-    t <- assignStmt
-      <|> ifStmt
-      <|> whileStmt
-      <|> forStmt
-      <|> foreachStmt
-    return t
+    assignStmt
+    <|> ifStmt
+    <|> whileStmt
+    <|> forStmt
+    <|> foreachStmt
 
 stmtList :: StateType [Token]
 stmtList = do
