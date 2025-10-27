@@ -29,27 +29,6 @@ vectraLanguage = do
             <|> funcDecl
             <|> varDecl
 
-
-funcDecl :: StateType [Token]
-funcDecl = do
-    a <- TT.kwFunc
-    b <- TT.id
-    _ <- TT.openParen
-    c <- optVarDeclList
-    _ <- TT.closeParen
-    d <- optionMaybe returnDecl
-    _ <- TT.kwColumn
-    _ <- TT.newLine
-    _ <- TT.indent
-    e <- stmtList
-    _ <- TT.unindent
-    return $ [a] ++ [b] ++ c ++ fromMaybe [] d ++ e
-    where
-        returnDecl = do
-            _ <- TT.opSub
-            _ <- TT.opGreater
-            typeDecl
-
 blockDecl :: StateType [Token]
 blockDecl = do
     _ <- TT.kwBlock
@@ -93,6 +72,44 @@ enumDecl = do
                 a <- TT.id
                 return [a]
 
+funcDecl :: StateType [Token]
+funcDecl = do
+    a <- TT.kwFunc
+    b <- TT.id
+    _ <- TT.openParen
+    c <- optVarDeclList
+    _ <- TT.closeParen
+    d <- optionMaybe returnDecl
+    _ <- TT.kwColumn
+    _ <- TT.newLine
+    _ <- TT.indent
+    e <- stmtList
+    _ <- TT.unindent
+    return $ [a] ++ [b] ++ c ++ fromMaybe [] d ++ e
+    where
+        returnDecl = do
+            _ <- TT.opSub
+            _ <- TT.opGreater
+            typeDecl
+
+        optVarDeclList :: StateType [Token]
+        optVarDeclList = do
+            concat <$> (varDecl `sepBy` TT.kwComma)
+
+
+varDecl :: StateType [Token]
+varDecl = do
+    _a <- optionMaybe TT.kwConst
+    b <- typeDecl
+    c <- TT.id
+    d <- do
+            e <- TT.kwAssingment
+            f <- expStmt
+            return $ e:f
+        <|> return []
+
+    return $ b ++ [c] ++ d
+
 var :: StateType [Token]
 var = do
     a <- TT.id
@@ -112,6 +129,15 @@ callStmt = do
     _ <- TT.closeParen
     -- TODO assure that exists a function called id and that there is no type error
     return $ a ++ b
+
+literal :: StateType [Token]
+literal = do
+    t <- TT.intLiteral
+      <|> TT.floatLiteral
+      <|> TT.stringLiteral
+      <|> TT.kwTrue
+      <|> TT.kwFalse
+    return [t]
 
 expStmtList :: StateType [Token]
 expStmtList = do
@@ -148,16 +174,26 @@ expStmt = do
     --     return a
     -- <|> callStmt
 
+stmtList :: StateType [Token]
+stmtList = do
+    _ <- optionMaybe TT.newLine
+    concat <$> (stmt `sepEndBy1` TT.newLine)
+    where 
+        stmt :: StateType [Token]
+        stmt = do
+            assignStmt
+            <|> ifStmt
+            <|> whileStmt
+            <|> forStmt
+            <|> foreachStmt
 
-literal :: StateType [Token]
-literal = do
-    t <- TT.intLiteral
-      <|> TT.floatLiteral
-      <|> TT.stringLiteral
-      <|> TT.kwTrue
-      <|> TT.kwFalse
-    return [t]
-
+assignStmt :: StateType [Token]
+assignStmt = do
+          a <- TT.id
+          b <- TT.kwAssingment
+          c <- expStmt
+          -- updateSymbol ("id lexema", IntType 1) -- TODO actually update the symbol table correctly
+          return (a:b:c)
 
 ifStmt :: StateType [Token]
 ifStmt = do
@@ -186,14 +222,6 @@ elseStmt = do
 
     return $ a : b
 
-assignStmt :: StateType [Token]
-assignStmt = do
-          a <- TT.id
-          b <- TT.kwAssingment
-          c <- expStmt
-          -- updateSymbol ("id lexema", IntType 1) -- TODO actually update the symbol table correctly
-          return (a:b:c)
-
 whileStmt :: StateType [Token]
 whileStmt = do
     a <- TT.kwWhile
@@ -209,7 +237,7 @@ whileStmt = do
 -- TODO better name this ?
 typeDecl :: StateType [Token]
 typeDecl = do
-    (:[]) <$> TT.kwInt
+        (:[]) <$> TT.kwInt
     <|> (:[]) <$> TT.kwFloat
     <|> (:[]) <$> TT.kwBool
     <|> (:[]) <$> TT.kwString
@@ -223,38 +251,6 @@ typeDecl = do
         a <- TT.id
         -- TODO check if id is a valid type, i.e. if there is a block declaration that matches id in the symbol table
         return [a]
-
-
-varDecl :: StateType [Token]
-varDecl = do
-    _a <- optionMaybe TT.kwConst
-    b <- typeDecl
-    c <- TT.id
-    d <- do
-            e <- TT.kwAssingment
-            f <- expStmt
-            return $ e:f
-        <|> return []
-
-    return $ b ++ [c] ++ d
-
-optVarDeclList :: StateType [Token]
-optVarDeclList = do
-    concat <$> (varDecl `sepBy` TT.kwComma)
-
-foreachStmt :: StateType [Token]
-foreachStmt = do
-    a <- TT.kwForeach
-    b <- TT.id
-    c <- TT.kwIn
-    d <- TT.id
-    _ <- TT.kwColumn
-    _ <- TT.newLine
-    _ <- TT.indent
-    e <- stmtList
-    _ <- TT.unindent
-
-    return $ [a] ++ [b] ++ [c] ++ [d] ++ e
 
 forStmt :: StateType [Token]
 forStmt = do
@@ -272,20 +268,19 @@ forStmt = do
 
     return (a : fromMaybe [] b ++ fromMaybe [] c ++ fromMaybe [] d ++ e)
 
--- TODO incomplete: missing some unimplemented stmt rules
-stmt :: StateType [Token]
-stmt = do
-    assignStmt
-    <|> ifStmt
-    <|> whileStmt
-    <|> forStmt
-    <|> foreachStmt
+foreachStmt :: StateType [Token]
+foreachStmt = do
+    a <- TT.kwForeach
+    b <- TT.id
+    c <- TT.kwIn
+    d <- TT.id
+    _ <- TT.kwColumn
+    _ <- TT.newLine
+    _ <- TT.indent
+    e <- stmtList
+    _ <- TT.unindent
 
-stmtList :: StateType [Token]
-stmtList = do
-    _ <- optionMaybe TT.newLine
-    concat <$> (stmt `sepEndBy1` TT.newLine)
-
+    return $ [a] ++ [b] ++ [c] ++ [d] ++ e
 
 parser :: [Token] -> SymbolTableStackType -> IO (Either ParseError [Token])
 parser token_list table_stack = do
