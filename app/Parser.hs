@@ -104,14 +104,28 @@ paramList :: StateType [Token]
 paramList = do
     concat <$> (varDecl `sepEndBy1` TT.kwComma)
 
+var :: StateType [Token]
+var = do
+    a <- TT.id
+    b <- optionMaybe memberAccess
+    return $ a:fromMaybe [] b
+    where 
+        memberAccess = do
+            _ <- TT.kwDot
+            var 
+
 callStmt :: StateType [Token]
 callStmt = do
-    a <- TT.id
+    a <- var
     _ <- TT.openParen
-    b <- idList
+    b <- expStmtList
     _ <- TT.closeParen
     -- TODO assure that exists a function called id and that there is no type error
-    return $ a:b
+    return $ a ++ b
+
+expStmtList :: StateType [Token]
+expStmtList = do
+    concat <$> (expStmt `sepBy` TT.kwComma)
 
 expStmt :: StateType [Token]
 expStmt = do
