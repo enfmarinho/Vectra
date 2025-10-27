@@ -52,8 +52,29 @@ blockDecl = do
                             <|> return True
                     -- TODO check of KW_TIL, marking that the method is the function destructor, if so 
                     -- confirm that funcDecl name is the same as the block name
-                    funcDecl <|> varDecl
+                    varDecl
+                    <|> do
+                        a <- TT.kwFunc
+                        -- TODO maybe add const functions to blocks
+                        b <- TT.id
+                        c <- optionMaybe operatorSymbol
+                        -- TODO if operatorSymbol is Just, id lexeme must be "operator"
+                        d <- funcDeclAux
+                        return $ [a] ++ [b] ++ fromMaybe [] c ++ d
                     -- TODO insert symbol to symbolTable
+                operatorSymbol = do
+                    (:[]) <$> (TT.opAdd 
+                            <|> TT.opSub
+                            <|> TT.opMult
+                            <|> TT.opDiv
+                            <|> TT.opAnd
+                            <|> TT.opOr
+                            <|> TT.opNot
+                            <|> do
+                                a <- TT.openBracket
+                                _ <- TT.closeBracket
+                                return a
+                            )
 
 enumDecl :: StateType [Token]
 enumDecl = do
@@ -76,6 +97,11 @@ funcDecl :: StateType [Token]
 funcDecl = do
     a <- TT.kwFunc
     b <- TT.id
+    c <- funcDeclAux
+    return $ [a] ++ [b] ++ c
+
+funcDeclAux :: StateType [Token]
+funcDeclAux = do
     _ <- TT.openParen
     c <- optVarDeclList
     _ <- TT.closeParen
@@ -85,7 +111,7 @@ funcDecl = do
     _ <- TT.indent
     e <- stmtList
     _ <- TT.unindent
-    return $ [a] ++ [b] ++ c ++ fromMaybe [] d ++ e
+    return $ c ++ fromMaybe [] d ++ e
     where
         returnDecl = do
             _ <- TT.opSub
