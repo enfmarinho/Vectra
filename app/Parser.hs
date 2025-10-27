@@ -22,15 +22,6 @@ importCommand = do
         <|> TT.stringLiteral
     return $ a:[b]
 
-
-idList :: StateType [Token]
-idList = do
-    concat <$> (ids `sepEndBy1` TT.newLine)
-    where
-    ids = do
-        a <- TT.id
-        return [a]
-
 globalDeclList :: StateType [Token]
 globalDeclList = do
     concat <$> (globalDecl `sepEndBy` TT.newLine)
@@ -99,6 +90,12 @@ enumDecl = do
     b <- idList
     -- TODO insert symbol to symbolTable
     return $ a:b
+    where idList = do
+            concat <$> (ids `sepEndBy1` TT.newLine)
+            where
+            ids = do
+                a <- TT.id
+                return [a]
 
 paramList :: StateType [Token]
 paramList = do
