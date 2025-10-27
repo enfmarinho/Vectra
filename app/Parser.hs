@@ -56,12 +56,15 @@ blockDecl = do
                     <|> do
                         a <- TT.kwFunc
                         -- TODO maybe add const functions to blocks
-                        b <- TT.id
-                        c <- optionMaybe operatorSymbol
+                        b <- optionMaybe destructorDecl
+                        c <- TT.id
+                        d <- optionMaybe operatorSymbol
                         -- TODO if operatorSymbol is Just, id lexeme must be "operator"
-                        d <- funcDeclAux
-                        return $ [a] ++ [b] ++ fromMaybe [] c ++ d
+                        e <- funcDeclAux
+                        return $ [a] ++ fromMaybe [] b ++ [c] ++ fromMaybe [] d ++ e
                     -- TODO insert symbol to symbolTable
+                destructorDecl = do
+                    (:[]) <$> TT.kwTil
                 operatorSymbol = do
                     (:[]) <$> (TT.opAdd 
                             <|> TT.opSub
