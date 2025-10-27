@@ -9,6 +9,8 @@ import Scanner
 import Data.Maybe
 import Text.Parsec
 
+-- TODO what about the template problem ? 
+
 vectraLanguage :: StateType [Token]
 vectraLanguage = do
     a <- concat <$> importCommand `sepEndBy` TT.newLine
@@ -66,6 +68,7 @@ blockDecl = do
                 destructorDecl = do
                     (:[]) <$> TT.kwTil
                 operatorSymbol = do
+                    -- TODO add missing operator symbols such as the comparison ones
                     (:[]) <$> (TT.opAdd 
                             <|> TT.opSub
                             <|> TT.opMult
@@ -172,6 +175,7 @@ expStmtList :: StateType [Token]
 expStmtList = do
     concat <$> (expStmt `sepBy` TT.kwComma)
 
+-- TODO allow [] 
 expStmt :: StateType [Token]
 expStmt = do
     literal
@@ -216,13 +220,25 @@ stmtList = do
             <|> forStmt
             <|> foreachStmt
 
+mathOpSymbol :: StateType [Token]
+mathOpSymbol = do
+    -- TODO add missing operator symbols such as the comparison ones
+    (:[]) <$> (TT.opAdd 
+            <|> TT.opSub
+            <|> TT.opMult
+            <|> TT.opDiv
+            <|> TT.opAnd
+            <|> TT.opOr
+            <|> TT.opNot)
+
 assignStmt :: StateType [Token]
 assignStmt = do
           a <- TT.id
-          b <- TT.kwAssingment
-          c <- expStmt
+          b <- optionMaybe mathOpSymbol
+          c <- TT.kwAssingment
+          d <- expStmt
           -- updateSymbol ("id lexema", IntType 1) -- TODO actually update the symbol table correctly
-          return (a:b:c)
+          return $ a:fromMaybe [] b ++ c:d
 
 ifStmt :: StateType [Token]
 ifStmt = do
