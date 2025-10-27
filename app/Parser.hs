@@ -113,9 +113,8 @@ callStmt = do
     -- TODO assure that exists a function called id and that there is no type error
     return $ a:b
 
--- TODO better name this ? 
-expDecl :: StateType [Token]
-expDecl = do
+expStmt :: StateType [Token]
+expStmt = do
     literal
     <|> typeDecl
     -- <|> do -- ComparisonExp
@@ -159,7 +158,7 @@ literal = do
 ifStmt :: StateType [Token]
 ifStmt = do
     a <- TT.kwIf
-    b <- expDecl
+    b <- expStmt
     c <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
@@ -187,14 +186,14 @@ assignStmt :: StateType [Token]
 assignStmt = do
           a <- TT.id
           b <- TT.kwAssingment
-          c <- expDecl
+          c <- expStmt
           -- updateSymbol ("id lexema", IntType 1) -- TODO actually update the symbol table correctly
           return (a:b:c)
 
 whileStmt :: StateType [Token]
 whileStmt = do
     a <- TT.kwWhile
-    b <- expDecl
+    b <- expStmt
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
@@ -229,7 +228,7 @@ varDecl = do
     c <- TT.id
     d <- do
             e <- TT.kwAssingment
-            f <- expDecl
+            f <- expStmt
             return $ e:f
         <|> return []
 
@@ -258,9 +257,9 @@ forStmt = do
     a <- TT.kwFor
     b <- optionMaybe varDecl
     _ <- TT.kwSemicolumn
-    c <- optionMaybe expDecl
+    c <- optionMaybe expStmt
     _ <- TT.kwSemicolumn
-    d <- optionMaybe expDecl
+    d <- optionMaybe expStmt
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
