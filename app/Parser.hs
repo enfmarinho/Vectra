@@ -10,6 +10,10 @@ import Data.Maybe
 import Text.Parsec
 
 -- TODO what about the template problem ? 
+-- TODO how the code will be run ? 
+-- TODO how type Function store the function declaration, i.e. the code it associated to it 
+-- TODO how Enums will be stored internally ? Maybe IntTypes ? If so, will the user be able 
+--      to assign int values to the labels and do arithmetic operations with the labels normally ? 
 
 vectraLanguage :: StateType [Token]
 vectraLanguage = do
@@ -292,20 +296,29 @@ whileStmt = do
 
 typeStmt :: StateType [Token]
 typeStmt = do
-        (:[]) <$> TT.kwInt
-    <|> (:[]) <$> TT.kwFloat
-    <|> (:[]) <$> TT.kwBool
-    <|> (:[]) <$> TT.kwString
-    <|> do -- refType
-        a <- TT.kwRef
-        _ <- TT.openParen
-        b <- typeStmt
-        _ <- TT.closeParen
-        return (a : b)
-    <|> do -- customType
-        a <- TT.id
-        -- TODO check if id is a valid type, i.e. if there is a block declaration that matches id in the symbol table
-        return [a]
+    a <- (:[]) <$> TT.kwInt
+        <|> (:[]) <$> TT.kwFloat
+        <|> (:[]) <$> TT.kwBool
+        <|> (:[]) <$> TT.kwString
+        <|> do -- refType
+            a <- TT.kwRef
+            _ <- TT.openParen
+            b <- typeStmt
+            _ <- TT.closeParen
+            return (a : b)
+        <|> do -- customType
+            a <- TT.id
+            -- TODO check if id is a valid type, i.e. if there is a block declaration that matches id in the symbol table
+            return [a]
+    b <- optionMaybe arrayDecl
+
+    return $ a ++ fromMaybe [] b
+    where 
+        arrayDecl = do
+            _ <- TT.openBracket
+            a <- expStmt
+            _ <- TT.closeBracket
+            return a
 
 forStmt :: StateType [Token]
 forStmt = do
