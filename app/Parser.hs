@@ -93,10 +93,6 @@ enumDecl = do
                 a <- TT.id
                 return [a]
 
-paramList :: StateType [Token]
-paramList = do
-    concat <$> (varDecl `sepEndBy1` TT.kwComma)
-
 var :: StateType [Token]
 var = do
     a <- TT.id
