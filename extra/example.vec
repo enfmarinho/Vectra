@@ -43,13 +43,13 @@ block Matrix:
     private int widht;
 
 enum DAY:
-	SEGUNDA,
-	TERCA,
-	QUARTA,
-	QUINTA,
-	SEXTA,
-	SABADO,
-	DOMINGO,
+	SEGUNDA
+	TERCA
+	QUARTA
+	QUINTA
+	SEXTA
+	SABADO
+	DOMINGO
 
 // Procedure to swap two values, marking its return type as void is optional
 func swap(ref(int) a, ref(int) b) -> void:
