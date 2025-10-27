@@ -52,14 +52,13 @@ blockDecl = do
                                 _ <- TT.kwPublic
                                 return True
                             <|> return True
-                    -- TODO check of KW_TIL, marking that the method is the function destructor, if so 
-                    -- confirm that funcDecl name is the same as the block name
                     varDecl
                     <|> do
                         a <- TT.kwFunc
                         -- TODO maybe add const functions to blocks
                         b <- optionMaybe destructorDecl
                         c <- TT.id
+                        -- TODO check if b is not Nothing, if so assure that c lexeme is the same as the block name
                         d <- optionMaybe operatorSymbol
                         -- TODO if operatorSymbol is Just, id lexeme must be "operator"
                         e <- funcDeclAux
@@ -214,18 +213,28 @@ stmtList :: StateType [Token]
 stmtList = do
     _ <- optionMaybe TT.newLine
     concat <$> (stmt `sepEndBy1` TT.newLine)
+
+loopStmtList :: StateType [Token]
+loopStmtList = do
+    _ <- optionMaybe TT.newLine
+    concat <$> (loopStmt `sepEndBy1` TT.newLine)
     where
-        stmt :: StateType [Token]
-        stmt = do
-            assignStmt
-            <|> ifStmt
-            <|> whileStmt
-            <|> forStmt
-            <|> foreachStmt
+        loopStmt :: StateType [Token]
+        loopStmt = do
+            stmt
+            <|> (:[]) <$> TT.kwContinue
+            <|> (:[]) <$> TT.kwBreak
+
+stmt :: StateType [Token]
+stmt = do
+    assignStmt
+    <|> ifStmt
+    <|> whileStmt
+    <|> forStmt
+    <|> foreachStmt
 
 mathOpSymbol :: StateType [Token]
 mathOpSymbol = do
-    -- TODO add missing operator symbols such as the comparison ones
     (:[]) <$> (TT.opAdd
             <|> TT.opSub
             <|> TT.opMult
@@ -277,10 +286,9 @@ whileStmt = do
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
-    c <- stmtList -- TODO this also has to include 'continue' and 'break' so... maybe a stmtListLoop to include those kws? 
+    c <- loopStmtList
     _ <- TT.unindent
     return (a:b ++ c)
-
 
 typeStmt :: StateType [Token]
 typeStmt = do
@@ -310,7 +318,7 @@ forStmt = do
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
-    e <- stmtList -- TODO this also has to include 'continue' and 'break' so... maybe a stmtListLoop to include those kws? 
+    e <- loopStmtList
     _ <- TT.unindent
 
     return (a : fromMaybe [] b ++ fromMaybe [] c ++ fromMaybe [] d ++ e)
@@ -324,7 +332,7 @@ foreachStmt = do
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
-    e <- stmtList
+    e <- loopStmtList
     _ <- TT.unindent
 
     return $ [a] ++ [b] ++ [c] ++ [d] ++ e
