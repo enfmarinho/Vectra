@@ -12,20 +12,17 @@ import Text.Parsec
 vectraLanguage :: StateType [Token]
 vectraLanguage = do
     a <- concat <$> importCommand `sepEndBy` TT.newLine
-    b <- optionMaybe globalDeclList
-    return $ a ++ fromMaybe [] b
-
-importCommand :: StateType [Token]
-importCommand = do
-    a <- TT.kwImport
-    b <- TT.id
-        <|> TT.stringLiteral
-    return $ a:[b]
-
-globalDeclList :: StateType [Token]
-globalDeclList = do
-    concat <$> (globalDecl `sepEndBy` TT.newLine)
+    b <- concat <$> (globalDecl `sepEndBy` TT.newLine)
+    return $ a ++ b
     where
+        importCommand :: StateType [Token]
+        importCommand = do
+            a <- TT.kwImport
+            b <- TT.id
+                <|> TT.stringLiteral
+            return $ a:[b]
+
+        globalDecl :: StateType [Token]
         globalDecl = do
             blockDecl
             <|> enumDecl
@@ -53,21 +50,6 @@ funcDecl = do
             _ <- TT.opGreater
             typeDecl
 
-blockList :: StateType [Token]
-blockList = do
-    concat <$> (blockStmt `sepEndBy1` TT.kwComma)
-    where
-        blockStmt = do
-            _isPublic <- do
-                        _ <- TT.kwPrivate
-                        return False
-                    <|> do
-                        _ <- TT.kwPublic
-                        return True
-                    <|> return True
-            funcDecl <|> varDecl
-            -- TODO insert symbol to symbolTable
-
 blockDecl :: StateType [Token]
 blockDecl = do
     _ <- TT.kwBlock
@@ -78,7 +60,21 @@ blockDecl = do
     _ <- TT.unindent
     -- TODO insert symbol to symbolTable
     return $ a :b
-
+    where blockList = do
+            concat <$> (blockStmt `sepEndBy1` TT.kwComma)
+            where
+                blockStmt = do
+                    _isPublic <- do
+                                _ <- TT.kwPrivate
+                                return False
+                            <|> do
+                                _ <- TT.kwPublic
+                                return True
+                            <|> return True
+                    -- TODO check of KW_TIL, marking that the method is the function destructor, if so 
+                    -- confirm that funcDecl name is the same as the block name
+                    funcDecl <|> varDecl
+                    -- TODO insert symbol to symbolTable
 
 enumDecl :: StateType [Token]
 enumDecl = do
@@ -105,6 +101,7 @@ var :: StateType [Token]
 var = do
     a <- TT.id
     b <- optionMaybe memberAccess
+    -- TODO check if var exists
     return $ a:fromMaybe [] b
     where 
         memberAccess = do
