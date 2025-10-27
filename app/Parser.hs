@@ -90,7 +90,7 @@ funcDecl = do
         returnDecl = do
             _ <- TT.opSub
             _ <- TT.opGreater
-            typeDecl
+            typeStmt
 
         optVarDeclList :: StateType [Token]
         optVarDeclList = do
@@ -100,7 +100,7 @@ funcDecl = do
 varDecl :: StateType [Token]
 varDecl = do
     _a <- optionMaybe TT.kwConst
-    b <- typeDecl
+    b <- typeStmt
     c <- TT.id
     d <- do
             e <- TT.kwAssingment
@@ -146,7 +146,7 @@ expStmtList = do
 expStmt :: StateType [Token]
 expStmt = do
     literal
-    <|> typeDecl
+    <|> typeStmt
     -- <|> do -- ComparisonExp
     --     a <- expDecl
     --     b <- TT.opCompare
@@ -234,9 +234,8 @@ whileStmt = do
     return (a:b ++ c)
 
 
--- TODO better name this ?
-typeDecl :: StateType [Token]
-typeDecl = do
+typeStmt :: StateType [Token]
+typeStmt = do
         (:[]) <$> TT.kwInt
     <|> (:[]) <$> TT.kwFloat
     <|> (:[]) <$> TT.kwBool
@@ -244,7 +243,7 @@ typeDecl = do
     <|> do -- refType
         a <- TT.kwRef
         _ <- TT.openParen
-        b <- typeDecl
+        b <- typeStmt
         _ <- TT.closeParen
         return (a : b)
     <|> do -- customType
