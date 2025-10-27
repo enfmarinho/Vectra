@@ -68,19 +68,22 @@ blockDecl = do
                 destructorDecl = do
                     (:[]) <$> TT.kwTil
                 operatorSymbol = do
-                    -- TODO add missing operator symbols such as the comparison ones
-                    (:[]) <$> (TT.opAdd 
-                            <|> TT.opSub
-                            <|> TT.opMult
-                            <|> TT.opDiv
-                            <|> TT.opAnd
-                            <|> TT.opOr
-                            <|> TT.opNot
-                            <|> do
-                                a <- TT.openBracket
-                                _ <- TT.closeBracket
-                                return a
-                            )
+                    a <- optionMaybe mathOpSymbol
+                    case a of
+                        Just s -> return s
+                        Nothing -> do 
+                            (:[]) <$> (TT.opSmaller
+                                    <|> TT.opSmallerEq
+                                    <|> TT.opGreater
+                                    <|> TT.opGreaterEq
+                                    <|> TT.opEq
+                                    <|> TT.opNotEq
+                                    <|> do
+                                        -- Only one of those token is enough to identify the operations, returning 
+                                        -- both of them would be unnecessary and annoying to do
+                                        _ <- TT.openBracket
+                                        TT.closeBracket
+                                    )
 
 enumDecl :: StateType [Token]
 enumDecl = do
@@ -148,10 +151,10 @@ var = do
     b <- optionMaybe memberAccess
     -- TODO check if var exists
     return $ a:fromMaybe [] b
-    where 
+    where
         memberAccess = do
             _ <- TT.kwDot
-            var 
+            var
 
 callStmt :: StateType [Token]
 callStmt = do
@@ -211,7 +214,7 @@ stmtList :: StateType [Token]
 stmtList = do
     _ <- optionMaybe TT.newLine
     concat <$> (stmt `sepEndBy1` TT.newLine)
-    where 
+    where
         stmt :: StateType [Token]
         stmt = do
             assignStmt
@@ -223,7 +226,7 @@ stmtList = do
 mathOpSymbol :: StateType [Token]
 mathOpSymbol = do
     -- TODO add missing operator symbols such as the comparison ones
-    (:[]) <$> (TT.opAdd 
+    (:[]) <$> (TT.opAdd
             <|> TT.opSub
             <|> TT.opMult
             <|> TT.opDiv
