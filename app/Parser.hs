@@ -9,12 +9,6 @@ import Scanner
 import Data.Maybe
 import Text.Parsec
 
--- TODO what about the template problem ? 
--- TODO how the code will be run ? 
--- TODO how type Function store the function declaration, i.e. the code it associated to it 
--- TODO how Enums will be stored internally ? Maybe IntTypes ? If so, will the user be able 
---      to assign int values to the labels and do arithmetic operations with the labels normally ? 
-
 vectraLanguage :: StateType [Token]
 vectraLanguage = do
     a <- concat <$> importCommand `sepEndBy` TT.newLine
@@ -39,14 +33,23 @@ blockDecl :: StateType [Token]
 blockDecl = do
     _ <- TT.kwBlock
     a <- TT.id
+    b <- optionMaybe template
     _ <- TT.kwColumn
     _ <- TT.indent
-    b <- blockList
+    -- TODO insert templates in symbolTable in case there are
+    c <- blockList
     _ <- TT.unindent
     -- TODO insert symbol to symbolTable
-    return $ a :b
-    where blockList = do
-            concat <$> (blockStmt `sepEndBy1` TT.kwComma)
+    return $ [a] ++ fromMaybe [] b ++ c
+    where 
+        template = do
+            _ <- TT.opSmaller
+            a <- concat <$> (idSymbol `sepEndBy1` TT.kwComma)
+            _ <- TT.opGreater
+            return a
+            where idSymbol = (:[]) <$> TT.id
+        blockList = do
+            concat <$> (blockStmt `sepEndBy1` TT.newLine)
             where
                 blockStmt = do
                     _isPublic <- do
