@@ -11,7 +11,7 @@ import Text.Parsec
 
 vectraLanguage :: StateType [Token]
 vectraLanguage = do
-    a <- concat <$> importCommand `sepEndBy` TT.newLine
+    a <- concat <$> (importCommand `sepEndBy` TT.newLine)
     b <- concat <$> (globalDecl `sepEndBy` TT.newLine)
     return $ a ++ b
     where
