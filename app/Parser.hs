@@ -115,6 +115,13 @@ funcDecl = do
     c <- funcDeclAux
     return $ [a] ++ [b] ++ c
 
+arrayDecl :: StateType [Token]
+arrayDecl = do
+    _ <- TT.openBracket
+    a <- expStmt
+    _ <- TT.closeBracket
+    return a
+
 funcDeclAux :: StateType [Token]
 funcDeclAux = do
     _ <- TT.openParen
@@ -131,7 +138,10 @@ funcDeclAux = do
         returnDecl = do
             _ <- TT.opSub
             _ <- TT.opGreater
-            typeStmt
+            a <- typeStmt
+            b <- optionMaybe arrayDecl
+            return $ a ++ fromMaybe [] b
+            
 
         optVarDeclList :: StateType [Token]
         optVarDeclList = do
@@ -143,13 +153,14 @@ varDecl = do
     _a <- optionMaybe TT.kwConst
     b <- typeStmt
     c <- TT.id
-    d <- do
+    d <- optionMaybe arrayDecl
+    e <- do
             e <- TT.kwAssingment
             f <- expStmt
             return $ e:f
         <|> return []
 
-    return $ b ++ [c] ++ d
+    return $ b ++ [c] ++ fromMaybe [] d ++ e
 
 var :: StateType [Token]
 var = do
@@ -188,7 +199,6 @@ expStmtList = do
 expStmt :: StateType [Token]
 expStmt = do
     literal
-    <|> typeStmt
     -- <|> do -- ComparisonExp
     --     a <- expDecl
     --     b <- TT.opCompare
@@ -299,7 +309,7 @@ whileStmt = do
 
 typeStmt :: StateType [Token]
 typeStmt = do
-    a <- (:[]) <$> TT.kwInt
+    (:[]) <$> TT.kwInt
         <|> (:[]) <$> TT.kwFloat
         <|> (:[]) <$> TT.kwBool
         <|> (:[]) <$> TT.kwString
@@ -313,15 +323,6 @@ typeStmt = do
             a <- TT.id
             -- TODO check if id is a valid type, i.e. if there is a block declaration that matches id in the symbol table
             return [a]
-    b <- optionMaybe arrayDecl
-
-    return $ a ++ fromMaybe [] b
-    where 
-        arrayDecl = do
-            _ <- TT.openBracket
-            a <- expStmt
-            _ <- TT.closeBracket
-            return a
 
 forStmt :: StateType [Token]
 forStmt = do
