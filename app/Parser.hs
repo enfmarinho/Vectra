@@ -60,6 +60,7 @@ blockDecl = do
                                 return True
                             <|> return True
                     varDecl
+                    <|> procDecl
                     <|> do
                         a <- TT.kwFunc
                         -- TODO maybe add const functions to blocks
@@ -108,6 +109,24 @@ enumDecl = do
                 a <- TT.id
                 return [a]
 
+optVarDeclList :: StateType [Token]
+optVarDeclList = do
+    concat <$> (varDecl `sepBy` TT.kwComma)
+
+procDecl :: StateType [Token]
+procDecl = do
+    a <- TT.kwProc
+    b <- TT.id
+    _ <- TT.openParen
+    c <- optVarDeclList
+    _ <- TT.closeParen
+    _ <- TT.kwColumn
+    _ <- TT.newLine
+    _ <- TT.indent
+    d <- stmtList
+    _ <- TT.unindent
+    return $ [a] ++ [b] ++ c ++ d
+
 funcDecl :: StateType [Token]
 funcDecl = do
     a <- TT.kwFunc
@@ -141,12 +160,6 @@ funcDeclAux = do
             a <- typeStmt
             b <- optionMaybe arrayDecl
             return $ a ++ fromMaybe [] b
-            
-
-        optVarDeclList :: StateType [Token]
-        optVarDeclList = do
-            concat <$> (varDecl `sepBy` TT.kwComma)
-
 
 varDecl :: StateType [Token]
 varDecl = do
