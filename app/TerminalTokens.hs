@@ -219,6 +219,11 @@ kwFunc = tokenPrim show update_pos get_token where
   get_token (KW_FUNC pos) = Just (KW_FUNC pos)
   get_token _       = Nothing
 
+kwProc :: StateType Token
+kwProc = tokenPrim show update_pos get_token where
+  get_token (KW_FUNC pos) = Just (KW_FUNC pos)
+  get_token _       = Nothing
+
 kwEnum :: StateType Token
 kwEnum = tokenPrim show update_pos get_token where
   get_token (KW_ENUM pos) = Just (KW_ENUM pos)

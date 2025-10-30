@@ -68,6 +68,7 @@ tokens :-
     public       { \aInp _ -> do t <- handleIndentation (KW_PUBLIC (alexPos aInp)); return $ Just t }
     private      { \aInp _ -> do t <- handleIndentation (KW_PRIVATE (alexPos aInp)); return $ Just t }
     func         { \aInp _ -> do t <- handleIndentation (KW_FUNC (alexPos aInp)); return $ Just t }
+    proc         { \aInp _ -> do t <- handleIndentation (KW_PROC (alexPos aInp)); return $ Just t }
     return       { \aInp _ -> do t <- handleIndentation (KW_RETURN (alexPos aInp)); return $ Just t }
     deref        { \aInp _ -> do t <- handleIndentation (KW_DEREF (alexPos aInp)); return $ Just t }
     import       { \aInp _ -> do t <- handleIndentation (KW_IMPORT (alexPos aInp)); return $ Just t }
@@ -228,6 +229,7 @@ data Token =
   KW_REF AlexPosn |
   KW_DEREF AlexPosn |
   KW_FUNC AlexPosn |
+  KW_PROC AlexPosn |
   KW_ENUM AlexPosn |
   KW_ELSE AlexPosn |
   KW_BLOCK AlexPosn |
