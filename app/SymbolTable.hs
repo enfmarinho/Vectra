@@ -11,14 +11,7 @@ module SymbolTable
 import qualified Data.HashTable.IO as H
 import Types
 import Text.Parsec
-import Scanner
 import Control.Monad.State.Lazy
-
-type SymbolType = (String, Type)
-type SymbolTableType = H.BasicHashTable String Type
-type SymbolTableStackType = [SymbolTableType]
-type SymbolTableStackState = StateT SymbolTableStackType IO
-type StateType = ParsecT [Token] SymbolTableStackType IO
 
 openScope :: SymbolTableStackState () 
 openScope = do
