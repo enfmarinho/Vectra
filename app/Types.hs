@@ -2,20 +2,24 @@ module Types where
 import qualified Data.HashTable.IO as H
 import Text.Parsec
 import Scanner
-import Control.Monad.State.Lazy
 
 type SymbolType = (String, Type)
 type SymbolTableType = H.BasicHashTable String Type
-type SymbolTableStackType = [SymbolTableType]
-type SymbolTableStackState = StateT SymbolTableStackType IO
+type SymbolTableStackType = [(SymbolTableType, Bool)]
 
 type MemoryType = (String, Value)
 type MemoryTableType = H.BasicHashTable String Value
 type MemoryTableStackType = [MemoryTableType]
-type MemoryTableStackState = StateT MemoryTableStackType IO
 
-type StateType = ParsecT [Token] SymbolTableStackType IO
--- type StateType = ParsecT [Token] (SymbolTableStackType, MemoryTableStackType, Bool) IO
+data ParserState = ParserState
+  { isRunning :: Bool
+  , symbolTableStack :: SymbolTableStackType
+  , memoryTableStack :: MemoryTableStackType
+  , globalSymbolTableStack :: SymbolTableStackType
+  , globalMemoryTableStack :: MemoryTableStackType
+  }
+
+type StateType = ParsecT [Token] ParserState IO
 
 data Type = IntType                               
           | FloatType                             

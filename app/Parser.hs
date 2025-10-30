@@ -8,6 +8,7 @@ import TerminalTokens as TT
 import Scanner
 import Data.Maybe
 import Text.Parsec
+import Types 
 
 vectraLanguage :: StateType [Token]
 vectraLanguage = do
@@ -376,7 +377,16 @@ foreachStmt = do
 
     return $ [a] ++ [b] ++ [c] ++ [d] ++ e
 
-parser :: [Token] -> SymbolTableStackType -> IO (Either ParseError [Token])
-parser token_list table_stack = do
+parser :: [Token] -> IO (Either ParseError [Token])
+parser token_list = do
+    let parserState = ParserState {
+            globalMemoryTableStack=[],
+            globalSymbolTableStack=[],
+            memoryTableStack=[],
+            symbolTableStack=[],
+            isRunning=False
+        }
+    -- TODO properly initialize parserState
+
     -- TODO improve error message
-    runParserT stmtList table_stack "Error message" token_list
+    runParserT stmtList parserState "Error message" token_list

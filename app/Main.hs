@@ -21,7 +21,7 @@ main = do
                     exitSuccess -- End execution early since a lexical error has been found
                 Right token_list -> return token_list
             
-            sintax_result <- parser token_list stack
+            sintax_result <- parser token_list
             case sintax_result of
                 Left err -> print err
                 Right ans -> print ans -- TODO a positive parser result should not be printed, this is only for development 
