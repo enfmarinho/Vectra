@@ -270,6 +270,7 @@ stmt = do
     <|> whileStmt
     <|> forStmt
     <|> foreachStmt
+    <|> callStmt
 
 mathOpSymbol :: StateType [Token]
 mathOpSymbol = do
