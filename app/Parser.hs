@@ -29,6 +29,7 @@ vectraLanguage = do
             <|> funcDecl
             <|> varDecl
 
+template :: StateType [Token]
 template = do
     _ <- TT.opSmaller
     a <- concat <$> (idSymbol `sepEndBy1` TT.kwComma)
@@ -48,7 +49,7 @@ blockDecl = do
     _ <- TT.unindent
     -- TODO insert symbol to symbolTable
     return $ fromMaybe [] a ++ [b] ++ c
-    where 
+    where
         blockList = do
             concat <$> (blockStmt `sepEndBy1` TT.newLine)
             where
@@ -65,15 +66,16 @@ blockDecl = do
                     <|> do
                         a <- TT.kwFunc
                         -- TODO maybe add const functions to blocks
-                        b <- option destructorDecl 
-                            <|> option template
-                            <|> return []
+                        -- TODO can i use option here ?
+                        b <- option [] destructorDecl
+                            <|> option [] template
+
                         c <- TT.id
                         -- TODO check if b is not Nothing, if so assure that c lexeme is the same as the block name
                         d <- optionMaybe operatorSymbol
                         -- TODO if operatorSymbol is Just, id lexeme must be "operator"
                         e <- funcDeclAux
-                        return $ [a] ++ fromMaybe [] b ++ [c] ++ fromMaybe [] d ++ e
+                        return $ [a] ++ b ++ [c] ++ fromMaybe [] d ++ e
                     -- TODO insert symbol to symbolTable
                 destructorDecl = do
                     (:[]) <$> TT.kwTil
@@ -81,7 +83,7 @@ blockDecl = do
                     a <- optionMaybe mathOpSymbol
                     case a of
                         Just s -> return s
-                        Nothing -> do 
+                        Nothing -> do
                             (:[]) <$> (TT.opSmaller
                                     <|> TT.opSmallerEq
                                     <|> TT.opGreater
