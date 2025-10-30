@@ -27,6 +27,7 @@ vectraLanguage = do
             blockDecl
             <|> enumDecl
             <|> funcDecl
+            <|> procDecl
             <|> varDecl
 
 template :: StateType [Token]
