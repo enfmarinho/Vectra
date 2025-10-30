@@ -29,25 +29,26 @@ vectraLanguage = do
             <|> funcDecl
             <|> varDecl
 
+template = do
+    _ <- TT.opSmaller
+    a <- concat <$> (idSymbol `sepEndBy1` TT.kwComma)
+    _ <- TT.opGreater
+    return a
+    where idSymbol = (:[]) <$> TT.id
+
 blockDecl :: StateType [Token]
 blockDecl = do
     _ <- TT.kwBlock
-    a <- TT.id
-    b <- optionMaybe template
+    a <- optionMaybe template
+    b <- TT.id
     _ <- TT.kwColumn
     _ <- TT.indent
     -- TODO insert templates in symbolTable in case there are
     c <- blockList
     _ <- TT.unindent
     -- TODO insert symbol to symbolTable
-    return $ [a] ++ fromMaybe [] b ++ c
+    return $ fromMaybe [] a ++ [b] ++ c
     where 
-        template = do
-            _ <- TT.opSmaller
-            a <- concat <$> (idSymbol `sepEndBy1` TT.kwComma)
-            _ <- TT.opGreater
-            return a
-            where idSymbol = (:[]) <$> TT.id
         blockList = do
             concat <$> (blockStmt `sepEndBy1` TT.newLine)
             where
@@ -64,7 +65,9 @@ blockDecl = do
                     <|> do
                         a <- TT.kwFunc
                         -- TODO maybe add const functions to blocks
-                        b <- optionMaybe destructorDecl
+                        b <- option destructorDecl 
+                            <|> option template
+                            <|> return []
                         c <- TT.id
                         -- TODO check if b is not Nothing, if so assure that c lexeme is the same as the block name
                         d <- optionMaybe operatorSymbol
@@ -116,23 +119,25 @@ optVarDeclList = do
 procDecl :: StateType [Token]
 procDecl = do
     a <- TT.kwProc
-    b <- TT.id
+    b <- optionMaybe template
+    c <- TT.id
     _ <- TT.openParen
-    c <- optVarDeclList
+    d <- optVarDeclList
     _ <- TT.closeParen
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
-    d <- stmtList
+    e <- stmtList
     _ <- TT.unindent
-    return $ [a] ++ [b] ++ c ++ d
+    return $ [a] ++ fromMaybe [] b ++ [c] ++ d ++ e
 
 funcDecl :: StateType [Token]
 funcDecl = do
     a <- TT.kwFunc
-    b <- TT.id
-    c <- funcDeclAux
-    return $ [a] ++ [b] ++ c
+    b <- optionMaybe template
+    c <- TT.id
+    d <- funcDeclAux
+    return $ [a] ++ fromMaybe [] b ++ [c] ++ d
 
 arrayDecl :: StateType [Token]
 arrayDecl = do
