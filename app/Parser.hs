@@ -197,11 +197,11 @@ var = do
 callStmt :: StateType [Token]
 callStmt = do
     a <- var
-    _ <- TT.openParen
-    b <- expStmtList
-    _ <- TT.closeParen
+    b <- TT.openParen
+    c <- expStmtList
+    d <- TT.closeParen
     -- TODO assure that exists a function called id and that there is no type error
-    return $ a ++ b
+    return $ a ++ [b] ++ c ++ [d]
 
 literal :: StateType [Token]
 literal = do
@@ -289,45 +289,45 @@ assignStmt = do
           c <- TT.kwAssingment
           d <- expStmt
           -- updateSymbol ("id lexema", IntType 1) -- TODO actually update the symbol table correctly
-          return $ a:fromMaybe [] b ++ c:d
+          return $ [a] ++ fromMaybe [] b ++ [c] ++ d
 
 ifStmt :: StateType [Token]
 ifStmt = do
     a <- TT.kwIf
     b <- expStmt
     c <- TT.kwColumn
-    _ <- TT.newLine
-    _ <- TT.indent
-    d <- stmtList
-    _ <- TT.unindent
-    e <- optionMaybe elseStmt
-    return $ [a] ++ b ++ [c] ++ d ++ fromMaybe [] e
+    d <- TT.newLine
+    e <- TT.indent
+    f <- stmtList
+    g <- TT.unindent
+    h <- optionMaybe elseStmt
+    return $ [a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g] ++ fromMaybe [] h
 
 elseStmt :: StateType [Token]
 elseStmt = do
-    _ <- TT.newLine
-    a <- TT.kwElse
-    b <- ifStmt
+    a <- TT.newLine
+    b <- TT.kwElse
+    c <- ifStmt
       <|> do
-            c <- TT.kwColumn
-            _ <- TT.newLine
-            _ <- TT.indent
-            d <- stmtList
-            _ <- TT.unindent
-            return $ c:d
+            d <- TT.kwColumn
+            e <- TT.newLine
+            f <- TT.indent
+            g <- stmtList
+            h <- TT.unindent
+            return $ [d] ++ [e] ++ [f] ++ g ++ [h]
 
-    return $ a : b
+    return $ [a] ++ [b] ++ c
 
 whileStmt :: StateType [Token]
 whileStmt = do
     a <- TT.kwWhile
     b <- expStmt
-    _ <- TT.kwColumn
-    _ <- TT.newLine
-    _ <- TT.indent
-    c <- loopStmtList
-    _ <- TT.unindent
-    return (a:b ++ c)
+    c <- TT.kwColumn
+    d <- TT.newLine
+    e <- TT.indent
+    f <- loopStmtList
+    g <- TT.unindent
+    return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g])
 
 typeStmt :: StateType [Token]
 typeStmt = do
@@ -337,10 +337,10 @@ typeStmt = do
         <|> (:[]) <$> TT.kwString
         <|> do -- refType
             a <- TT.kwRef
-            _ <- TT.openParen
-            b <- typeStmt
-            _ <- TT.closeParen
-            return (a : b)
+            b <- TT.openParen
+            c <- typeStmt
+            d <- TT.closeParen
+            return ([a] ++ [b] ++ c ++ [d])
         <|> do -- customType
             a <- TT.id
             -- TODO check if id is a valid type, i.e. if there is a struct declaration that matches id in the symbol table
@@ -350,17 +350,17 @@ forStmt :: StateType [Token]
 forStmt = do
     a <- TT.kwFor
     b <- optionMaybe varDecl
-    _ <- TT.kwSemicolumn
-    c <- optionMaybe expStmt
-    _ <- TT.kwSemicolumn
+    c <- TT.kwSemicolumn
     d <- optionMaybe expStmt
-    _ <- TT.kwColumn
-    _ <- TT.newLine
-    _ <- TT.indent
-    e <- loopStmtList
-    _ <- TT.unindent
+    e <- TT.kwSemicolumn
+    f <- optionMaybe expStmt
+    g <- TT.kwColumn
+    h <- TT.newLine
+    i <- TT.indent
+    j <- loopStmtList
+    k <- TT.unindent
 
-    return (a : fromMaybe [] b ++ fromMaybe [] c ++ fromMaybe [] d ++ e)
+    return (a : fromMaybe [] b ++ [c] ++ fromMaybe [] d ++ [e] ++ fromMaybe [] f ++ [g] ++ [h] ++ [i] ++ j ++ [k])
 
 foreachStmt :: StateType [Token]
 foreachStmt = do
@@ -368,13 +368,13 @@ foreachStmt = do
     b <- TT.id
     c <- TT.kwIn
     d <- TT.id
-    _ <- TT.kwColumn
-    _ <- TT.newLine
-    _ <- TT.indent
-    e <- loopStmtList
-    _ <- TT.unindent
+    e <- TT.kwColumn
+    f <- TT.newLine
+    g <- TT.indent
+    h <- loopStmtList
+    i <- TT.unindent
 
-    return $ [a] ++ [b] ++ [c] ++ [d] ++ e
+    return $ [a] ++ [b] ++ [c] ++ [d] ++ [e] ++ [f] ++ [g] ++ h ++ [i]
 
 parser :: [Token] -> IO (Either ParseError [Token])
 parser token_list = do
