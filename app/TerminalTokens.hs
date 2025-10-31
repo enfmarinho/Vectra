@@ -234,9 +234,9 @@ kwElse = tokenPrim show update_pos get_token where
   get_token (KW_ELSE pos) = Just (KW_ELSE pos)
   get_token _       = Nothing
 
-kwBlock :: StateType Token
-kwBlock = tokenPrim show update_pos get_token where
-  get_token (KW_BLOCK pos) = Just (KW_BLOCK pos)
+kwStruct :: StateType Token
+kwStruct = tokenPrim show update_pos get_token where
+  get_token (KW_STRUCT pos) = Just (KW_STRUCT pos)
   get_token _       = Nothing
 
 kwConst :: StateType Token

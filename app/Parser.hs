@@ -8,7 +8,6 @@ import TerminalTokens as TT
 import Scanner
 import Data.Maybe
 import Text.Parsec
-import Types 
 
 vectraLanguage :: StateType [Token]
 vectraLanguage = do
@@ -25,7 +24,7 @@ vectraLanguage = do
 
         globalDecl :: StateType [Token]
         globalDecl = do
-            blockDecl
+            structDecl
             <|> enumDecl
             <|> funcDecl
             <|> procDecl
@@ -39,23 +38,23 @@ template = do
     return a
     where idSymbol = (:[]) <$> TT.id
 
-blockDecl :: StateType [Token]
-blockDecl = do
-    _ <- TT.kwBlock
+structDecl :: StateType [Token]
+structDecl = do
+    _ <- TT.kwStruct
     a <- optionMaybe template
     b <- TT.id
     _ <- TT.kwColumn
     _ <- TT.indent
     -- TODO insert templates in symbolTable in case there are
-    c <- blockList
+    c <- structList
     _ <- TT.unindent
     -- TODO insert symbol to symbolTable
     return $ fromMaybe [] a ++ [b] ++ c
     where
-        blockList = do
-            concat <$> (blockStmt `sepEndBy1` TT.newLine)
+        structList = do
+            concat <$> (structStmt `sepEndBy1` TT.newLine)
             where
-                blockStmt = do
+                structStmt = do
                     _isPublic <- do
                                 _ <- TT.kwPrivate
                                 return False
@@ -67,13 +66,13 @@ blockDecl = do
                     <|> procDecl
                     <|> do
                         a <- TT.kwFunc
-                        -- TODO maybe add const functions to blocks
+                        -- TODO maybe add const functions to structs
                         -- TODO can i use option here ?
                         b <- option [] destructorDecl
                             <|> option [] template
 
                         c <- TT.id
-                        -- TODO check if b is not Nothing, if so assure that c lexeme is the same as the block name
+                        -- TODO check if b is not Nothing, if so assure that c lexeme is the same as the struct name
                         d <- optionMaybe operatorSymbol
                         -- TODO if operatorSymbol is Just, id lexeme must be "operator"
                         e <- funcDeclAux
@@ -344,7 +343,7 @@ typeStmt = do
             return (a : b)
         <|> do -- customType
             a <- TT.id
-            -- TODO check if id is a valid type, i.e. if there is a block declaration that matches id in the symbol table
+            -- TODO check if id is a valid type, i.e. if there is a struct declaration that matches id in the symbol table
             return [a]
 
 forStmt :: StateType [Token]

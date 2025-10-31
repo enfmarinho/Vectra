@@ -6,7 +6,7 @@ import "../other_file.vec"
 
 const int x = 4
 
-block Matrix:
+struct Matrix:
     public Matrix(int h, int w):
         height = h
         width = w

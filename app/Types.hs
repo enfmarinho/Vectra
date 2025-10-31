@@ -32,8 +32,8 @@ data Type = IntType
           | EnumType [String]                                   -- (valid_labels)
           | ProcType [String] [Type] [Token]                    -- (template_ids, param_types, method_body)
           | FuncType [String] [Type] Type [Token]               -- (template_ids, param_types, return_type, method_body)
-          | BlockType [String] SymbolTableType SymbolTableType  -- (template_ids, table_for_methods, table_for_data)
-          | BlockInstanceType String                            -- (block_type_id)
+          | StructType [String] SymbolTableType SymbolTableType  -- (template_ids, table_for_methods, table_for_data)
+          | StructInstanceType String                            -- (struct_type_id)
           | EnumInstanceType String                             -- (enum_type_id)
 
 data Value = IntValue Int                     
@@ -44,4 +44,4 @@ data Value = IntValue Int
            | ConstValue Value                 
            | ArrayValue [Value]               
            | EnumValue String
-           | BlockValue SymbolTableType MemoryTableType -- (internal_symbol_table, internal_memory)
+           | StructValue SymbolTableType MemoryTableType -- (internal_symbol_table, internal_memory)

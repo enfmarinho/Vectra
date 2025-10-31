@@ -64,7 +64,7 @@ tokens :-
     in           { \aInp _ -> do t <- handleIndentation (KW_IN (alexPos aInp)); return $ Just t }
     break        { \aInp _ -> do t <- handleIndentation (KW_BREAK (alexPos aInp)); return $ Just t }
     continue     { \aInp _ -> do t <- handleIndentation (KW_CONTINUE (alexPos aInp)); return $ Just t }
-    block        { \aInp _ -> do t <- handleIndentation (KW_BLOCK (alexPos aInp)); return $ Just t }
+    struct       { \aInp _ -> do t <- handleIndentation (KW_STRUCT (alexPos aInp)); return $ Just t }
     public       { \aInp _ -> do t <- handleIndentation (KW_PUBLIC (alexPos aInp)); return $ Just t }
     private      { \aInp _ -> do t <- handleIndentation (KW_PRIVATE (alexPos aInp)); return $ Just t }
     func         { \aInp _ -> do t <- handleIndentation (KW_FUNC (alexPos aInp)); return $ Just t }
@@ -232,7 +232,7 @@ data Token =
   KW_PROC AlexPosn |
   KW_ENUM AlexPosn |
   KW_ELSE AlexPosn |
-  KW_BLOCK AlexPosn |
+  KW_STRUCT AlexPosn |
   KW_CONST AlexPosn |
   KW_TRUE AlexPosn |
   KW_FALSE AlexPosn |
