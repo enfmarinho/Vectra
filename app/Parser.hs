@@ -379,14 +379,6 @@ foreachStmt = do
 
 parser :: [Token] -> IO (Either ParseError [Token])
 parser token_list = do
-    let parserState = ParserState {
-            globalMemoryTableStack=[],
-            globalSymbolTableStack=[],
-            memoryTableStack=[],
-            symbolTableStack=[],
-            isRunning=False
-        }
-    -- TODO properly initialize parserState
-
+    parserState <- initParserState
     -- TODO improve error message
     runParserT stmtList parserState "Error message" token_list
