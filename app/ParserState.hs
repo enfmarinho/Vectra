@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module SymbolTable
+module ParserState
   ( SymbolType
   , SymbolTableType
   , SymbolTableStackType

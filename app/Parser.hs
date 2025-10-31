@@ -3,11 +3,13 @@ module Parser
   ( parser
   ) where
 
-import SymbolTable
+import ParserState
 import TerminalTokens as TT
 import Scanner
 import Data.Maybe
 import Text.Parsec
+import Types
+import Assert
 
 vectraLanguage :: StateType [Token]
 vectraLanguage = do
