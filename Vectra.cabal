@@ -21,6 +21,7 @@ executable Vectra
                       Parser
                       Scanner
                       TerminalTokens
+                      Assert
     build-depends:    base ^>=4.18.2.1,
                       hashtables,
                       mtl,
