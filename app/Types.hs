@@ -27,13 +27,14 @@ data Type = IntType
           | BoolType                              
           | StringType                            
           | TemplateType                          
+          | RefType Type
           | ConstType Type                                      -- (internal_type)
           | ArrayType Int Type                                  -- (size, type)                 
           | EnumType [String]                                   -- (valid_labels)
           | ProcType [String] [Type] [Token]                    -- (template_ids, param_types, method_body)
           | FuncType [String] [Type] Type [Token]               -- (template_ids, param_types, return_type, method_body)
-          | StructType [String] SymbolTableType SymbolTableType  -- (template_ids, table_for_methods, table_for_data)
-          | StructInstanceType String                            -- (struct_type_id)
+          | StructType [String] SymbolTableType SymbolTableType -- (template_ids, table_for_methods, table_for_data)
+          | StructInstanceType String                           -- (struct_type_id)
           | EnumInstanceType String                             -- (enum_type_id)
 
 data Value = IntValue Int                     
