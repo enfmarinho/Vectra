@@ -15,8 +15,8 @@ data ParserState = ParserState
   { isRunning :: Bool
   , symbolTableStack :: SymbolTableStackType
   , memoryTableStack :: MemoryTableStackType
-  , globalSymbolTableStack :: SymbolTableStackType
-  , globalMemoryTableStack :: MemoryTableStackType
+  , globalSymbolTable :: SymbolTableType
+  , globalMemoryTable :: MemoryTableType
   }
 
 type StateType = ParsecT [Token] ParserState IO
