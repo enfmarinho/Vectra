@@ -1,7 +1,5 @@
 module Main where
 
-import qualified Data.HashTable.IO as H
-import SymbolTable
 import System.Environment (getArgs)
 import Parser
 import Scanner
@@ -12,9 +10,6 @@ main = do
     args <- getArgs
     case args of 
         [filename] -> do
-            global_symbol_table <- H.new :: IO SymbolTableType
-            let stack = [global_symbol_table]
-
             lexical_result <- getTokens filename
             token_list <- case lexical_result of
                 Left _ -> do
