@@ -1,0 +1,6 @@
+import to_string
+
+func main() -> int:
+    int v[4] = {1, 2, 3, 4}
+    foreach i in v:
+        println("value is " ++ to_string(i))

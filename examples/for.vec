@@ -1,0 +1,6 @@
+import to_string
+import println
+
+func main() -> int:
+    for int a = 1; a < 5; a +=1:
+        println(a)

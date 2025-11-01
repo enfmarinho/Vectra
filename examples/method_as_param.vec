@@ -1,0 +1,10 @@
+func pow(int x) -> int:
+    return x * x 
+
+func map(int list[5], <(int) -> int> f):
+    for i in list:
+        i = f(i)
+
+func main() -> int:
+    int list[5] = {1, 2, 3, 4, 5}
+    map(list, pow)
