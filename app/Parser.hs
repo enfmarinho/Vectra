@@ -404,18 +404,20 @@ expStmt = do
 stmtList :: StateType [Token]
 stmtList = do
     _ <- optionMaybe TT.newLine
-    concat <$> (stmt `sepEndBy1` TT.newLine)
+    concat <$> many (do
+        a <- stmt
+        b <- TT.newLine
+        return (a ++ [b]))
 
 loopStmtList :: StateType [Token]
 loopStmtList = do
     _ <- optionMaybe TT.newLine
-    concat <$> (loopStmt `sepEndBy1` TT.newLine)
-    where
-        loopStmt :: StateType [Token]
-        loopStmt = do
-            stmt
+    concat <$> many (do
+        a <- stmt
             <|> (:[]) <$> TT.kwContinue
             <|> (:[]) <$> TT.kwBreak
+        b <- TT.newLine
+        return (a ++ [b]))
 
 stmt :: StateType [Token]
 stmt = do
