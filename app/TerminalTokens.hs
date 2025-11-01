@@ -24,6 +24,11 @@ stringLiteral = tokenPrim show updatePos getToken where
   getToken (STRING_LITERAL pos s) = Just (STRING_LITERAL pos s)
   getToken _       = Nothing
 
+kwNamespace :: StateType Token
+kwNamespace = tokenPrim show updatePos getToken where
+  getToken (KW_NAMESPACE pos) = Just (KW_NAMESPACE pos)
+  getToken _       = Nothing
+
 kwSemicolumn :: StateType Token
 kwSemicolumn = tokenPrim show updatePos getToken where
   getToken (KW_SEMICOLUMN pos) = Just (KW_SEMICOLUMN pos)
@@ -32,6 +37,11 @@ kwSemicolumn = tokenPrim show updatePos getToken where
 kwColumn :: StateType Token
 kwColumn = tokenPrim show updatePos getToken where
   getToken (KW_COLUMN pos) = Just (KW_COLUMN pos)
+  getToken _       = Nothing
+
+kwDoubleColumn :: StateType Token
+kwDoubleColumn = tokenPrim show updatePos getToken where
+  getToken (KW_DOUBLE_COLUMN pos) = Just (KW_DOUBLE_COLUMN pos)
   getToken _       = Nothing
 
 kwComma :: StateType Token

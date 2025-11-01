@@ -20,6 +20,7 @@ tokens :-
 
     -- Punctuation and operators
     ";"          { \aInp _ -> do t <- handleIndentation (KW_SEMICOLUMN (alexPos aInp)); return $ Just t }
+    "::"         { \aInp _ -> do t <- handleIndentation (KW_DOUBLE_COLUMN (alexPos aInp)); return $ Just t }
     ":"          { \aInp _ -> do t <- handleIndentation (KW_COLUMN (alexPos aInp)); return $ Just t }
     ","          { \aInp _ -> do t <- handleIndentation (KW_COMMA (alexPos aInp)); return $ Just t }
     "."          { \aInp _ -> do t <- handleIndentation (KW_DOT (alexPos aInp)); return $ Just t }
@@ -49,6 +50,7 @@ tokens :-
     \".*\"       { \aInp len -> do t <- handleIndentation (STRING_LITERAL (alexPos aInp) (take len (alexInputStr aInp))); return $ Just t }
 
     -- Keywords
+    namespace    { \aInp _ -> do t <- handleIndentation (KW_NAMESPACE (alexPos aInp)); return $ Just t }
     const        { \aInp _ -> do t <- handleIndentation (KW_CONST (alexPos aInp)); return $ Just t }
     int          { \aInp _ -> do t <- handleIndentation (KW_INT (alexPos aInp)); return $ Just t }
     float        { \aInp _ -> do t <- handleIndentation (KW_FLOAT (alexPos aInp)); return $ Just t }
@@ -193,6 +195,7 @@ data Token =
   STRING_LITERAL AlexPosn String |
   KW_SEMICOLUMN AlexPosn |
   KW_COLUMN AlexPosn |
+  KW_DOUBLE_COLUMN AlexPosn |
   KW_COMMA AlexPosn |
   KW_DOT AlexPosn |
   KW_ASSIGNMENT AlexPosn |
@@ -215,6 +218,7 @@ data Token =
   CLOSE_BRACKET AlexPosn |
   INDENT AlexPosn |
   UNINDENT AlexPosn |
+  KW_NAMESPACE AlexPosn |
   KW_IF AlexPosn |
   KW_INT AlexPosn |
   KW_FLOAT AlexPosn |
