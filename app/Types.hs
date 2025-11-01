@@ -29,16 +29,17 @@ data Type = IntType
           | StringType                            
           | TemplateType                          
           | RefType Type
-          | ConstType Type                                      -- (internal_type)
-          | ArrayType Int Type                                  -- (size, type)                 
-          | EnumType [String]                                   -- (valid_labels)
-          | ProcType [String] [(String, Type)] [Token]          -- (template_ids, param_types, method_body)
-          | FuncType [String] [(String, Type)] Type [Token]     -- (template_ids, (param_ids, param_types), return_type, method_body)
-          | StructType [String] SymbolTableType SymbolTableType -- (template_ids, table_for_methods, table_for_data)
-          | StructInstanceType String                           -- (struct_type_id)
-          | EnumInstanceType String                             -- (enum_type_id)
-          | FuncRefType [String] [Type] Type                    -- (templates_ids, param_types, return_type)
-          | ProcRefType [String] [Type]                         -- (templates_ids, param_types)
+          | ConstType Type                                  -- (internal_type)
+          | ArrayType Int Type                              -- (size, type)                 
+          | EnumType [String]                               -- (valid_labels)
+          | ProcType [String] [(String, Type)] [Token]      -- (template_ids, param_types, method_body)
+          | FuncType [String] [(String, Type)] Type [Token] -- (template_ids, (param_ids, param_types), return_type, method_body)
+          | StructType [String] SymbolTableType             -- (template_ids, table_for_data)
+          | StructInstanceType String                       -- (struct_type_id)
+          | EnumInstanceType String                         -- (enum_type_id)
+          | FuncRefType [String] [Type] Type                -- (templates_ids, param_types, return_type)
+          | ProcRefType [String] [Type]                     -- (templates_ids, param_types)
+          | NamespaceType SymbolTableType                   -- (symbol_table)
           deriving (Show)
 
 data Value = IntValue Int                     
@@ -51,7 +52,8 @@ data Value = IntValue Int
            | EnumValue String
            | FuncRefValue String
            | ProcRefValue String
-           | StructValue SymbolTableType MemoryTableType -- (internal_symbol_table, internal_memory)
+           | StructValue SymbolTableType MemoryTableType    -- (internal_symbol_table, internal_memory)
+           | NamespaceValue SymbolTableType MemoryTableType -- (internal_symbol_table, internal_memory)
 
 instance Eq Type where
     IntType == IntType = True
