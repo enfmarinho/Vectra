@@ -48,7 +48,7 @@ assertAssignableType symbolId t posn = do
     case t of
         ConstType _ -> semanticError errMsg
         ArrayType {} -> semanticError errMsg
-        -- TODO FuncType?
+        FuncType {} -> semanticError errMsg
         StructType {} -> semanticError errMsg
         _ -> return ()
 

@@ -36,6 +36,8 @@ data Type = IntType
           | StructType [String] SymbolTableType SymbolTableType -- (template_ids, table_for_methods, table_for_data)
           | StructInstanceType String                           -- (struct_type_id)
           | EnumInstanceType String                             -- (enum_type_id)
+          | FuncRefType [String] [Type] Type                    -- (templates_ids, param_types, return_type)
+          | ProcRefType [String] [Type]                         -- (templates_ids, param_types)
           deriving (Show)
 
 data Value = IntValue Int                     
@@ -46,6 +48,8 @@ data Value = IntValue Int
            | ConstValue Value                 
            | ArrayValue [Value]               
            | EnumValue String
+           | FuncRefValue String
+           | ProcRefValue String
            | StructValue SymbolTableType MemoryTableType -- (internal_symbol_table, internal_memory)
 
 instance Eq Type where
@@ -66,5 +70,9 @@ instance Eq Type where
     StructType {} == StructType {} = False
     StructInstanceType s1 == StructInstanceType s2 = s1 == s2
     EnumInstanceType e1 == EnumInstanceType e2 = e1 == e2
+    FuncRefType templates1 params1 r1 == FuncRefType templates2 params2 r2 = 
+        templates1 == templates2 && params1 == params2 && r1 == r2
+    ProcRefType templates1 params1 == ProcRefType templates2 params2 = 
+        templates1 == templates2 && params1 == params2
 
     _ == _ = False
