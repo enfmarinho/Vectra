@@ -5,7 +5,6 @@ module Parser
 import ParserState
 import TerminalTokens as TT
 import Scanner
-import Data.Maybe
 import Text.Parsec
 import Types
 import Assert
@@ -159,7 +158,7 @@ enumDecl = do
                     return [symbolId]
 
 optParamDeclList :: StateType ([Token], [(String, Type)])
-optParamDeclList = paramDeclList <|> return ([], [])
+optParamDeclList = option ([], []) paramDeclList
 
 paramDeclList :: StateType ([Token], [(String, Type)])
 paramDeclList = do
@@ -243,11 +242,11 @@ returnDecl :: StateType ([Token], Type)
 returnDecl = do
     _ <- TT.opSub
     _ <- TT.opGreater
-    (a, a_type) <- typeStmt
+    (a, aType) <- typeStmt
     optionB <- optionMaybe arrayDecl
     (b, returnType) <- case optionB of
-        Nothing -> return ([], a_type)
-        Just (b, arraySize) -> return (b, a_type) -- TODO change to array type of size arraySize
+        Nothing -> return ([], aType)
+        Just (b, arraySize) -> return (b, ArrayType arraySize aType)
     return (a ++ b, returnType)
 
 varDecl :: StateType [Token]
@@ -257,7 +256,7 @@ varDecl = do
     optionD <- optionMaybe arrayDecl
     (d, varType) <- case optionD of
                         Nothing -> return ([], bType)
-                        Just (d, arraySize) -> return (d, bType) -- TODO change bType to array type of size arraySize
+                        Just (d, arraySize) -> return (d, ArrayType arraySize bType)
     let ID posn symbolId = c
     checkShadowing symbolId posn
     insertSymbol (symbolId, bType)
@@ -274,7 +273,7 @@ varDecl = do
 var :: StateType ([Token], Type)
 var = do
     a <- TT.id
-    b <- optionMaybe memberAccess
+    b <- option [] memberAccess
 
     -- Checks if id symbol exists
     let ID _ symbol_id = a
@@ -283,7 +282,7 @@ var = do
                     Nothing -> semanticError "asd"
                     Just v -> return v
 
-    return (a:fromMaybe [] b, id_type)
+    return (a:b, id_type)
     where
         memberAccess :: StateType [Token]
         memberAccess = do
@@ -294,7 +293,7 @@ var = do
 callStmt :: StateType [Token]
 callStmt = do
     openScope False
-    (a, symbolType) <- var
+    (a, symbolType) <- var -- TODO var cannot be used in this context
 
     (templateIds, paramList, _funcBody) <- case symbolType of
                         FuncType _templateIds paramList _ _funcBody -> return (_templateIds, paramList, _funcBody)
@@ -440,7 +439,7 @@ mathOpSymbol = do
 assignStmt :: StateType [Token]
 assignStmt = do
     a <- TT.id
-    b <- optionMaybe mathOpSymbol
+    b <- option [] mathOpSymbol
     c <- TT.kwAssingment
     (d, d_type, d_value) <- expStmt
 
@@ -451,7 +450,7 @@ assignStmt = do
 
     -- TODO handle case b is Just
     -- updateValue (symbol_id, IntType 1) -- TODO actually update the symbol table correctly
-    return $ [a] ++ fromMaybe [] b ++ [c] ++ d
+    return $ [a] ++ b ++ [c] ++ d
 
 ifStmt :: StateType [Token]
 ifStmt = do
@@ -467,10 +466,10 @@ ifStmt = do
     e <- TT.indent
     f <- stmtList
     g <- TT.unindent
-    h <- optionMaybe elseStmt
+    h <- option [] elseStmt
 
     closeScope
-    return $ [a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g] ++ fromMaybe [] h
+    return $ [a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g] ++ h
 
 elseStmt :: StateType [Token]
 elseStmt = do
