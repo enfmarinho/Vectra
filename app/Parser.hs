@@ -24,14 +24,14 @@ vectraLanguage = do
 
         globalDecl :: StateType [Token]
         globalDecl = do
-            -- structDecl<|> 
-            enumDecl
+            structDecl 
+            <|> enumDecl
             <|> funcDecl
             <|> procDecl
             <|> varDecl
 
-template :: StateType ([Token], [String])
-template = do
+templateDecl :: StateType ([Token], [String])
+templateDecl = do
     a <- TT.opSmaller
     (b, bId) <- idSymbol
     c <- many $ do
@@ -183,7 +183,7 @@ procDecl :: StateType [Token]
 procDecl = do
     openScope False
     a <- TT.kwProc
-    (bTokens, bIds) <- option ([], []) template
+    (bTokens, bIds) <- option ([], []) templateDecl
     c <- TT.id
     _ <- TT.openParen
     (dTokens, dParams) <- optParamDeclList
@@ -205,7 +205,7 @@ funcDecl :: StateType [Token]
 funcDecl = do
     openScope False
     a <- TT.kwFunc
-    (templateTokens, templateIds) <- option ([], []) template
+    (templateTokens, templateIds) <- option ([], []) templateDecl
     c <- TT.id
     (d, paramList, returnType) <- funcDeclAux
 
@@ -536,7 +536,7 @@ typeStmt = do
                 return ([b], t)
             <|> do -- reference for method
                 b <- TT.openParen
-                (c, templateIds) <- option ([], []) template
+                (c, templateIds) <- option ([], []) templateDecl
                 d <- TT.openParen
                 (e, paramList) <- optParamDeclList
                 f <- TT.closeParen
