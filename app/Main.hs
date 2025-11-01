@@ -19,6 +19,6 @@ main = do
             sintax_result <- parser token_list
             case sintax_result of
                 Left err -> print err
-                Right ans -> print ans -- TODO a positive parser result should not be printed, this is only for development 
+                Right _ -> return ()
 
         _ -> putStrLn "Missing file to interprete, pass its path as a command line argument!"
