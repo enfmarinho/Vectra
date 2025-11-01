@@ -2,6 +2,7 @@ module Types where
 import qualified Data.HashTable.IO as H
 import Text.Parsec
 import Scanner
+import Data.Array
 
 type SymbolType = (String, Type)
 type SymbolTableType = H.BasicHashTable String Type
@@ -46,7 +47,7 @@ data Value = IntValue Int
            | BoolValue Bool                   
            | StringValue String               
            | ConstValue Value                 
-           | ArrayValue [Value]               
+           | ArrayValue (Array Int Value)
            | EnumValue String
            | FuncRefValue String
            | ProcRefValue String
