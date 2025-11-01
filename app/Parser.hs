@@ -75,66 +75,21 @@ insertTemplateInstantiation (t:typeRest) (s:symbolRest) = do
     insertTemplateInstantiation typeRest symbolRest
 
 
--- structDecl :: StateType [Token]
--- structDecl = do
---     _ <- TT.kwStruct
---     optionA <- optionMaybe template
---     b <- TT.id
---     _ <- TT.kwColumn
---     _ <- TT.indent
---     -- TODO insert templates in symbolTable in case there are
---     c <- structList
---     _ <- TT.unindent
---     -- TODO insert symbol to symbolTable
---     return $ fromMaybe [] a ++ [b] ++ c
---     where
---         structList = do
---             concat <$> (structStmt `sepEndBy1` TT.newLine)
---             where
---                 structStmt = do
---                     _isPublic <- do
---                                 _ <- TT.kwPrivate
---                                 return False
---                             <|> do
---                                 _ <- TT.kwPublic
---                                 return True
---                             <|> return True
---
---                     varDecl
---                     <|> procDecl
---                     <|> do
---                         a <- TT.kwFunc
---                         -- TODO maybe add const functions to structs
---                         -- TODO can i use option here ?
---                         b <- option [] destructorDecl
---                             <|> option [] template
---
---                         c <- TT.id
---                         -- TODO check if b is not Nothing, if so assure that c lexeme is the same as the struct name
---                         d <- optionMaybe operatorSymbol
---                         -- TODO if operatorSymbol is Just, id lexeme must be "operator"
---                         (e, t) <- funcDeclAux
---                         return $ [a] ++ b ++ [c] ++ fromMaybe [] d ++ e
---                     -- TODO insert symbol to symbolTable
---                 destructorDecl = do
---                     (:[]) <$> TT.kwTil
---                 operatorSymbol = do
---                     a <- optionMaybe mathOpSymbol
---                     case a of
---                         Just s -> return s
---                         Nothing -> do
---                             (:[]) <$> (TT.opSmaller
---                                     <|> TT.opSmallerEq
---                                     <|> TT.opGreater
---                                     <|> TT.opGreaterEq
---                                     <|> TT.opEq
---                                     <|> TT.opNotEq
---                                     <|> do
---                                         -- Only one of those token is enough to identify the operations, returning 
---                                         -- both of them would be unnecessary and annoying to do
---                                         _ <- TT.openBracket
---                                         TT.closeBracket
---                                     )
+structDecl :: StateType [Token]
+structDecl = do
+    openScope False
+    _ <- TT.kwStruct
+    (a, templateIds) <- option ([], []) templateDecl
+    b <- TT.id
+    _ <- TT.kwColumn
+    _ <- TT.indent
+    c <- concat <$> many1 varDecl
+    _ <- TT.unindent
+    structScope <- topScope
+    closeScope
+    let ID _posn symbolId = b
+    insertSymbol (symbolId, StructType templateIds structScope)
+    return $ a ++ [b] ++ c
 
 enumDecl :: StateType [Token]
 enumDecl = do
