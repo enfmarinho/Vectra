@@ -533,21 +533,26 @@ typeStmt = do
                 let ID posn s = b
                 t <- consultType s posn
                 return ([b], t)
-            -- <|> do -- functionType
-            --     optionB <- optionMaybe template
-            --     c <- TT.openParen
-            --     (d <- optParamDeclList
-            --     d <- TT.closeParen
-            --
-            --     return ([], FuncType )
+            <|> do -- reference for method
+                b <- TT.openParen
+                (c, templateIds) <- option ([], []) template
+                d <- TT.openParen
+                (e, paramList) <- optParamDeclList
+                f <- TT.closeParen
+                optionG <- optionMaybe returnDecl
 
-    final_t <- case a of
-                    Nothing -> return t
-                    Just _ -> return $ ConstType t
+                let (gTokens, t) = case optionG of
+                        Nothing -> ([], ProcRefType templateIds (map snd paramList))
+                        Just (returnTokens, returnType) -> (returnTokens, FuncRefType templateIds (map snd paramList) returnType)
 
-    return (b, final_t)
-    where constDecl = do
-            TT.kwConst
+                return ([b] ++ c ++ [d] ++ e ++ [f] ++ gTokens, t)
+
+    (aTokens, finalType) <- case a of
+                    Nothing -> return ([], t)
+                    Just aTokens -> return ([aTokens], ConstType t)
+
+    return (aTokens ++ b, finalType)
+    where constDecl = TT.kwConst
 
 forStmt :: StateType [Token]
 forStmt = do
