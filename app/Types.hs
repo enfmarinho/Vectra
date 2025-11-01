@@ -31,11 +31,12 @@ data Type = IntType
           | ConstType Type                                      -- (internal_type)
           | ArrayType Int Type                                  -- (size, type)                 
           | EnumType [String]                                   -- (valid_labels)
-          | ProcType [String] [Type] [Token]                    -- (template_ids, param_types, method_body)
-          | FuncType [String] [Type] Type [Token]               -- (template_ids, param_types, return_type, method_body)
+          | ProcType [String] [(String, Type)] [Token]          -- (template_ids, param_types, method_body)
+          | FuncType [String] [(String, Type)] Type [Token]     -- (template_ids, (param_ids, param_types), return_type, method_body)
           | StructType [String] SymbolTableType SymbolTableType -- (template_ids, table_for_methods, table_for_data)
           | StructInstanceType String                           -- (struct_type_id)
           | EnumInstanceType String                             -- (enum_type_id)
+          deriving (Show)
 
 data Value = IntValue Int                     
            | FloatValue Float                 
@@ -46,3 +47,24 @@ data Value = IntValue Int
            | ArrayValue [Value]               
            | EnumValue String
            | StructValue SymbolTableType MemoryTableType -- (internal_symbol_table, internal_memory)
+
+instance Eq Type where
+    IntType == IntType = True
+    FloatType == FloatType = True
+    CharType == CharType = True
+    BoolType == BoolType = True
+    StringType == StringType = True
+    TemplateType == TemplateType = True
+    RefType t1 == RefType t2 = t1 == t2
+    ConstType t1 == ConstType t2 = t1 == t2
+    ArrayType _ t1 == ArrayType _ t2 = t1 == t2
+    EnumType _ == EnumType _ = False
+    ProcType templates1 params1 _ == ProcType templates2 params2 _ =
+        templates1 == templates2 && params1 == params2
+    FuncType templates1 params1 r1 _ == FuncType templates2 params2 r2 _ =
+        templates1 == templates2 && params1 == params2 && r1 == r2
+    StructType {} == StructType {} = False
+    StructInstanceType s1 == StructInstanceType s2 = s1 == s2
+    EnumInstanceType e1 == EnumInstanceType e2 = e1 == e2
+
+    _ == _ = False
