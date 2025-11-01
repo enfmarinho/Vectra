@@ -262,8 +262,8 @@ varDecl = do
     insertSymbol (symbolId, bType)
     e <- do
             e <- TT.kwAssingment
-            (f, f_type, f_value) <- expStmt
-            assertTypesEq bType f_type posn
+            (f, fType, fValue) <- expStmt
+            assertTypesEq bType fType posn
             -- TODO insert it's value in memory
             return $ e:f
         <|> return []
@@ -276,13 +276,13 @@ var = do
     b <- option [] memberAccess
 
     -- Checks if id symbol exists
-    let ID _ symbol_id = a
-    consultResult <- consultSymbol symbol_id
-    id_type <- case consultResult of
+    let ID _ symbolId = a
+    consultResult <- consultSymbol symbolId
+    idType <- case consultResult of
                     Nothing -> semanticError "asd"
                     Just v -> return v
 
-    return (a:b, id_type)
+    return (a:b, idType)
     where
         memberAccess :: StateType [Token]
         memberAccess = do
@@ -443,15 +443,15 @@ assignStmt = do
     a <- TT.id
     b <- option [] mathOpSymbol
     c <- TT.kwAssingment
-    (d, d_type, d_value) <- expStmt
+    (d, dType, dValue) <- expStmt
 
-    let ID posn symbol_id = a
-    symbolType <- consultType symbol_id posn
+    let ID posn symbolId = a
+    symbolType <- consultType symbolId posn
 
-    assertTypesEq symbolType d_type posn
+    assertTypesEq symbolType dType posn
 
     -- TODO handle case b is Just
-    -- updateValue (symbol_id, IntType 1) -- TODO actually update the symbol table correctly
+    -- updateValue (symbolId, IntType 1) -- TODO actually update the symbol table correctly
     return $ [a] ++ b ++ [c] ++ d
 
 ifStmt :: StateType [Token]
@@ -610,7 +610,7 @@ foreachStmt = do
     return $ [a] ++ [b] ++ [c] ++ [d] ++ [e] ++ [f] ++ [g] ++ h ++ [i]
 
 parser :: [Token] -> IO (Either ParseError [Token])
-parser token_list = do
+parser tokenList = do
     parserState <- initParserState
     -- TODO improve error message
-    runParserT vectraLanguage parserState "Error message" token_list
+    runParserT vectraLanguage parserState "Error message" tokenList

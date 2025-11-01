@@ -10,14 +10,14 @@ main = do
     args <- getArgs
     case args of 
         [filename] -> do
-            lexical_result <- getTokens filename
-            token_list <- case lexical_result of
+            lexicalResult <- getTokens filename
+            tokenList <- case lexicalResult of
                 Left _ -> do
                     exitSuccess -- End execution early since a lexical error has been found
-                Right token_list -> return token_list
+                Right tokenList -> return tokenList
             
-            sintax_result <- parser token_list
-            case sintax_result of
+            sintaxResult <- parser tokenList
+            case sintaxResult of
                 Left err -> print err
                 Right _ -> return ()
 

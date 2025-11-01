@@ -62,32 +62,32 @@ closeScope = do
       }
 
 insertSymbol :: SymbolType -> StateType ()
-insertSymbol (symbol_id, symbol_type) = do
+insertSymbol (symbolId, symbolType) = do
     st@ParserState{..} <- getState
     case symbolTableStack of
         [] -> do
-            liftIO $ H.insert globalSymbolTable symbol_id symbol_type
+            liftIO $ H.insert globalSymbolTable symbolId symbolType
             putState st { globalSymbolTable = globalSymbolTable }
         (top : rest) -> do
             let (table, b) = top
-            liftIO $ H.insert table symbol_id symbol_type
+            liftIO $ H.insert table symbolId symbolType
             putState st { symbolTableStack = (table, b):rest}
 
 insertValue :: MemoryType -> StateType ()
-insertValue (symbol_id, value) = do
+insertValue (symbolId, value) = do
     st@ParserState{..} <- getState
     case memoryTableStack of
         [] -> do
-            liftIO $ H.insert globalMemoryTable symbol_id value
+            liftIO $ H.insert globalMemoryTable symbolId value
             putState st { globalMemoryTable = globalMemoryTable }
         (top : rest) -> do
-            liftIO $ H.insert top symbol_id value
+            liftIO $ H.insert top symbolId value
             putState st { memoryTableStack = top:rest}
 
 updateValue :: MemoryType -> StateType ()
-updateValue (symbol_id, value) = do
+updateValue (symbolId, value) = do
     ParserState{..} <- getState
-    liftIO $ update (symbol_id, value) memoryTableStack
+    liftIO $ update (symbolId, value) memoryTableStack
   where
     update :: MemoryType -> MemoryTableStackType -> IO ()
     update (_, _) [] = return ()
