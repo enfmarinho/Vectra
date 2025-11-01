@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 module Parser
   ( parser
   ) where
@@ -30,9 +29,7 @@ vectraLanguage = do
             enumDecl
             <|> funcDecl
             <|> procDecl
-            <|> do
-                (a, t) <- varDecl
-                return a
+            <|> varDecl
 
 template :: StateType ([Token], [String])
 template = do
@@ -148,11 +145,11 @@ enumDecl = do
     _ <- TT.newLine
     _ <- TT.indent
     b <- idList
-    
+
     let ID _posn enumId = a
     insertSymbol (enumId, EnumType b)
     return [a]
-    where 
+    where
         idList :: StateType [String]
         idList = do
             concat <$> (ids `sepEndBy1` TT.newLine)
@@ -187,7 +184,7 @@ procDecl :: StateType [Token]
 procDecl = do
     openScope False
     a <- TT.kwProc
-    optionB <- optionMaybe template
+    (bTokens, bIds) <- option ([], []) template
     c <- TT.id
     _ <- TT.openParen
     (dTokens, dParams) <- optParamDeclList
@@ -198,29 +195,24 @@ procDecl = do
     e <- stmtList
     _ <- TT.unindent
 
+    closeScope
+
     let ID _posn symbolId = c
-    let (bTokens, bIds) = case optionB of
-                    Nothing -> ([], [])
-                    Just (tokenList, idsList) -> (tokenList, idsList)
     insertSymbol (symbolId, ProcType bIds dParams e)
 
-    closeScope
     return $ [a] ++ bTokens ++ [c] ++ dTokens ++ e
 
 funcDecl :: StateType [Token]
 funcDecl = do
     openScope False
     a <- TT.kwFunc
-    optionB <- optionMaybe template
+    (templateTokens, templateIds) <- option ([], []) template
     c <- TT.id
     (d, paramList, returnType) <- funcDeclAux
 
-    let ID _posn symbolId = c
-    let (templateTokens, templateIds) = case optionB of
-                                            Nothing -> ([], [])
-                                            Just (tokenList, idsList) -> (tokenList, idsList) 
-    insertSymbol (symbolId, FuncType templateIds paramList returnType d)
     closeScope
+    let ID _posn symbolId = c
+    insertSymbol (symbolId, FuncType templateIds paramList returnType d)
 
     return $ [a] ++ templateTokens ++ [c] ++ d
 
@@ -258,7 +250,7 @@ returnDecl = do
         Just (b, arraySize) -> return (b, a_type) -- TODO change to array type of size arraySize
     return (a ++ b, returnType)
 
-varDecl :: StateType ([Token], Type)
+varDecl :: StateType [Token]
 varDecl = do
     (b, bType) <- typeStmt
     c <- TT.id
@@ -277,7 +269,7 @@ varDecl = do
             return $ e:f
         <|> return []
 
-    return (b ++ [c] ++ d ++ e, varType)
+    return (b ++ [c] ++ d ++ e)
 
 var :: StateType ([Token], Type)
 var = do
@@ -318,7 +310,7 @@ callStmt = do
 
     let OPEN_PAREN posn = c
     let (_, expectedParamTypes) = unzip paramList
-    assertTypesMatch expectedParamTypes typeList posn
+    assertValidParamList expectedParamTypes typeList posn
 
     -- TODO Instantiate args
     -- TODO actually run the function body
@@ -344,7 +336,7 @@ funcCallStmt = do
 
     let OPEN_PAREN posn = c
     let (_, expectedParamTypes) = unzip paramList
-    assertTypesMatch expectedParamTypes typeList posn
+    assertValidParamList expectedParamTypes typeList posn
 
     -- TODO Instantiate args
     -- TODO actually run the function body
@@ -428,12 +420,12 @@ loopStmtList = do
 
 stmt :: StateType [Token]
 stmt = do
-    assignStmt
+    try assignStmt
     <|> ifStmt
     <|> whileStmt
     <|> forStmt
     <|> foreachStmt
-    <|> callStmt
+    <|> try callStmt
 
 mathOpSymbol :: StateType [Token]
 mathOpSymbol = do
@@ -561,7 +553,7 @@ forStmt :: StateType [Token]
 forStmt = do
     openScope True
     a <- TT.kwFor
-    optionB <- optionMaybe varDecl
+    b <- option [] varDecl
     c <- TT.kwSemicolumn
     optionD <- optionMaybe expStmt
 
@@ -580,9 +572,6 @@ forStmt = do
     j <- loopStmtList
     k <- TT.unindent
 
-    b <- case optionB of
-            Nothing -> return []
-            Just (b, _) -> return b
     f <- case optionF of
             Nothing -> return []
             Just (f, _, _) -> return f
@@ -597,9 +586,13 @@ foreachStmt = do
     c <- TT.kwIn
     d <- TT.id
 
-    let ID posn symbol_id = d
-    symbol_type <- consultType symbol_id posn
-    assertArrayType symbol_type posn
+    let ID posn dSymbol = d
+    dType <- consultType dSymbol posn
+    assertIterableType dSymbol dType posn
+
+    let ArrayType _size underlyingType = dType
+    let ID _ bSymbol = b
+    insertSymbol (bSymbol, underlyingType)
 
     e <- TT.kwColumn
     f <- TT.newLine
@@ -614,4 +607,4 @@ parser :: [Token] -> IO (Either ParseError [Token])
 parser token_list = do
     parserState <- initParserState
     -- TODO improve error message
-    runParserT stmtList parserState "Error message" token_list
+    runParserT vectraLanguage parserState "Error message" token_list
