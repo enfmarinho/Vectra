@@ -52,6 +52,7 @@ tokens :-
     -- Keywords
     namespace    { \aInp _ -> do t <- handleIndentation (KW_NAMESPACE (alexPos aInp)); return $ Just t }
     const        { \aInp _ -> do t <- handleIndentation (KW_CONST (alexPos aInp)); return $ Just t }
+    impl         { \aInp _ -> do t <- handleIndentation (KW_IMPL (alexPos aInp)); return $ Just t }
     int          { \aInp _ -> do t <- handleIndentation (KW_INT (alexPos aInp)); return $ Just t }
     float        { \aInp _ -> do t <- handleIndentation (KW_FLOAT (alexPos aInp)); return $ Just t }
     string       { \aInp _ -> do t <- handleIndentation (KW_STRING (alexPos aInp)); return $ Just t }
@@ -238,6 +239,7 @@ data Token =
   KW_ELSE AlexPosn |
   KW_STRUCT AlexPosn |
   KW_CONST AlexPosn |
+  KW_IMPL AlexPosn |
   KW_TRUE AlexPosn |
   KW_FALSE AlexPosn |
   KW_RETURN AlexPosn |
