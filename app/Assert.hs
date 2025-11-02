@@ -1,15 +1,10 @@
 module Assert where
 
 import Scanner
-import Text.Parsec
 import ParserState
 import Types
 import Control.Monad (when)
 import Control.Monad.IO.Class (MonadIO(liftIO))
-
--- Aux function to emit semantic error messages and finish execution early with err
-semanticError :: String -> StateType a
-semanticError msg = parserFail ("Semantic Error: " ++ msg)
 
 warningMsg :: String -> StateType ()
 warningMsg msg = liftIO $ putStrLn $ "Warning: " ++ msg
@@ -18,18 +13,51 @@ showPos :: AlexPosn -> String
 showPos (AlexPn _ line col) =
     "(Line " ++ show line ++ ", Column " ++ show col ++ ")"
 
+consultTypeList :: String -> AlexPosn -> StateType [Type]
+consultTypeList symbolId posn = do
+    consultResult <- consultSymbol symbolId
+    case consultResult of
+        Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
+        Just t -> return t
+
+getEnumOrStructTypes :: String -> AlexPosn -> [Type] -> StateType Type
+getEnumOrStructTypes symbolId posn (h:t) = do
+    case h of
+        EnumType list -> return  $ EnumType list
+        StructType templateList dataList -> return $ StructType templateList dataList
+        _ -> getEnumOrStructTypes symbolId posn t
+getEnumOrStructTypes symbolId posn [] = do
+    semanticError $ symbolId ++ " should be either an Enum or a Struct " ++ showPos posn
+
+
 consultType :: String -> AlexPosn -> StateType Type
 consultType symbolId posn = do
     consultResult <- consultSymbol symbolId
     case consultResult of
         Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
-        Just t -> return t
+        Just [] -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
+        Just [h] -> return h
+        Just (h:t) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
 
 assertIterableType :: String -> Type -> AlexPosn -> StateType ()
 assertIterableType symbolId t posn = do
     case t of
         ArrayType _ _ -> return ()
         _ -> semanticError $ symbolId ++ " is not iterable " ++ showPos posn
+
+assertStructType :: String -> [Type] -> AlexPosn -> StateType ()
+assertStructType symbolId (h:t) posn = do
+    case h of
+        StructType {} -> assertStructType symbolId t posn
+        NamespaceType {} -> assertStructType symbolId t posn
+        _ -> semanticError $ symbolId ++ " must be a struct " ++ showPos posn
+assertStructType _ [] _ = return ()
+
+assertNamespaceType :: String -> Type -> AlexPosn -> StateType ()
+assertNamespaceType symbolId t posn = do
+    case t of
+        NamespaceType {} -> return ()
+        _ -> semanticError $ symbolId ++ " must be a namespace " ++ showPos posn
 
 assertBooleanCompatible :: Type -> AlexPosn -> StateType ()
 assertBooleanCompatible t posn = do
@@ -53,13 +81,19 @@ assertAssignableType symbolId t posn = do
         _ -> return ()
 
 assertTypesEq :: Type -> Type -> AlexPosn -> StateType ()
-assertTypesEq lhs rhs posn = do
-    when (lhs /= rhs) 
-        $ semanticError $ "Type mismatch between " ++ show lhs ++ " and " ++ show rhs ++ " " ++ showPos posn  
+assertTypesEq l r posn = do
+    when (l /= r)
+        $ semanticError $ "Type mismatch between " ++ show l ++ " and " ++ show r ++ " " ++ showPos posn
+
+assertTypeListTypeEq :: [Type] -> Type -> AlexPosn -> StateType ()
+assertTypeListTypeEq (l:ltail) r posn = do
+    when (l /= r && null ltail)
+        $ semanticError $ "Type mismatch between " ++ show l ++ " and " ++ show r ++ " " ++ showPos posn
+assertTypeListTypeEq [] _ posn = semanticError $ "Type mismatch "  ++ showPos posn
 
 assertValidParamList :: [Type] -> [Type] -> AlexPosn -> StateType ()
 assertValidParamList (l:lRest) (r:rRest) posn = do
-    when (l /= r) 
+    when (l /= r)
         $ semanticError $ "Type mismatch in method call: expected " ++ show r ++ ", but got " ++ show l ++ " " ++ showPos posn
     assertValidParamList lRest rRest posn
 assertValidParamList [] (_:_) posn = do

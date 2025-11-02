@@ -49,7 +49,7 @@ templateDecl = do
     idSymbol = do
         a <- TT.id
         let ID _posn symbolId = a
-        insertSymbol (symbolId, TemplateType)
+        insertSymbol (symbolId, TemplateType) False
         return (a, symbolId)
 
 
@@ -71,7 +71,7 @@ insertTemplateInstantiation [] [] = return ()
 insertTemplateInstantiation (_:_) [] = semanticError "Template instantiation: missing symbols"
 insertTemplateInstantiation [] (_:_) = semanticError "Template instantiation: missing types"
 insertTemplateInstantiation (t:typeRest) (s:symbolRest) = do
-    insertSymbol (s, t)
+    insertSymbol (s, t) False
     insertTemplateInstantiation typeRest symbolRest
 
 
@@ -83,12 +83,12 @@ structDecl = do
     b <- TT.id
     _ <- TT.kwColumn
     _ <- TT.indent
-    c <- concat <$> many1 varDecl
+    c <- concat <$> many1 varDecl -- TODO handle private and public kws
     _ <- TT.unindent
     structScope <- topScope
     closeScope
     let ID _posn symbolId = b
-    insertSymbol (symbolId, StructType templateIds structScope)
+    insertSymbol (symbolId, StructType templateIds structScope) False
     return $ a ++ [b] ++ c
 
 enumDecl :: StateType [Token]
@@ -101,7 +101,7 @@ enumDecl = do
     b <- idList
 
     let ID _posn enumId = a
-    insertSymbol (enumId, EnumType b)
+    insertSymbol (enumId, EnumType b) False
     return [a]
     where
         idList :: StateType [String]
@@ -131,7 +131,7 @@ paramDeclList = do
             (a, varType) <- typeStmt
             b <- TT.id
             let ID _posn symbolId = b
-            insertSymbol (symbolId, varType)
+            insertSymbol (symbolId, varType) False
             return (a ++ [b], (symbolId, varType))
 
 procDecl :: StateType [Token]
@@ -152,7 +152,7 @@ procDecl = do
     closeScope
 
     let ID _posn symbolId = c
-    insertSymbol (symbolId, ProcType bIds dParams e)
+    insertSymbol (symbolId, ProcType bIds dParams e) True
 
     return $ [a] ++ bTokens ++ [c] ++ dTokens ++ e
 
@@ -166,7 +166,8 @@ funcDecl = do
 
     closeScope
     let ID _posn symbolId = c
-    insertSymbol (symbolId, FuncType templateIds paramList returnType d)
+    -- TODO check for existing method with the same signature, should be a warning or an error
+    insertSymbol (symbolId, FuncType templateIds paramList returnType d) True
 
     return $ [a] ++ templateTokens ++ [c] ++ d
 
@@ -214,7 +215,7 @@ varDecl = do
                         Just (d, arraySize) -> return (d, ArrayType arraySize bType)
     let ID posn symbolId = c
     checkShadowing symbolId posn
-    insertSymbol (symbolId, bType)
+    insertSymbol (symbolId, bType) False
     e <- do
             e <- TT.kwAssingment
             (f, fType, fValue) <- expStmt
@@ -231,11 +232,8 @@ var = do
     b <- option [] memberAccess
 
     -- Checks if id symbol exists
-    let ID _ symbolId = a
-    consultResult <- consultSymbol symbolId
-    idType <- case consultResult of
-                    Nothing -> semanticError "asd"
-                    Just v -> return v
+    let ID posn symbolId = a
+    idType <- consultType symbolId posn
 
     return (a:b, idType)
     where
@@ -487,7 +485,7 @@ typeStmt = do
             <|> do -- customType
                 b <- TT.id
                 let ID posn s = b
-                t <- consultType s posn
+                t <- consultTypeList s posn >>= getEnumOrStructTypes s posn
                 return ([b], t)
             <|> do -- reference for method
                 b <- TT.openParen
@@ -553,7 +551,7 @@ foreachStmt = do
 
     let ArrayType _size underlyingType = dType
     let ID _ bSymbol = b
-    insertSymbol (bSymbol, underlyingType)
+    insertSymbol (bSymbol, underlyingType) False
 
     e <- TT.kwColumn
     f <- TT.newLine

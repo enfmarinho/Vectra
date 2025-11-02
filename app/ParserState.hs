@@ -1,22 +1,16 @@
 {-# LANGUAGE RecordWildCards #-}
-module ParserState
-  ( SymbolType
-  , SymbolTableType
-  , SymbolTableStackType
-  , StateType
-  , initParserState
-  , openScope
-  , closeScope
-  , insertSymbol
-  , insertValue
-  , updateValue
-  , consultSymbol
-  ) where
+module ParserState where
 
 import qualified Data.HashTable.IO as H
 import Types
 import Text.Parsec
 import Control.Monad.State.Lazy
+import Data.Maybe (fromMaybe)
+import Data.Foldable
+
+-- Aux function to emit semantic error messages and finish execution early with err
+semanticError :: String -> StateType a
+semanticError msg = parserFail ("Semantic Error: " ++ msg)
 
 initParserState :: IO ParserState
 initParserState = do
@@ -61,16 +55,67 @@ closeScope = do
       , memoryTableStack = newMemoryStack
       }
 
-insertSymbol :: SymbolType -> StateType ()
-insertSymbol (symbolId, symbolType) = do
+topScope :: StateType SymbolTableType
+topScope = do
+    ParserState{..} <- getState
+    case symbolTableStack of
+        [] -> return globalSymbolTable
+        (top : _) -> do
+            let (table, _) = top
+            return table
+
+addImplMethods :: SymbolType -> StateType ()
+addImplMethods (symbolId, NamespaceType st) = do
+    result <- consultSymbol symbolId
+    case result of
+        Nothing -> semanticError "TODO How did we get here ??????" 
+        Just typeList -> findUpdateNamespace typeList []
+    where 
+        findUpdateNamespace (NamespaceType currSt:t) carry = do
+            liftIO $ mergeSymbolTables currSt st
+            updateSymbol symbolId $ carry ++ [NamespaceType currSt] ++ t
+        findUpdateNamespace (h:t) carry = findUpdateNamespace t (h:carry)
+        findUpdateNamespace [] _ = 
+            insertSymbol (symbolId, NamespaceType st) True
+addImplMethods (_, _) = fail "TODO write errmsg: should not get into this"
+
+mergeSymbolTables :: SymbolTableType -> SymbolTableType -> IO ()
+mergeSymbolTables dst src = do
+    pairs <- liftIO $ H.toList src
+    forM_ pairs $ \(k, v) -> do
+        existing <- liftIO $ H.lookup dst k
+        case existing of
+            Nothing -> liftIO $ H.insert dst k v
+            Just existingList -> liftIO $ H.insert dst k (existingList ++ v)
+            
+updateSymbol :: String -> [Type] -> StateType ()
+updateSymbol symbolId typeList = do
     st@ParserState{..} <- getState
     case symbolTableStack of
         [] -> do
-            liftIO $ H.insert globalSymbolTable symbolId symbolType
+            liftIO $ H.insert globalSymbolTable symbolId typeList
             putState st { globalSymbolTable = globalSymbolTable }
         (top : rest) -> do
             let (table, b) = top
-            liftIO $ H.insert table symbolId symbolType
+            liftIO $ H.insert table symbolId typeList
+            putState st { symbolTableStack = (table, b):rest}
+
+insertSymbol :: SymbolType -> Bool -> StateType ()
+insertSymbol (symbolId, symbolType) canBeDuplicate = do
+    st@ParserState{..} <- getState
+    case symbolTableStack of
+        [] -> do
+            existingSymbol <- liftIO $ H.lookup globalSymbolTable symbolId
+            if canBeDuplicate then
+                liftIO $ H.insert globalSymbolTable symbolId $ fromMaybe [] existingSymbol ++ [symbolType]
+                else liftIO $ H.insert globalSymbolTable symbolId [symbolType]
+            putState st { globalSymbolTable = globalSymbolTable }
+        (top : rest) -> do
+            let (table, b) = top
+            existingSymbol <- liftIO $ H.lookup table symbolId
+            if canBeDuplicate then
+                liftIO $ H.insert table symbolId $ fromMaybe [] existingSymbol ++ [symbolType]
+                else liftIO $ H.insert table symbolId [symbolType]
             putState st { symbolTableStack = (table, b):rest}
 
 insertValue :: MemoryType -> StateType ()
@@ -97,12 +142,12 @@ updateValue (symbolId, value) = do
             Just _ -> H.insert top n v
             Nothing -> update (n, v) rest
 
-consultSymbol :: String -> StateType (Maybe Type)
+consultSymbol :: String -> StateType (Maybe [Type])
 consultSymbol symbol = do
     ParserState{..} <- getState
     liftIO $ search symbol symbolTableStack
   where
-    search :: String -> SymbolTableStackType -> IO (Maybe Type)
+    search :: String -> SymbolTableStackType -> IO (Maybe [Type])
     search _ [] = return Nothing
     search name ((table, canAccessParent):rest) = do
         result <- H.lookup table name

@@ -5,7 +5,7 @@ import Scanner
 import Data.Array
 
 type SymbolType = (String, Type)
-type SymbolTableType = H.BasicHashTable String Type
+type SymbolTableType = H.BasicHashTable String [Type]
 type SymbolTableStackType = [(SymbolTableType, Bool)]
 
 type MemoryType = (String, Value)
