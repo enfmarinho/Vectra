@@ -37,7 +37,7 @@ consultType symbolId posn = do
         Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
         Just [] -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
         Just [h] -> return h
-        Just (h:t) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
+        Just (_:_) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
 
 assertIterableType :: String -> Type -> AlexPosn -> StateType ()
 assertIterableType symbolId t posn = do
@@ -45,18 +45,19 @@ assertIterableType symbolId t posn = do
         ArrayType _ _ -> return ()
         _ -> semanticError $ symbolId ++ " is not iterable " ++ showPos posn
 
-assertStructType :: String -> [Type] -> AlexPosn -> StateType ()
-assertStructType symbolId (h:t) posn = do
+assertStructType :: String -> AlexPosn -> [Type]  -> StateType ()
+assertStructType symbolId posn (h:t) = do
     case h of
-        StructType {} -> assertStructType symbolId t posn
-        NamespaceType {} -> assertStructType symbolId t posn
+        StructType {} -> assertStructType symbolId posn t
+        ImplNamespaceType {} -> assertStructType symbolId posn t 
         _ -> semanticError $ symbolId ++ " must be a struct " ++ showPos posn
-assertStructType _ [] _ = return ()
+assertStructType _ _ [] = return ()
 
 assertNamespaceType :: String -> Type -> AlexPosn -> StateType ()
 assertNamespaceType symbolId t posn = do
     case t of
         NamespaceType {} -> return ()
+        ImplNamespaceType {} -> return ()
         _ -> semanticError $ symbolId ++ " must be a namespace " ++ showPos posn
 
 assertBooleanCompatible :: Type -> AlexPosn -> StateType ()

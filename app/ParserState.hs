@@ -71,12 +71,12 @@ addImplMethods (symbolId, NamespaceType st) = do
         Nothing -> semanticError "TODO How did we get here ??????" 
         Just typeList -> findUpdateNamespace typeList []
     where 
-        findUpdateNamespace (NamespaceType currSt:t) carry = do
+        findUpdateNamespace (ImplNamespaceType currSt:t) carry = do
             liftIO $ mergeSymbolTables currSt st
             updateSymbol symbolId $ carry ++ [NamespaceType currSt] ++ t
         findUpdateNamespace (h:t) carry = findUpdateNamespace t (h:carry)
         findUpdateNamespace [] _ = 
-            insertSymbol (symbolId, NamespaceType st) True
+            insertSymbol (symbolId, ImplNamespaceType st) True
 addImplMethods (_, _) = fail "TODO write errmsg: should not get into this"
 
 mergeSymbolTables :: SymbolTableType -> SymbolTableType -> IO ()

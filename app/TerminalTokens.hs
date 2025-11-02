@@ -2,7 +2,7 @@ module TerminalTokens where
 
 import Scanner
 import Text.Parsec
-import ParserState
+import Types
 
 id :: StateType Token
 id = tokenPrim show updatePos getToken where

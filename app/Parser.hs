@@ -398,6 +398,7 @@ stmt = do
     <|> forStmt
     <|> foreachStmt
     <|> try callStmt
+    <|> varDecl
 
 mathOpSymbol :: StateType [Token]
 mathOpSymbol = do
@@ -446,19 +447,19 @@ ifStmt = do
 
 elseStmt :: StateType [Token]
 elseStmt = do
-    openScope True
     a <- TT.newLine
     b <- TT.kwElse
     c <- ifStmt
       <|> do
+            openScope True
             d <- TT.kwColumn
             e <- TT.newLine
             f <- TT.indent
             g <- stmtList
             h <- TT.unindent
+            closeScope
             return $ [d] ++ [e] ++ [f] ++ g ++ [h]
 
-    closeScope
     return $ [a] ++ [b] ++ c
 
 whileStmt :: StateType [Token]

@@ -40,6 +40,7 @@ data Type = IntType
           | FuncRefType [String] [Type] Type                -- (templates_ids, param_types, return_type)
           | ProcRefType [String] [Type]                     -- (templates_ids, param_types)
           | NamespaceType SymbolTableType                   -- (symbol_table)
+          | ImplNamespaceType SymbolTableType               -- (symbol_table)
           deriving (Show)
 
 data Value = IntValue Int                     
