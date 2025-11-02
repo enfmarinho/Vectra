@@ -440,27 +440,31 @@ ifStmt = do
     e <- TT.indent
     f <- stmtList
     g <- TT.unindent
-    h <- option [] elseStmt
+    h <- concat <$> option [] (many $ try elseIfStmt)
+    i <- option [] elseStmt
 
     closeScope
-    return $ [a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g] ++ h
-
-elseStmt :: StateType [Token]
-elseStmt = do
-    a <- TT.newLine
-    b <- TT.kwElse
-    c <- ifStmt
-      <|> do
+    return $ [a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g] ++ h ++ i
+    where 
+        elseIfStmt :: StateType [Token]
+        elseIfStmt = do
+            a <- TT.newLine
+            b <- TT.kwElse
+            c <- ifStmt
+            return $ [a] ++ [b] ++ c
+        elseStmt :: StateType [Token]
+        elseStmt = do
             openScope True
-            d <- TT.kwColumn
-            e <- TT.newLine
-            f <- TT.indent
-            g <- stmtList
-            h <- TT.unindent
+            a <- TT.newLine
+            b <- TT.kwElse
+            c <- TT.kwColumn
+            d <- TT.newLine
+            e <- TT.indent
+            f <- stmtList
+            g <- TT.unindent
             closeScope
-            return $ [d] ++ [e] ++ [f] ++ g ++ [h]
+            return $ [a] ++ [b] ++ [c] ++ [d] ++ [e] ++ f ++ [g]
 
-    return $ [a] ++ [b] ++ c
 
 whileStmt :: StateType [Token]
 whileStmt = do
