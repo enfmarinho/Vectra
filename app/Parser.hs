@@ -91,6 +91,24 @@ structDecl = do
     insertSymbol (symbolId, StructType templateIds structScope) False
     return $ a ++ [b] ++ c
 
+implDecl :: StateType [Token]
+implDecl = do
+    openScope False
+    _ <- TT.kwImpl
+    a <- TT.id
+    
+    let ID posn symbolId = a
+    consultTypeList symbolId posn >>= assertStructType symbolId posn
+
+    _ <- TT.kwColumn
+    _ <- TT.indent
+    c <- concat <$> many1 (try procDecl <|> funcDecl) -- TODO handle private and public kws
+    _ <- TT.unindent
+    implScope <- topScope
+    closeScope
+    addImplMethods (symbolId, ImplNamespaceType implScope)
+    return []
+
 enumDecl :: StateType [Token]
 enumDecl = do
     _ <- TT.kwEnum
