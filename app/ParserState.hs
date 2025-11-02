@@ -64,6 +64,14 @@ topScope = do
             let (table, _) = top
             return table
 
+getIsRunning :: StateType Bool
+getIsRunning = isRunning <$> getState
+
+setIsRunning :: Bool -> StateType ()
+setIsRunning run = do
+  st <- getState
+  putState st { isRunning = run }
+
 addImplMethods :: SymbolType -> StateType ()
 addImplMethods (symbolId, NamespaceType st) = do
     result <- consultSymbol symbolId
