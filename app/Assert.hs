@@ -117,4 +117,37 @@ checkShadowing symbolId posn = do
         Nothing -> return ()
         Just _ -> warningMsg $ "Declaring " ++ symbolId ++ " shadows and exists symbol " ++ showPos posn
 
+handleAdd :: Value -> Value -> StateType Value
+handleAdd lhs _rhs = do
+    -- TODO
+    return lhs
 
+handleSub :: Value -> Value -> StateType Value
+handleSub lhs _rhs = do
+    -- TODO
+    return lhs
+
+handleMult :: Value -> Value -> StateType Value
+handleMult lhs _rhs = do
+    -- TODO
+    return lhs
+
+handleDiv :: Value -> Value -> StateType Value
+handleDiv lhs _rhs = do
+    -- TODO
+    return lhs
+
+handleAnd :: Value -> Value -> StateType Value
+handleAnd lhs _rhs = do
+    -- TODO
+    return lhs
+
+handleOr :: Value -> Value -> StateType Value
+handleOr lhs _rhs = do
+    -- TODO
+    return lhs
+
+handleNot :: Value -> StateType Value
+handleNot lhs = do
+    -- TODO
+    return lhs
