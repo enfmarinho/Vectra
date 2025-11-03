@@ -381,20 +381,20 @@ stmt = do
         return a)
     <|> varDecl
 
-mathOpSymbol :: StateType [Token]
+mathOpSymbol :: StateType Token
 mathOpSymbol = do
-    (:[]) <$> (TT.opAdd
-            <|> TT.opSub
-            <|> TT.opMult
-            <|> TT.opDiv
-            <|> TT.opAnd
-            <|> TT.opOr
-            <|> TT.opNot)
+    TT.opAdd
+    <|> TT.opSub
+    <|> TT.opMult
+    <|> TT.opDiv
+    <|> TT.opAnd
+    <|> TT.opOr
+    <|> TT.opNot
 
 assignStmt :: StateType [Token]
 assignStmt = do
     a <- TT.id
-    b <- option [] mathOpSymbol
+    optionB <- optionMaybe mathOpSymbol
     c <- TT.kwAssingment
     (d, dType, dValue) <- expStmt
 
@@ -403,8 +403,23 @@ assignStmt = do
 
     assertTypesEq symbolType dType posn
 
-    -- TODO handle case b is Just
-    updateValue (symbolId, dValue)
+    (b, value) <- case optionB of
+                    Nothing -> return ([], dValue)
+                    Just op -> do
+                                maybeValue <- consultValue symbolId
+                                value <- case maybeValue of
+                                    Nothing -> semanticError $ "Trying to use " ++ symbolId ++ " without initializing it " ++ showPos posn
+                                    Just value -> return value
+                                resultValue <- case op of
+                                            OP_ADD _ -> handleAdd value dValue
+                                            OP_SUB _ -> handleSub value dValue
+                                            OP_MULT _ -> handleMult value dValue
+                                            OP_DIV _ ->handleDiv value dValue
+                                            OP_AND _ ->handleAnd value dValue
+                                            OP_OR _ -> handleOr value dValue
+                                            _ -> semanticError $ "Invalid operation on assignment operation for " ++ symbolId ++ " " ++ showPos posn
+                                return ([op], resultValue)
+    updateValue (symbolId, value)
     return $ [a] ++ b ++ [c] ++ d
 
 ifStmt :: StateType [Token]
