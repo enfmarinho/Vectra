@@ -166,3 +166,15 @@ consultSymbol symbol = do
                     search name rest
                 else return Nothing
 
+consultValue :: String -> StateType (Maybe Value)
+consultValue symbol = do
+    ParserState{..} <- getState
+    liftIO $ search symbol memoryTableStack
+  where
+    search :: String -> MemoryTableStackType -> IO (Maybe Value)
+    search _ [] = return Nothing
+    search name (table:rest) = do
+        result <- H.lookup table name
+        case result of
+            Just ty -> return (Just ty)
+            Nothing -> search name rest
