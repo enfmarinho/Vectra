@@ -267,7 +267,7 @@ var = do
 
     return (a:b, idType, Nothing)
 
-callStmt :: StateType [Token]
+callStmt :: StateType ([Token], Maybe Type, Maybe Value)
 callStmt = do
     openScope False
     (a, symbolType, _) <- var
@@ -275,9 +275,9 @@ callStmt = do
     c <- TT.openParen
 
     let OPEN_PAREN posn = c
-    (templateIds, paramList, _funcBody) <- case symbolType of
-                        FuncType _templateIds paramList _ _funcBody -> return (_templateIds, paramList, _funcBody)
-                        ProcType _templateIds paramList _funcBody -> return (_templateIds, paramList, _funcBody)
+    (templateIds, paramList, maybeReturnType, _funcBody) <- case symbolType of
+                        FuncType _templateIds paramList returnType _funcBody -> return (_templateIds, paramList, Just returnType, _funcBody)
+                        ProcType _templateIds paramList _funcBody -> return (_templateIds, paramList, Nothing, _funcBody)
                         _ -> semanticError $ "Trying to call type " ++ show symbolType ++ ", it must be a function or procedure "  ++ showPos posn
     insertTemplateInstantiation templateTypeList templateIds
 
@@ -291,33 +291,7 @@ callStmt = do
     -- TODO actually run the function body
 
     closeScope
-    return (a ++  b ++ [c] ++ concat d ++ [e])
-
-funcCallStmt :: StateType ([Token], Type)
-funcCallStmt = do
-    openScope False
-    (a, symbolType, _) <- var
-
-    (templateIds, paramList, returnType, _funcBody) <- case symbolType of
-                        FuncType _templateIds paramList returnType _funcBody -> return (_templateIds, paramList, returnType, _funcBody)
-                        _ -> semanticError "TODO funcCallStmt err msg"
-
-    (b, templateTypeList) <- option ([], []) templateInstanciation
-    insertTemplateInstantiation templateTypeList templateIds
-
-    c <- TT.openParen
-    (d, typeList, valueList) <- unzip3 <$> expStmtList
-    e <- TT.closeParen
-
-    let OPEN_PAREN posn = c
-    let (_, expectedParamTypes) = unzip paramList
-    assertValidParamList expectedParamTypes typeList posn
-
-    -- TODO Instantiate args
-    -- TODO actually run the function body
-
-    closeScope
-    return (a ++  b ++ [c] ++ concat d ++ [e], returnType)
+    return (a ++  b ++ [c] ++ concat d ++ [e], maybeReturnType, Nothing) -- TODO return correct Value
 
 literal :: StateType ([Token], Type, Value)
 literal = do
@@ -402,7 +376,9 @@ stmt = do
     <|> whileStmt
     <|> forStmt
     <|> foreachStmt
-    <|> try callStmt
+    <|> try (do
+        (a, _, _) <- callStmt
+        return a)
     <|> varDecl
 
 mathOpSymbol :: StateType [Token]
