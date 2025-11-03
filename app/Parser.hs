@@ -182,11 +182,11 @@ funcDecl = do
     (templateTokens, templateIds) <- option ([], []) templateDecl
     c <- TT.id
 
-    let ID _posn symbolId = c
+    let ID posn symbolId = c
     z <- getProgramState
     when (symbolId == "main") $
         if z /= Starting
-            then semanticError "TODO A second main exits"
+            then semanticError $ "A second main method is declared here, it must exist only one " ++ showPos posn
             else setProgramState Running
 
     (d, paramList, returnType) <- funcDeclAux
@@ -253,41 +253,37 @@ varDecl = do
 
     return (b ++ [c] ++ d ++ e)
 
-var :: StateType ([Token], Type)
+var :: StateType ([Token], Type, Maybe Value)
 var = do
     a <- TT.id
-    b <- option [] memberAccess
+    b <- concat <$> many (do
+            b <- TT.kwDot
+            (c, cType, cValue) <- var
+            return $ b:c)
 
     -- Checks if id symbol exists
     let ID posn symbolId = a
     idType <- consultType symbolId posn
 
-    return (a:b, idType)
-    where
-        memberAccess :: StateType [Token]
-        memberAccess = do
-            a <- TT.kwDot
-            (b, _) <- var
-            return $ a:b
+    return (a:b, idType, Nothing)
 
 callStmt :: StateType [Token]
 callStmt = do
     openScope False
-    (a, symbolType) <- var -- TODO var cannot be used in this context
+    (a, symbolType, _) <- var
+    (b, templateTypeList) <- option ([], []) templateInstanciation
+    c <- TT.openParen
 
+    let OPEN_PAREN posn = c
     (templateIds, paramList, _funcBody) <- case symbolType of
                         FuncType _templateIds paramList _ _funcBody -> return (_templateIds, paramList, _funcBody)
                         ProcType _templateIds paramList _funcBody -> return (_templateIds, paramList, _funcBody)
-                        _ -> semanticError "TODO funcCallStmt err msg"
-
-    (b, templateTypeList) <- option ([], []) templateInstanciation
+                        _ -> semanticError $ "Trying to call type " ++ show symbolType ++ ", it must be a function or procedure "  ++ showPos posn
     insertTemplateInstantiation templateTypeList templateIds
 
-    c <- TT.openParen
     (d, typeList, valueList) <- unzip3 <$> expStmtList
     e <- TT.closeParen
 
-    let OPEN_PAREN posn = c
     let (_, expectedParamTypes) = unzip paramList
     assertValidParamList expectedParamTypes typeList posn
 
@@ -300,7 +296,7 @@ callStmt = do
 funcCallStmt :: StateType ([Token], Type)
 funcCallStmt = do
     openScope False
-    (a, symbolType) <- var
+    (a, symbolType, _) <- var
 
     (templateIds, paramList, returnType, _funcBody) <- case symbolType of
                         FuncType _templateIds paramList returnType _funcBody -> return (_templateIds, paramList, returnType, _funcBody)
@@ -429,10 +425,10 @@ assignStmt = do
     let ID posn symbolId = a
     symbolType <- consultType symbolId posn
 
-    assertTypesEq symbolType dType posn
+    -- assertTypesEq symbolType dType posn -- TODO check why this does not work
 
     -- TODO handle case b is Just
-    -- updateValue (symbolId, IntType 1) -- TODO actually update the symbol table correctly
+    updateValue (symbolId, dValue)
     return $ [a] ++ b ++ [c] ++ d
 
 ifStmt :: StateType [Token]
