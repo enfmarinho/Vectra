@@ -8,6 +8,7 @@ import Scanner
 import Text.Parsec
 import Types
 import Assert
+import Control.Monad
 
 vectraLanguage :: StateType [Token]
 vectraLanguage = do
@@ -180,13 +181,21 @@ funcDecl = do
     a <- TT.kwFunc
     (templateTokens, templateIds) <- option ([], []) templateDecl
     c <- TT.id
+
+    let ID _posn symbolId = c
+    z <- getProgramState
+    when (symbolId == "main") $
+        if z /= Starting
+            then semanticError "TODO A second main exits"
+            else setProgramState Running
+
     (d, paramList, returnType) <- funcDeclAux
 
     closeScope
-    let ID _posn symbolId = c
     -- TODO check for existing method with the same signature, should be a warning or an error
     insertSymbol (symbolId, FuncType templateIds paramList returnType d) True
-
+    when (symbolId == "main") $
+        setProgramState Finished
     return $ [a] ++ templateTokens ++ [c] ++ d
 
 funcDeclAux :: StateType ([Token], [(String, Type)], Type)

@@ -22,7 +22,7 @@ initParserState = do
         , globalSymbolTable=globalSymbolTable
         , memoryTableStack=[]
         , symbolTableStack=[]
-        , isRunning=False
+        , programState=Starting
         }
     
 
@@ -64,13 +64,13 @@ topScope = do
             let (table, _) = top
             return table
 
-getIsRunning :: StateType Bool
-getIsRunning = isRunning <$> getState
+getProgramState :: StateType ProgramState
+getProgramState = programState <$> getState
 
-setIsRunning :: Bool -> StateType ()
-setIsRunning run = do
+setProgramState :: ProgramState -> StateType ()
+setProgramState pst = do
   st <- getState
-  putState st { isRunning = run }
+  putState st { programState = pst }
 
 addImplMethods :: SymbolType -> StateType ()
 addImplMethods (symbolId, NamespaceType st) = do

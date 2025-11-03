@@ -13,7 +13,7 @@ type MemoryTableType = H.BasicHashTable String Value
 type MemoryTableStackType = [MemoryTableType]
 
 data ParserState = ParserState
-  { isRunning :: Bool
+  { programState :: ProgramState
   , symbolTableStack :: SymbolTableStackType
   , memoryTableStack :: MemoryTableStackType
   , globalSymbolTable :: SymbolTableType
@@ -21,6 +21,11 @@ data ParserState = ParserState
   }
 
 type StateType = ParsecT [Token] ParserState IO
+
+data ProgramState = Starting
+                  | Running
+                  | Finished
+                  deriving (Eq)
 
 data Type = IntType                               
           | FloatType                             
