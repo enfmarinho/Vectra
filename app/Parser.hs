@@ -247,7 +247,7 @@ varDecl = do
             e <- TT.kwAssingment
             (f, fType, fValue) <- expStmt
             assertTypesEq bType fType posn
-            -- TODO insert it's value in memory
+            insertValue (symbolId, fValue)
             return $ e:f
         <|> return []
 
@@ -401,7 +401,7 @@ assignStmt = do
     let ID posn symbolId = a
     symbolType <- consultType symbolId posn
 
-    -- assertTypesEq symbolType dType posn -- TODO check why this does not work
+    assertTypesEq symbolType dType posn
 
     -- TODO handle case b is Just
     updateValue (symbolId, dValue)
@@ -476,10 +476,10 @@ typeStmt = do
                 return ([b], FloatType)
             <|> do
                 b <- TT.kwBool
-                return ([b], FloatType)
+                return ([b], BoolType)
             <|> do
                 b <- TT.kwString
-                return ([b], FloatType)
+                return ([b], StringType)
             <|> do -- refType
                 b <- TT.kwRef
                 c <- TT.openParen
