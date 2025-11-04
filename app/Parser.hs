@@ -9,6 +9,7 @@ import Text.Parsec
 import Types
 import Assert
 import Control.Monad
+import Data.Maybe
 
 vectraLanguage :: StateType [Token]
 vectraLanguage = do
@@ -27,8 +28,7 @@ vectraLanguage = do
         globalDecl = do
             structDecl 
             <|> enumDecl
-            <|> funcDecl
-            <|> procDecl
+            <|> methodDecl
             <|> varDecl
 
 templateDecl :: StateType ([Token], [String])
@@ -103,7 +103,7 @@ implDecl = do
 
     _ <- TT.kwColumn
     _ <- TT.indent
-    c <- concat <$> many1 (try procDecl <|> funcDecl) -- TODO handle private and public kws
+    c <- concat <$> many1 methodDecl -- TODO handle private and public kws
     _ <- TT.unindent
     implScope <- topScope
     closeScope

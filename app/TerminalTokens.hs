@@ -231,7 +231,7 @@ kwFunc = tokenPrim show updatePos getToken where
 
 kwProc :: StateType Token
 kwProc = tokenPrim show updatePos getToken where
-  getToken (KW_FUNC pos) = Just (KW_FUNC pos)
+  getToken (KW_PROC pos) = Just (KW_PROC pos)
   getToken _       = Nothing
 
 kwEnum :: StateType Token
