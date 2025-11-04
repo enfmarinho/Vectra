@@ -93,10 +93,19 @@ assertBooleanCompatible t posn = do
         BoolType -> return ()
         IntType -> return ()
         FloatType -> return ()
-        CharType -> return ()
         RefType _ -> return ()
         ConstType ct -> assertBooleanCompatible ct posn
         _ -> semanticError $ show t ++ " cannot be interpreted as a bool " ++ showPos posn
+
+getBooleanValue :: Value -> StateType Bool 
+getBooleanValue value = do
+    case value of 
+        BoolValue v -> return v
+        IntValue v -> return $ v /= 0
+        FloatValue v -> return $ v /= 0
+        -- RefValue v -> v /= 0 -- TODO return true in case ref is valid
+        ConstValue v -> getBooleanValue v
+        _ -> fail "Trying to get a bool from something that cannot be interpreted as such" -- Should not reach this, since assertBooleanCompatible should be called previously 
 
 assertAssignableType :: String -> Type -> AlexPosn -> StateType ()
 assertAssignableType symbolId t posn = do

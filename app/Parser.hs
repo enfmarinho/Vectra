@@ -27,7 +27,7 @@ vectraLanguage = do
 
         globalDecl :: StateType [Token]
         globalDecl = do
-            structDecl 
+            structDecl
             <|> implDecl
             <|> enumDecl
             <|> methodDecl
@@ -99,7 +99,7 @@ implDecl = do
     openScope False
     _ <- TT.kwImpl
     a <- TT.id
-    
+
     let ID posn symbolId = a
     consultTypeList symbolId posn >>= assertStructType symbolId posn
 
@@ -158,7 +158,7 @@ paramDeclList = do
 methodDecl :: StateType [Token]
 methodDecl = do
     openScope False
-    a <- TT.kwProc 
+    a <- TT.kwProc
         <|> TT.kwFunc
     (bTokens, bIds) <- option ([], []) templateDecl
     c <- TT.id
@@ -177,13 +177,13 @@ methodDecl = do
 
     returnType <- case a of
                     KW_PROC _ -> do
-                        when (isJust optionF) $ semanticError $ 
+                        when (isJust optionF) $ semanticError $
                             "A procedure cannot return a value, only functions can. Considerer declaring " ++ symbolId ++
                             " as a functions instead " ++ showPos posn
                         return TemplateType -- Just a workaround, if its a procedure this type won't be used anyway
-                    _         -> do 
+                    _         -> do
                                     case optionF of
-                                        Nothing -> semanticError $ "A function must return something. Consider declaring " 
+                                        Nothing -> semanticError $ "A function must return something. Consider declaring "
                                                                     ++ symbolId ++ " as a procedure instead " ++ showPos posn
                                         Just (_, returnType) -> return returnType
 
@@ -195,7 +195,7 @@ methodDecl = do
 
     closeScope
     assertMethodDeclNotAmbiguous symbolId (map snd dParams) posn
-    case a of 
+    case a of
         KW_PROC _ -> insertSymbol (symbolId, ProcType bIds dParams g) True
         KW_FUNC _ -> insertSymbol (symbolId, FuncType bIds dParams returnType g) True
         _ -> return () -- Impossible to get here, this is just to avoid warnings  
@@ -366,7 +366,9 @@ loopStmtList = do
 stmt :: StateType [Token]
 stmt = do
     try assignStmt
-    <|> ifStmt
+    <|> do
+        (a, _) <- ifStmt
+        return a
     <|> whileStmt
     <|> forStmt
     <|> foreachStmt
@@ -408,40 +410,56 @@ assignStmt = do
                                             OP_ADD _ -> handleAdd value dValue
                                             OP_SUB _ -> handleSub value dValue
                                             OP_MULT _ -> handleMult value dValue
-                                            OP_DIV _ ->handleDiv value dValue
-                                            OP_AND _ ->handleAnd value dValue
+                                            OP_DIV _ -> handleDiv value dValue
+                                            OP_AND _ -> handleAnd value dValue
                                             OP_OR _ -> handleOr value dValue
                                             _ -> semanticError $ "Invalid operation on assignment operation for " ++ symbolId ++ " " ++ showPos posn
                                 return ([op], resultValue)
     updateValue (symbolId, value)
     return $ [a] ++ b ++ [c] ++ d
 
-ifStmt :: StateType [Token]
+ifStmt :: StateType ([Token], Bool)
 ifStmt = do
+    previousProgramState <- getProgramState
     openScope True
     a <- TT.kwIf
-    (b, expType, _expValue) <- expStmt
+    (b, expType, expValue) <- expStmt
 
     let KW_IF posn = a
     assertBooleanCompatible expType posn
+    expBool <- getBooleanValue expValue
+
+    let conditional = expBool && previousProgramState == Running
+    unless conditional $ do setProgramState Skip
 
     c <- TT.kwColumn
     d <- TT.newLine
     e <- TT.indent
     f <- stmtList
     g <- TT.unindent
-    h <- concat <$> option [] (many $ try elseIfStmt)
+
+    if conditional then
+        setProgramState Skip
+        else setProgramState previousProgramState
+
+    h <- concat <$> many (try $ do
+            (h, executed) <- elseIfStmt
+            when executed $ setProgramState Skip
+            return h
+        )
+
     i <- option [] elseStmt
 
     closeScope
-    return $ [a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g] ++ h ++ i
-    where 
-        elseIfStmt :: StateType [Token]
+    setProgramState previousProgramState
+    return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g] ++ h ++ i, conditional)
+    where
+        elseIfStmt :: StateType ([Token], Bool)
         elseIfStmt = do
             a <- TT.newLine
             b <- TT.kwElse
-            c <- ifStmt
-            return $ [a] ++ [b] ++ c
+            (c, executed) <- ifStmt
+            return ([a] ++ [b] ++ c, executed)
         elseStmt :: StateType [Token]
         elseStmt = do
             openScope True
