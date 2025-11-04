@@ -38,6 +38,8 @@ tokens :-
     ")"          { \aInp _ -> do t <- handleIndentation (CLOSE_PAREN (alexPos aInp)); return $ Just t }
     "["          { \aInp _ -> do t <- handleIndentation (OPEN_BRACKET (alexPos aInp)); return $ Just t }
     "]"          { \aInp _ -> do t <- handleIndentation (CLOSE_BRACKET (alexPos aInp)); return $ Just t }
+    "{"          { \aInp _ -> do t <- handleIndentation (OPEN_CURLY (alexPos aInp)); return $ Just t }
+    "}"          { \aInp _ -> do t <- handleIndentation (CLOSE_CURLY (alexPos aInp)); return $ Just t }
     "+"          { \aInp _ -> do t <- handleIndentation (OP_ADD (alexPos aInp)); return $ Just t }
     "-"          { \aInp _ -> do t <- handleIndentation (OP_SUB (alexPos aInp)); return $ Just t }
     "*"          { \aInp _ -> do t <- handleIndentation (OP_MULT (alexPos aInp)); return $ Just t }
@@ -156,7 +158,7 @@ alexInputStr :: AlexInput -> String
 alexInputStr (_, _, _, str) = str
 
 handleIndentation :: Token -> Alex Token
-handleIndentation token = do
+handleIndentation currToken = do
     pastIndentationLevel <- topIndentationLevelStack
     currIndentationLevel <- getCurrIndentationLevel
 
@@ -166,15 +168,15 @@ handleIndentation token = do
     inp <- alexGetInput
     let posn = alexPos inp
     if not beginLine then
-        return token
+        return currToken
     else if pastIndentationLevel < currIndentationLevel then do
         pushIndentationLevel currIndentationLevel
-        return $ SPECIAL_CASE [INDENT posn, token]
+        return $ SPECIAL_CASE [INDENT posn, currToken]
     else if pastIndentationLevel > currIndentationLevel then do
         unindents <- unindentLoop pastIndentationLevel currIndentationLevel posn
-        return $ SPECIAL_CASE (unindents ++ [NEWLINE posn, token]) -- This is a workaround
+        return $ SPECIAL_CASE (unindents ++ [NEWLINE posn, currToken]) -- This is a workaround
     else
-        return token
+        return currToken
 
     where
       unindentLoop :: Int -> Int -> AlexPosn -> Alex [Token]
@@ -217,6 +219,8 @@ data Token =
   CLOSE_PAREN AlexPosn |
   OPEN_BRACKET AlexPosn |
   CLOSE_BRACKET AlexPosn |
+  OPEN_CURLY AlexPosn |
+  CLOSE_CURLY AlexPosn |
   INDENT AlexPosn |
   UNINDENT AlexPosn |
   KW_NAMESPACE AlexPosn |

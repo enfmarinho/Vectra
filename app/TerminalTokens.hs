@@ -144,6 +144,16 @@ closeBracket = tokenPrim show updatePos getToken where
   getToken (CLOSE_BRACKET pos) = Just (CLOSE_BRACKET pos)
   getToken _       = Nothing
 
+openCurly :: StateType Token
+openCurly = tokenPrim show updatePos getToken where
+  getToken (OPEN_CURLY pos) = Just (OPEN_CURLY pos)
+  getToken _       = Nothing
+
+closeCurly :: StateType Token
+closeCurly = tokenPrim show updatePos getToken where
+  getToken (CLOSE_CURLY pos) = Just (CLOSE_CURLY pos)
+  getToken _       = Nothing
+
 indent :: StateType Token
 indent = tokenPrim show updatePos getToken where
   getToken (INDENT posn) = Just (INDENT posn)
