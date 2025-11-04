@@ -26,6 +26,7 @@ data ProgramState = Starting
                   | Running
                   | Finished
                   | Skip
+                  | Return
                   | Continue
                   | Break
                   deriving (Eq)
