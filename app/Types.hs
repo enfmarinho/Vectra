@@ -25,6 +25,7 @@ type StateType = ParsecT [Token] ParserState IO
 data ProgramState = Starting
                   | Running
                   | Finished
+                  | Skip
                   deriving (Eq)
 
 data Type = IntType                               
