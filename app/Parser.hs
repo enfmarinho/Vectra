@@ -194,7 +194,7 @@ methodDecl = do
     _ <- TT.unindent
 
     closeScope
-    -- TODO check if this declaration is ambiguous with some existing declaration
+    assertMethodDeclNotAmbiguous symbolId (map snd dParams) posn
     case a of 
         KW_PROC _ -> insertSymbol (symbolId, ProcType bIds dParams g) True
         KW_FUNC _ -> insertSymbol (symbolId, FuncType bIds dParams returnType g) True

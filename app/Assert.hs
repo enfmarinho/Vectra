@@ -5,6 +5,7 @@ import ParserState
 import Types
 import Control.Monad (when)
 import Control.Monad.IO.Class (MonadIO(liftIO))
+import Data.Maybe
 
 warningMsg :: String -> StateType ()
 warningMsg msg = liftIO $ putStrLn $ "Warning: " ++ msg
@@ -38,6 +39,32 @@ consultType symbolId posn = do
         Just [] -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
         Just [h] -> return h
         Just (_:_) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
+
+assertMethodDeclNotAmbiguous :: String -> [Type] -> AlexPosn -> StateType ()
+assertMethodDeclNotAmbiguous symbolId paramTypeList posn = do
+    maybeTypeList <- consultSymbol symbolId
+    let typeList = fromMaybe [] maybeTypeList
+
+    when (ambiguous typeList paramTypeList) $
+        semanticError $
+            "Ambiguous declaration for " ++ symbolId ++ " at " ++ showPos posn
+  where
+    ambiguous :: [Type] -> [Type] -> Bool
+    ambiguous [] _ = False
+    ambiguous (h:t) paramList =
+        let currParamList = case h of
+                ProcType _ params _   -> map snd params
+                FuncType _ params _ _ -> map snd params
+                _                     -> []
+         in typeListMatch currParamList paramList || ambiguous t paramList
+
+    typeListMatch :: [Type] -> [Type] -> Bool
+    typeListMatch [] [] = True
+    typeListMatch [] _  = False
+    typeListMatch _  [] = False
+    typeListMatch (h1:t1) (h2:t2)
+        | h1 /= h2  = False
+        | otherwise = typeListMatch t1 t2
 
 assertIterableType :: String -> Type -> AlexPosn -> StateType ()
 assertIterableType symbolId t posn = do
