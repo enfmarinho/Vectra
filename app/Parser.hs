@@ -522,15 +522,14 @@ whileStmt = do
 
     let runWhile = do
             currProgramState <- getProgramState
-            when (currProgramState == Break || currProgramState == Return) $ return ()
+            when (currProgramState == Break || currProgramState == Return || previousProgramState /= Running) $ return ()
             setProgramState previousProgramState
 
             (expValue', resultState) <- evaluateBooleanExp b
             condition' <- getBooleanValue expValue'
             setState resultState
             
-            currProgramState' <- getProgramState
-            when (condition' && currProgramState' == Running) $ do
+            when condition' $ do
                 st <- getState
                 parserResult <- liftIO $ runParserT loopStmtList st "<while>" f
                 case parserResult of
@@ -610,7 +609,7 @@ forStmt = do
 
     e <- TT.kwSemicolumn
     setProgramState Skip -- Don't execute assignStmt yet no mater what
-    optionF <- optionMaybe assignStmt
+    optionF <- optionMaybe assignStmt -- TODO this can also be a callStmt
     setProgramState previousProgramState
 
     f <- case optionF of
@@ -628,25 +627,23 @@ forStmt = do
 
     let runFor = do
             currProgramState <- getProgramState
-            when (currProgramState == Break || currProgramState == Return) $ return ()
+            when (currProgramState == Break || currProgramState == Return || previousProgramState /= Running) $ return ()
             setProgramState previousProgramState
 
-            -- Perform assingStmt, i.e. operation to be performed after loop
-            currProgramState' <- getProgramState
-            when (currProgramState' == Running) $ do
-                st <- getState
-                parserResultAssingStmt <- liftIO $ runParserT assignStmt st "<for>" f
-                case parserResultAssingStmt of
-                    Left _ -> fail "<for>"
-                    Right (_, resultState') -> putState resultState'
+            -- Perform assignStmt, i.e. operation to be performed after loop
+            st <- getState
+            parserResultAssingStmt <- liftIO $ runParserT assignStmt st "<for>" f
+            case parserResultAssingStmt of
+                Left _ -> fail "<for>"
+                Right (_, resultState') -> putState resultState'
 
             (expValue', resultState) <- evaluateBooleanExp d
             condition' <- getBooleanValue expValue'
             setState resultState
             
-            when (condition' && currProgramState' == Running) $ do
-                st <- getState
-                parserResult <- liftIO $ runParserT loopStmtList st "<for>" f
+            when condition' $ do
+                st' <- getState
+                parserResult <- liftIO $ runParserT loopStmtList st' "<for>" f
                 case parserResult of
                     Left _ -> fail "<for>"
                     Right (_, resultState') -> putState resultState'
