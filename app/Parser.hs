@@ -11,6 +11,7 @@ import Types
 import Assert
 import Control.Monad
 import Data.Maybe
+import Control.Monad.IO.Class
 
 vectraLanguage :: StateType [Token]
 vectraLanguage = do
@@ -311,6 +312,7 @@ literal = do
     <|> do
         a <- TT.kwFalse
         return ([a], BoolType, BoolValue False)
+        -- TODO implement literal for list 
 
 expStmtList :: StateType [([Token], Type, Value)]
 expStmtList = do
@@ -484,22 +486,58 @@ ifStmt = do
             return $ [a] ++ [b] ++ [c] ++ [d] ++ [e] ++ f ++ [g]
 
 
+evaluateBooleanExp :: [Token] -> StateType (Value, ParserState)
+evaluateBooleanExp tokenList = do
+    previusState <- getState
+
+    parserExpResult <- liftIO $ runParserT expStmt previusState "<evaluateBooleanExp>" tokenList
+    expValue <- case parserExpResult of
+                        Left _ -> fail "<evaluateBooleanExp>"
+                        Right (_, _, expValue) -> return expValue
+    resultState <- getState
+    return (expValue, resultState)
+
 whileStmt :: StateType [Token]
 whileStmt = do
+    previousProgramState <- getProgramState
     openScope True
     a <- TT.kwWhile
-    (b, expType, _expValue) <- expStmt
+    (b, expType, expValue) <- expStmt
 
     let KW_WHILE posn = a
+
     assertBooleanCompatible expType posn
+    condition <- getBooleanValue expValue
+    unless condition $ setProgramState Skip
 
     c <- TT.kwColumn
     d <- TT.newLine
     e <- TT.indent
-    f <- loopStmtList
+    (f, _) <- loopStmtList
     g <- TT.unindent
 
+    let runWhile = do
+            currProgramState <- getProgramState
+            when (currProgramState == Break || currProgramState == Return) $ return ()
+            setProgramState previousProgramState
+
+            (expValue', resultState) <- evaluateBooleanExp b
+            condition' <- getBooleanValue expValue'
+            setState resultState
+            
+            currProgramState' <- getProgramState
+            when (condition' && currProgramState' == Running) $ do
+                st <- getState
+                parserResult <- liftIO $ runParserT loopStmtList st "<while>" f
+                case parserResult of
+                    Left _ -> fail "<while>"
+                    Right (_, resultState') -> putState resultState'
+                runWhile
+
+    when condition runWhile
+    setProgramState previousProgramState
     closeScope
+
     return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g])
 
 typeStmt :: StateType ([Token], Type)
@@ -569,7 +607,7 @@ forStmt = do
     g <- TT.kwColumn
     h <- TT.newLine
     i <- TT.indent
-    j <- loopStmtList
+    (j, _) <- loopStmtList
     k <- TT.unindent
 
     f <- case optionF of
@@ -597,7 +635,7 @@ foreachStmt = do
     e <- TT.kwColumn
     f <- TT.newLine
     g <- TT.indent
-    h <- loopStmtList
+    (h, _) <- loopStmtList
     i <- TT.unindent
 
     closeScope
