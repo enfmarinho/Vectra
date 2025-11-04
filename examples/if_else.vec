@@ -1,13 +1,11 @@
 import println
 
-func main() -> int:
+proc main():
     int x = 80
     string msg
-    if x > 80:
+    if true:
 	    msg = "x maior que 80"
-    else if x > 40:
+    else if false:
 	    msg = "x maior que 40"
     else:
 	    msg = "x menor que 40"
-
-    println(msg)
