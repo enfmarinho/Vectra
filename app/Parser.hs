@@ -246,7 +246,7 @@ varDecl = do
 
     return (b ++ [c] ++ d ++ e)
 
-var :: StateType ([Token], Type, Maybe Value)
+var :: StateType ([Token], Type, Value)
 var = do
     a <- TT.id
     next <- optionMaybe $ do
@@ -256,8 +256,12 @@ var = do
     case next of
         Nothing -> do
             t <- consultType symbolId posn
-            v <- consultValue symbolId
-            return ([a], t, v)
+            maybeValue <- consultValue symbolId
+            value <- case maybeValue of
+                        Nothing -> semanticError $ "Trying to use uninitialized symbol " ++ symbolId ++ " " ++ showPos posn
+                        Just v -> return v
+
+            return ([a], t, value)
         Just (bTokens, bType, bValue) ->
             return (a:bTokens, bType, bValue)
 
