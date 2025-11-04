@@ -194,6 +194,7 @@ methodDecl = do
     _ <- TT.unindent
 
     closeScope
+    -- TODO check if this declaration is ambiguous with some existing declaration
     case a of 
         KW_PROC _ -> insertSymbol (symbolId, ProcType bIds dParams g) True
         KW_FUNC _ -> insertSymbol (symbolId, FuncType bIds dParams returnType g) True
@@ -225,6 +226,7 @@ returnDecl = do
 
 varDecl :: StateType [Token]
 varDecl = do
+    a <- optionMaybe TT.kwLocal
     (b, bType) <- typeStmt
     c <- TT.id
     optionD <- optionMaybe arrayDecl
@@ -232,7 +234,7 @@ varDecl = do
                         Nothing -> return ([], bType)
                         Just (d, arraySize) -> return (d, ArrayType arraySize bType)
     let ID posn symbolId = c
-    checkShadowing symbolId posn
+    when (isNothing a) $ checkShadowing symbolId posn
     insertSymbol (symbolId, varType) False
     e <- do
             e <- TT.kwAssingment
