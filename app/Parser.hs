@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module Parser
   ( parser
   ) where
@@ -27,6 +28,7 @@ vectraLanguage = do
         globalDecl :: StateType [Token]
         globalDecl = do
             structDecl 
+            <|> implDecl
             <|> enumDecl
             <|> methodDecl
             <|> varDecl
@@ -103,7 +105,7 @@ implDecl = do
 
     _ <- TT.kwColumn
     _ <- TT.indent
-    c <- concat <$> many1 methodDecl -- TODO handle private and public kws
+    _ <- concat <$> many1 methodDecl -- TODO handle private and public kws
     _ <- TT.unindent
     implScope <- topScope
     closeScope
@@ -204,7 +206,7 @@ methodDecl = do
 arrayDecl :: StateType ([Token], Int)
 arrayDecl = do
     a <- TT.openBracket
-    (b, bType, bValue) <- expStmt
+    (b, _bType, bValue) <- expStmt
     let OPEN_BRACKET posn = a
     arraySize <- assertNumberTypeReturnInt bValue posn
     c <- TT.closeBracket
@@ -231,11 +233,11 @@ varDecl = do
                         Just (d, arraySize) -> return (d, ArrayType arraySize bType)
     let ID posn symbolId = c
     checkShadowing symbolId posn
-    insertSymbol (symbolId, bType) False
+    insertSymbol (symbolId, varType) False
     e <- do
             e <- TT.kwAssingment
             (f, fType, fValue) <- expStmt
-            assertTypesEq bType fType posn
+            assertTypesEq varType fType posn
             insertValue (symbolId, fValue)
             return $ e:f
         <|> return []
@@ -245,16 +247,17 @@ varDecl = do
 var :: StateType ([Token], Type, Maybe Value)
 var = do
     a <- TT.id
-    b <- concat <$> many (do
-            b <- TT.kwDot
-            (c, cType, cValue) <- var
-            return $ b:c)
-
-    -- Checks if id symbol exists
+    next <- optionMaybe $ do
+        _ <- TT.kwDot
+        var
     let ID posn symbolId = a
-    idType <- consultType symbolId posn
-
-    return (a:b, idType, Nothing)
+    case next of
+        Nothing -> do
+            t <- consultType symbolId posn
+            v <- consultValue symbolId
+            return ([a], t, v)
+        Just (bTokens, bType, bValue) ->
+            return (a:bTokens, bType, bValue)
 
 callStmt :: StateType ([Token], Maybe Type, Maybe Value)
 callStmt = do
@@ -270,13 +273,13 @@ callStmt = do
                         _ -> semanticError $ "Trying to call type " ++ show symbolType ++ ", it must be a function or procedure "  ++ showPos posn
     insertTemplateInstantiation templateTypeList templateIds
 
-    (d, typeList, valueList) <- unzip3 <$> expStmtList
+    (d, typeList, _valueList) <- unzip3 <$> expStmtList
     e <- TT.closeParen
 
     let (_, expectedParamTypes) = unzip paramList
     assertValidParamList expectedParamTypes typeList posn
 
-    -- TODO Instantiate args
+    -- TODO Instantiate args with _valueList
     -- TODO actually run the function body
 
     closeScope
@@ -415,7 +418,7 @@ ifStmt :: StateType [Token]
 ifStmt = do
     openScope True
     a <- TT.kwIf
-    (b, expType, expValue) <- expStmt
+    (b, expType, _expValue) <- expStmt
 
     let KW_IF posn = a
     assertBooleanCompatible expType posn
@@ -455,7 +458,7 @@ whileStmt :: StateType [Token]
 whileStmt = do
     openScope True
     a <- TT.kwWhile
-    (b, expType, expValue) <- expStmt
+    (b, expType, _expValue) <- expStmt
 
     let KW_WHILE posn = a
     assertBooleanCompatible expType posn
@@ -524,7 +527,7 @@ forStmt = do
     c <- TT.kwSemicolumn
     optionD <- optionMaybe expStmt
 
-    (d, dType, dValue) <- case optionD of
+    (d, dType, _dValue) <- case optionD of
                 Nothing -> return ([], BoolType, BoolValue True) -- Bool and True are returned as a workaround
                 Just (d, dType, dValue) -> return (d, dType, dValue)
 
