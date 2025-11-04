@@ -375,7 +375,9 @@ loopStmtList = do
 
 stmt :: StateType [Token]
 stmt = do
-    try assignStmt
+    try (do
+        (a, _) <- assignStmt
+        return a)
     <|> do
         (a, _) <- ifStmt
         return a
@@ -397,7 +399,7 @@ mathOpSymbol = do
     <|> TT.opOr
     <|> TT.opNot
 
-assignStmt :: StateType [Token]
+assignStmt :: StateType ([Token], ParserState)
 assignStmt = do
     a <- TT.id
     optionB <- optionMaybe mathOpSymbol
@@ -426,7 +428,9 @@ assignStmt = do
                                             _ -> semanticError $ "Invalid operation on assignment operation for " ++ symbolId ++ " " ++ showPos posn
                                 return ([op], resultValue)
     updateValue (symbolId, value)
-    return $ [a] ++ b ++ [c] ++ d
+
+    currParserState <- getState
+    return ([a] ++ b ++ [c] ++ d, currParserState)
 
 -- The Bool indicates whether the conditional was executed
 ifStmt :: StateType ([Token], Bool)
@@ -589,31 +593,70 @@ typeStmt = do
 
 forStmt :: StateType [Token]
 forStmt = do
+    previousProgramState <- getProgramState
     openScope True
     a <- TT.kwFor
     b <- option [] varDecl
     c <- TT.kwSemicolumn
     optionD <- optionMaybe expStmt
 
-    (d, dType, _dValue) <- case optionD of
-                Nothing -> return ([], BoolType, BoolValue True) -- Bool and True are returned as a workaround
+    let KW_SEMICOLUMN posn = c
+
+    (d, expType, expValue) <- case optionD of
+                Nothing -> return ([KW_TRUE posn], BoolType, BoolValue True) -- if conditional is empty True will be used
                 Just (d, dType, dValue) -> return (d, dType, dValue)
 
-    let KW_SEMICOLUMN posn = c
-    assertBooleanCompatible dType posn
+    assertBooleanCompatible expType posn
 
     e <- TT.kwSemicolumn
-    optionF <- optionMaybe expStmt
+    setProgramState Skip -- Don't execute assignStmt yet no mater what
+    optionF <- optionMaybe assignStmt
+    setProgramState previousProgramState
+
+    f <- case optionF of
+            Nothing -> return []
+            Just (f, _) -> return f
+
+    condition <- getBooleanValue expValue
+    unless condition $ setProgramState Skip
+
     g <- TT.kwColumn
     h <- TT.newLine
     i <- TT.indent
     (j, _) <- loopStmtList
     k <- TT.unindent
 
-    f <- case optionF of
-            Nothing -> return []
-            Just (f, _, _) -> return f
+    let runFor = do
+            currProgramState <- getProgramState
+            when (currProgramState == Break || currProgramState == Return) $ return ()
+            setProgramState previousProgramState
+
+            -- Perform assingStmt, i.e. operation to be performed after loop
+            currProgramState' <- getProgramState
+            when (currProgramState' == Running) $ do
+                st <- getState
+                parserResultAssingStmt <- liftIO $ runParserT assignStmt st "<for>" f
+                case parserResultAssingStmt of
+                    Left _ -> fail "<for>"
+                    Right (_, resultState') -> putState resultState'
+
+            (expValue', resultState) <- evaluateBooleanExp d
+            condition' <- getBooleanValue expValue'
+            setState resultState
+            
+            when (condition' && currProgramState' == Running) $ do
+                st <- getState
+                parserResult <- liftIO $ runParserT loopStmtList st "<for>" f
+                case parserResult of
+                    Left _ -> fail "<for>"
+                    Right (_, resultState') -> putState resultState'
+
+                runFor
+
+    when condition runFor
+    setProgramState previousProgramState
     closeScope
+
     return ([a] ++ b  ++ [c] ++ d ++ [e] ++ f ++ [g] ++ [h] ++ [i] ++ j ++ [k])
 
 foreachStmt :: StateType [Token]
