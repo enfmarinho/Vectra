@@ -153,33 +153,12 @@ paramDeclList = do
             insertSymbol (symbolId, varType) False
             return (a ++ [b], (symbolId, varType))
 
-procDecl :: StateType [Token]
-procDecl = do
+methodDecl :: StateType [Token]
+methodDecl = do
     openScope False
-    a <- TT.kwProc
+    a <- TT.kwProc 
+        <|> TT.kwFunc
     (bTokens, bIds) <- option ([], []) templateDecl
-    c <- TT.id
-    _ <- TT.openParen
-    (dTokens, dParams) <- optParamDeclList
-    _ <- TT.closeParen
-    _ <- TT.kwColumn
-    _ <- TT.newLine
-    _ <- TT.indent
-    e <- stmtList
-    _ <- TT.unindent
-
-    closeScope
-
-    let ID _posn symbolId = c
-    insertSymbol (symbolId, ProcType bIds dParams e) True
-
-    return $ [a] ++ bTokens ++ [c] ++ dTokens ++ e
-
-funcDecl :: StateType [Token]
-funcDecl = do
-    openScope False
-    a <- TT.kwFunc
-    (templateTokens, templateIds) <- option ([], []) templateDecl
     c <- TT.id
 
     let ID posn symbolId = c
@@ -189,28 +168,38 @@ funcDecl = do
             then semanticError $ "A second main method is declared here, it must exist only one " ++ showPos posn
             else setProgramState Running
 
-    (d, paramList, returnType) <- funcDeclAux
-
-    closeScope
-    -- TODO check for existing method with the same signature, should be a warning or an error
-    insertSymbol (symbolId, FuncType templateIds paramList returnType d) True
-    when (symbolId == "main") $
-        setProgramState Finished
-    return $ [a] ++ templateTokens ++ [c] ++ d
-
-funcDeclAux :: StateType ([Token], [(String, Type)], Type)
-funcDeclAux = do
     _ <- TT.openParen
-    (c, paramList) <- optParamDeclList
-    _ <- TT.closeParen
-    (d, returnType) <- returnDecl
+    (dTokens, dParams) <- optParamDeclList
+    e <- TT.closeParen
+    optionF <- optionMaybe returnDecl
+
+    returnType <- case a of
+                    KW_PROC _ -> do
+                        when (isJust optionF) $ semanticError $ 
+                            "A procedure cannot return a value, only functions can. Considerer declaring " ++ symbolId ++
+                            " as a functions instead " ++ showPos posn
+                        return TemplateType -- Just a workaround, if its a procedure this type won't be used anyway
+                    _         -> do 
+                                    case optionF of
+                                        Nothing -> semanticError $ "A function must return something. Consider declaring " 
+                                                                    ++ symbolId ++ " as a procedure instead " ++ showPos posn
+                                        Just (_, returnType) -> return returnType
+
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
-    e <- stmtList
+    g <- stmtList
     _ <- TT.unindent
 
-    return (c ++ d ++ e, paramList, returnType)
+    closeScope
+    case a of 
+        KW_PROC _ -> insertSymbol (symbolId, ProcType bIds dParams g) True
+        KW_FUNC _ -> insertSymbol (symbolId, FuncType bIds dParams returnType g) True
+        _ -> return () -- Impossible to get here, this is just to avoid warnings  
+
+    when (symbolId == "main") $
+        setProgramState Finished
+    return ([a] ++ bTokens ++ [c] ++ dTokens ++ [e] ++ maybe [] fst optionF ++ g)
 
 arrayDecl :: StateType ([Token], Int)
 arrayDecl = do
