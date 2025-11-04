@@ -26,6 +26,8 @@ data ProgramState = Starting
                   | Running
                   | Finished
                   | Skip
+                  | Continue
+                  | Break
                   deriving (Eq)
 
 data Type = IntType                               
@@ -57,6 +59,7 @@ data Value = IntValue Int
            | ConstValue Value                 
            | ArrayValue (Array Int Value)
            | EnumValue String
+           | RefValue Int String 
            | FuncRefValue String
            | ProcRefValue String
            | StructValue SymbolTableType MemoryTableType    -- (internal_symbol_table, internal_memory)

@@ -190,7 +190,7 @@ methodDecl = do
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
-    g <- stmtList
+    (g, _) <- stmtList
     _ <- TT.unindent
 
     closeScope
@@ -345,23 +345,27 @@ expStmt = do
     --     return a
     -- <|> callStmt
 
-stmtList :: StateType [Token]
+stmtList :: StateType ([Token], ParserState)
 stmtList = do
     _ <- optionMaybe TT.newLine
-    concat <$> many (do
+    a <- concat <$> many (do
         a <- stmt
         b <- TT.newLine
         return (a ++ [b]))
+    st <- getState
+    return (a, st)
 
-loopStmtList :: StateType [Token]
+loopStmtList :: StateType ([Token], ParserState)
 loopStmtList = do
     _ <- optionMaybe TT.newLine
-    concat <$> many (do
+    a <- concat <$> many (do
         a <- stmt
             <|> (:[]) <$> TT.kwContinue
             <|> (:[]) <$> TT.kwBreak
         b <- TT.newLine
         return (a ++ [b]))
+    st <- getState
+    return (a, st)
 
 stmt :: StateType [Token]
 stmt = do
@@ -418,6 +422,7 @@ assignStmt = do
     updateValue (symbolId, value)
     return $ [a] ++ b ++ [c] ++ d
 
+-- The Bool indicates whether the conditional was executed
 ifStmt :: StateType ([Token], Bool)
 ifStmt = do
     previousProgramState <- getProgramState
@@ -435,7 +440,7 @@ ifStmt = do
     c <- TT.kwColumn
     d <- TT.newLine
     e <- TT.indent
-    f <- stmtList
+    (f, _) <- stmtList
     g <- TT.unindent
 
     if conditional then
@@ -454,6 +459,7 @@ ifStmt = do
     setProgramState previousProgramState
     return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g] ++ h ++ i, conditional)
     where
+        -- The Bool indicates whether the conditional was executed
         elseIfStmt :: StateType ([Token], Bool)
         elseIfStmt = do
             a <- TT.newLine
@@ -468,7 +474,7 @@ ifStmt = do
             c <- TT.kwColumn
             d <- TT.newLine
             e <- TT.indent
-            f <- stmtList
+            (f, _) <- stmtList
             g <- TT.unindent
             closeScope
             return $ [a] ++ [b] ++ [c] ++ [d] ++ [e] ++ f ++ [g]
