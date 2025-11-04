@@ -8,9 +8,11 @@ import Control.Monad.State.Lazy
 import Data.Maybe (fromMaybe)
 import Data.Foldable
 
--- Aux function to emit semantic error messages and finish execution early with err
+-- Aux function to emit error messages and finish execution early with err
 semanticError :: String -> StateType a
 semanticError msg = parserFail ("Semantic Error: " ++ msg)
+runtimeError :: String -> StateType a
+runtimeError msg = parserFail ("Error: " ++ msg)
 
 initParserState :: IO ParserState
 initParserState = do

@@ -3,7 +3,7 @@ module Assert where
 import Scanner
 import ParserState
 import Types
-import Control.Monad (when)
+import Control.Monad (when, unless)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Data.Maybe
 
@@ -113,6 +113,7 @@ assertAssignableType symbolId t posn = do
     case t of
         ConstType _ -> semanticError errMsg
         ArrayType {} -> semanticError errMsg
+        EnumType {} -> semanticError errMsg
         FuncType {} -> semanticError errMsg
         StructType {} -> semanticError errMsg
         _ -> return ()
@@ -145,6 +146,11 @@ assertNumberTypeReturnInt value posn = do
     case value of
         IntValue intValue -> return intValue
         _ -> semanticError $ "Array size should be declared with a int type " ++ showPos posn
+
+assertInBounds :: String -> Int -> Int -> AlexPosn -> StateType ()
+assertInBounds symbolId size idx posn = do
+    unless (idx >= 0 && idx < size) $ runtimeError 
+        $ "Trying access index " ++ show idx ++ " of " ++ symbolId ++ " but it's size is " ++ show size ++ showPos posn
 
 checkShadowing :: String -> AlexPosn -> StateType ()
 checkShadowing symbolId posn = do
