@@ -66,6 +66,23 @@ assertMethodDeclNotAmbiguous symbolId paramTypeList posn = do
         | h1 /= h2  = False
         | otherwise = typeListMatch t1 t2
 
+assertBreakable :: AlexPosn -> StateType ()
+assertBreakable posn = do
+    currProgramState <- getParserState
+    when (currProgramState /= Loop && currProgramState /= Conditional) 
+        $ semanticError $ "Trying to use break outside a loop " ++ showPos posn
+
+assertContinuable :: AlexPosn -> StateType ()
+assertContinuable posn = do
+    currProgramState <- getParserState
+    when (currProgramState /= Loop && currProgramState /= Conditional) 
+        $ semanticError $ "Trying to use continue outside a loop " ++ showPos posn
+
+assertReturnable :: AlexPosn -> StateType ()
+assertReturnable posn = do
+    currProgramState <- getParserState
+    when (currProgramState /= Method) $ semanticError $ "Trying to use return outside a method " ++ showPos posn
+
 assertIterableType :: String -> Type -> AlexPosn -> StateType ()
 assertIterableType symbolId t posn = do
     case t of
