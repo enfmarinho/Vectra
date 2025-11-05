@@ -21,16 +21,22 @@ data InterpreterState = InterpreterState
   , globalMemoryTable :: MemoryTableType
   }
 
-type StateType = ParsecT [Token] ParserState IO
+type StateType = ParsecT [Token] InterpreterState IO
+
+data ParserState = GlobalScope
+                 | InnerScope
+                 | Method
+                 | Loop
+                 | Conditional
+                 deriving (Eq)
 
 data ProgramState = Starting
                   | Running
-                  | Finished
                   | Skip
-                  | Return
                   | Continue
                   | Break
-                  deriving (Eq)
+                  | Return (Type, Value)
+                  | Finished
 
 data Type = IntType                               
           | FloatType                             
@@ -66,6 +72,17 @@ data Value = IntValue Int
            | ProcRefValue String
            | StructValue SymbolTableType MemoryTableType    -- (internal_symbol_table, internal_memory)
            | NamespaceValue SymbolTableType MemoryTableType -- (internal_symbol_table, internal_memory)
+
+instance Eq ProgramState where
+ Starting == Starting = True
+ Running == Running = True
+ Skip == Skip = True
+ Continue == Continue = True
+ Break == Break = True
+ Return _ == Return _ = True
+ Finished == Finished = True
+
+ _ == _ = False
 
 instance Eq Type where
     IntType == IntType = True
