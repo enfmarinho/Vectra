@@ -75,6 +75,14 @@ setProgramState pst = do
   st <- getState
   putState st { programState = pst }
 
+getParserState :: StateType ParserState
+getParserState = parserState <$> getState
+
+setParserState :: ParserState -> StateType ()
+setParserState pst = do
+  st <- getState
+  putState st { parserState = pst }
+
 addImplMethods :: SymbolType -> StateType ()
 addImplMethods (symbolId, NamespaceType st) = do
     result <- consultSymbol symbolId
