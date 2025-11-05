@@ -1,7 +1,7 @@
 module Assert where
 
 import Scanner
-import ParserState
+import InterpreterState
 import Types
 import Control.Monad (when, unless)
 import Control.Monad.IO.Class (MonadIO(liftIO))

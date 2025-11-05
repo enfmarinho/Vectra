@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module ParserState where
+module InterpreterState where
 
 import qualified Data.HashTable.IO as H
 import Types
@@ -14,23 +14,24 @@ semanticError msg = parserFail ("Semantic Error: " ++ msg)
 runtimeError :: String -> StateType a
 runtimeError msg = parserFail ("Error: " ++ msg)
 
-initParserState :: IO ParserState
-initParserState = do
+initInterpreterState :: IO InterpreterState
+initInterpreterState = do
     globalMemory <- liftIO H.new
     globalSymbolTable <- liftIO H.new
 
-    return ParserState 
+    return InterpreterState 
         { globalMemoryTable=globalMemory
         , globalSymbolTable=globalSymbolTable
         , memoryTableStack=[]
         , symbolTableStack=[]
         , programState=Starting
+        , parserState=GlobalScope
         }
     
 
 openScope :: Bool -> StateType () 
 openScope canAccessParentTables = do
-    st@ParserState{..} <- getState
+    st@InterpreterState{..} <- getState
     newTable <- liftIO H.new -- st stands for symbol table
     newMemory <- liftIO H.new 
     putState st {
@@ -40,7 +41,7 @@ openScope canAccessParentTables = do
 
 closeScope :: StateType ()
 closeScope = do
-    st@ParserState{..} <- getState
+    st@InterpreterState{..} <- getState
 
     let newSymbolStack =
           case symbolTableStack of
@@ -59,7 +60,7 @@ closeScope = do
 
 topScope :: StateType SymbolTableType
 topScope = do
-    ParserState{..} <- getState
+    InterpreterState{..} <- getState
     case symbolTableStack of
         [] -> return globalSymbolTable
         (top : _) -> do
@@ -100,7 +101,7 @@ mergeSymbolTables dst src = do
             
 updateSymbol :: String -> [Type] -> StateType ()
 updateSymbol symbolId typeList = do
-    st@ParserState{..} <- getState
+    st@InterpreterState{..} <- getState
     case symbolTableStack of
         [] -> do
             liftIO $ H.insert globalSymbolTable symbolId typeList
@@ -112,7 +113,7 @@ updateSymbol symbolId typeList = do
 
 insertSymbol :: SymbolType -> Bool -> StateType ()
 insertSymbol (symbolId, symbolType) canBeDuplicate = do
-    st@ParserState{..} <- getState
+    st@InterpreterState{..} <- getState
     case symbolTableStack of
         [] -> do
             existingSymbol <- liftIO $ H.lookup globalSymbolTable symbolId
@@ -130,7 +131,7 @@ insertSymbol (symbolId, symbolType) canBeDuplicate = do
 
 insertValue :: MemoryType -> StateType ()
 insertValue (symbolId, value) = do
-    st@ParserState{..} <- getState
+    st@InterpreterState{..} <- getState
     case memoryTableStack of
         [] -> do
             liftIO $ H.insert globalMemoryTable symbolId value
@@ -141,7 +142,7 @@ insertValue (symbolId, value) = do
 
 updateValue :: MemoryType -> StateType ()
 updateValue (symbolId, value) = do
-    ParserState{..} <- getState
+    InterpreterState{..} <- getState
     liftIO $ update (symbolId, value) memoryTableStack
   where
     update :: MemoryType -> MemoryTableStackType -> IO ()
@@ -154,7 +155,7 @@ updateValue (symbolId, value) = do
 
 consultSymbol :: String -> StateType (Maybe [Type])
 consultSymbol symbol = do
-    ParserState{..} <- getState
+    InterpreterState{..} <- getState
     liftIO $ search symbol symbolTableStack
   where
     search :: String -> SymbolTableStackType -> IO (Maybe [Type])
@@ -170,7 +171,7 @@ consultSymbol symbol = do
 
 consultValue :: String -> StateType (Maybe Value)
 consultValue symbol = do
-    ParserState{..} <- getState
+    InterpreterState{..} <- getState
     liftIO $ search symbol memoryTableStack
   where
     search :: String -> MemoryTableStackType -> IO (Maybe Value)

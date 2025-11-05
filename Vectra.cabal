@@ -16,7 +16,7 @@ common warnings
 executable Vectra
     import:           warnings
     main-is:          Main.hs
-    other-modules:    ParserState
+    other-modules:    InterpreterState
                       Types
                       Parser
                       Scanner

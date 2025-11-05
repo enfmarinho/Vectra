@@ -3,7 +3,7 @@ module Parser
   ( parser
   ) where
 
-import ParserState
+import InterpreterState
 import TerminalTokens as TT
 import Scanner
 import Text.Parsec
@@ -249,6 +249,7 @@ varDecl = do
 
 var :: StateType ([Token], Type, Value)
 var = do
+    -- TODO this in bugged
     a <- TT.id
     next <- optionMaybe $ do
         _ <- TT.kwDot
@@ -351,7 +352,7 @@ expStmt = do
     --     return a
     -- <|> callStmt
 
-stmtList :: StateType ([Token], ParserState)
+stmtList :: StateType ([Token], InterpreterState)
 stmtList = do
     _ <- optionMaybe TT.newLine
     a <- concat <$> many (do
@@ -361,7 +362,7 @@ stmtList = do
     st <- getState
     return (a, st)
 
-loopStmtList :: StateType ([Token], ParserState)
+loopStmtList :: StateType ([Token], InterpreterState)
 loopStmtList = do
     _ <- optionMaybe TT.newLine
     a <- concat <$> many (do
@@ -399,7 +400,7 @@ mathOpSymbol = do
     <|> TT.opOr
     <|> TT.opNot
 
-assignStmt :: StateType ([Token], ParserState)
+assignStmt :: StateType ([Token], InterpreterState)
 assignStmt = do
     a <- TT.id
     optionB <- optionMaybe mathOpSymbol
@@ -429,8 +430,8 @@ assignStmt = do
                                 return ([op], resultValue)
     updateValue (symbolId, value)
 
-    currParserState <- getState
-    return ([a] ++ b ++ [c] ++ d, currParserState)
+    currInterpreterState <- getState
+    return ([a] ++ b ++ [c] ++ d, currInterpreterState)
 
 -- The Bool indicates whether the conditional was executed
 ifStmt :: StateType ([Token], Bool)
@@ -490,7 +491,7 @@ ifStmt = do
             return $ [a] ++ [b] ++ [c] ++ [d] ++ [e] ++ f ++ [g]
 
 
-evaluateBooleanExp :: [Token] -> StateType (Value, ParserState)
+evaluateBooleanExp :: [Token] -> StateType (Value, InterpreterState)
 evaluateBooleanExp tokenList = do
     previusState <- getState
 
@@ -683,6 +684,6 @@ foreachStmt = do
 
 parser :: [Token] -> IO (Either ParseError [Token])
 parser tokenList = do
-    parserState <- initParserState
+    interpreterState <- initInterpreterState
     -- TODO improve error message
-    runParserT vectraLanguage parserState "Error message" tokenList
+    runParserT vectraLanguage interpreterState "Error message" tokenList

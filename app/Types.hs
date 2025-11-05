@@ -12,8 +12,9 @@ type MemoryType = (String, Value)
 type MemoryTableType = H.BasicHashTable String Value
 type MemoryTableStackType = [MemoryTableType]
 
-data ParserState = ParserState
-  { programState :: ProgramState
+data InterpreterState = InterpreterState
+  { parserState :: ParserState
+  , programState :: ProgramState
   , symbolTableStack :: SymbolTableStackType
   , memoryTableStack :: MemoryTableStackType
   , globalSymbolTable :: SymbolTableType
