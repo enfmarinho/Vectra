@@ -269,29 +269,66 @@ var = do
 
 callStmt :: StateType ([Token], Maybe Type, Maybe Value)
 callStmt = do
+    previousProgramState <- getProgramState
     openScope False
-    (a, symbolType, _) <- var
+    (a, symbolType, _) <- var -- TODO maybe create a new rule for this, since it's a bit different than var itself
     (b, templateTypeList) <- option ([], []) templateInstanciation
     c <- TT.openParen
 
+    -- TODO this is wrong, must search [Type] for valid method to allow method override
     let OPEN_PAREN posn = c
-    (templateIds, paramList, maybeReturnType, _funcBody) <- case symbolType of
+    (templateIds, paramList, maybeReturnType, funcBody) <- case symbolType of
                         FuncType _templateIds paramList returnType _funcBody -> return (_templateIds, paramList, Just returnType, _funcBody)
                         ProcType _templateIds paramList _funcBody -> return (_templateIds, paramList, Nothing, _funcBody)
                         _ -> semanticError $ "Trying to call type " ++ show symbolType ++ ", it must be a function or procedure "  ++ showPos posn
+
+    -- Check and instantiate templates and parameters
+    (d, typeList, valueList) <- unzip3 <$> expStmtList
+    let (idList, expectedParamTypes) = unzip paramList
+    assertValidParamList expectedParamTypes typeList posn
+    instatiateArgs idList typeList valueList
     insertTemplateInstantiation templateTypeList templateIds
 
-    (d, typeList, _valueList) <- unzip3 <$> expStmtList
     e <- TT.closeParen
 
-    let (_, expectedParamTypes) = unzip paramList
-    assertValidParamList expectedParamTypes typeList posn
+    returnValue <- runFuncBody funcBody
 
-    -- TODO Instantiate args with _valueList
-    -- TODO actually run the function body
-
+    setProgramState previousProgramState
     closeScope
-    return (a ++  b ++ [c] ++ concat d ++ [e], maybeReturnType, Nothing) -- TODO return correct Value
+    return (a ++  b ++ [c] ++ concat d ++ [e], maybeReturnType, returnValue)
+    where 
+        instatiateArgs :: [String] -> [Type] -> [Value] -> StateType ()
+        instatiateArgs (idListHead:isListTail) (typeListHead:typeListTail) (valueListHead:valueListTail) = do
+            insertSymbol (idListHead, typeListHead) False
+            insertValue (idListHead, valueListHead)
+            instatiateArgs isListTail typeListTail valueListTail
+        instatiateArgs [] [] [] = return ()
+        instatiateArgs [] _ _ = fail "<callStmt>"
+        instatiateArgs _ [] _ = fail "<callStmt>"
+        instatiateArgs _ _ [] = fail "<callStmt>"
+
+        
+        runFuncBody :: [Token] -> StateType (Maybe Value)
+        runFuncBody funcBody = do
+            previousProgramState <- getProgramState
+            if previousProgramState == Running then 
+                return Nothing
+                else do
+                    st <- getState
+                    parserResultFuncBody <- liftIO $ runParserT stmtList st "<callStmt>" funcBody
+                    finalInterpreterState <- case parserResultFuncBody of
+                                                Left _ -> fail "<callStmt>"
+                                                Right (_, finalInterpreterState) -> return finalInterpreterState
+                    setState finalInterpreterState
+                    currProgramState <- getProgramState
+                    case currProgramState of
+                                Return (_returnType, returnValue) -> do
+                                    -- TODO check for mismatch between expected type and returned type
+                                    return $ Just returnValue
+                                _ -> do
+                                    -- TODO confirm its a call for a procedure, otherwise emit warning for function with no return on control path
+                                    return Nothing 
+            
 
 literal :: StateType ([Token], Type, Value)
 literal = do
