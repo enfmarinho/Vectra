@@ -56,7 +56,6 @@ templateDecl = do
         insertSymbol (symbolId, TemplateType) False
         return (a, symbolId)
 
-
 templateInstanciation :: StateType ([Token], [Type])
 templateInstanciation = do
     _ <- TT.opSmaller
@@ -77,7 +76,6 @@ insertTemplateInstantiation [] (_:_) = semanticError "Template instantiation: mi
 insertTemplateInstantiation (t:typeRest) (s:symbolRest) = do
     insertSymbol (s, t) False
     insertTemplateInstantiation typeRest symbolRest
-
 
 structDecl :: StateType [Token]
 structDecl = do
@@ -399,23 +397,11 @@ stmtList = do
     st <- getState
     return (a, st)
 
-loopStmtList :: StateType ([Token], InterpreterState)
-loopStmtList = do
-    _ <- optionMaybe TT.newLine
-    a <- concat <$> many (do
-        a <- stmt
-            <|> (:[]) <$> TT.kwContinue
-            <|> (:[]) <$> TT.kwBreak
-        b <- TT.newLine
-        return (a ++ [b]))
-    st <- getState
-    return (a, st)
-
 stmt :: StateType [Token]
 stmt = do
-    try (do
+    try $ do
         (a, _) <- assignStmt
-        return a)
+        return a
     <|> do
         (a, _) <- ifStmt
         return a
@@ -426,6 +412,26 @@ stmt = do
         (a, _, _) <- callStmt
         return a)
     <|> varDecl
+    <|> do
+        a <- TT.kwContinue
+        let KW_CONTINUE posn = a
+        assertContinuable posn
+        setProgramState Skip
+        return [a]
+    <|> do
+        a <- TT.kwBreak
+        let KW_BREAK posn = a
+        assertBreakable posn
+        setProgramState Break
+        return [a]
+    <|> do
+        a <- TT.kwReturn 
+        (b, expType, expValue) <- expStmt
+        let KW_RETURN posn = a
+        assertReturnable posn
+        setProgramState $ Return (expType, expValue)
+        return $ a:b
+        
 
 mathOpSymbol :: StateType Token
 mathOpSymbol = do
@@ -555,12 +561,12 @@ whileStmt = do
     c <- TT.kwColumn
     d <- TT.newLine
     e <- TT.indent
-    (f, _) <- loopStmtList
+    (f, _) <- stmtList
     g <- TT.unindent
 
     let runWhile = do
             currProgramState <- getProgramState
-            when (currProgramState == Break || currProgramState == Return || previousProgramState /= Running) $ return ()
+            when (currProgramState == Break || currProgramState == Return {} || previousProgramState /= Running) $ return () -- TODO bug
             setProgramState previousProgramState
 
             (expValue', resultState) <- evaluateBooleanExp b
@@ -569,7 +575,7 @@ whileStmt = do
             
             when condition' $ do
                 st <- getState
-                parserResult <- liftIO $ runParserT loopStmtList st "<while>" f
+                parserResult <- liftIO $ runParserT stmtList st "<while>" f
                 case parserResult of
                     Left _ -> fail "<while>"
                     Right (_, resultState') -> putState resultState'
@@ -660,12 +666,12 @@ forStmt = do
     g <- TT.kwColumn
     h <- TT.newLine
     i <- TT.indent
-    (j, _) <- loopStmtList
+    (j, _) <- stmtList
     k <- TT.unindent
 
     let runFor = do
             currProgramState <- getProgramState
-            when (currProgramState == Break || currProgramState == Return || previousProgramState /= Running) $ return ()
+            when (currProgramState == Break || currProgramState == Return {} || previousProgramState /= Running) $ return () -- TODO bug
             setProgramState previousProgramState
 
             -- Perform assignStmt, i.e. operation to be performed after loop
@@ -681,7 +687,7 @@ forStmt = do
             
             when condition' $ do
                 st' <- getState
-                parserResult <- liftIO $ runParserT loopStmtList st' "<for>" f
+                parserResult <- liftIO $ runParserT stmtList st' "<for>" f
                 case parserResult of
                     Left _ -> fail "<for>"
                     Right (_, resultState') -> putState resultState'
@@ -713,7 +719,7 @@ foreachStmt = do
     e <- TT.kwColumn
     f <- TT.newLine
     g <- TT.indent
-    (h, _) <- loopStmtList
+    (h, _) <- stmtList
     i <- TT.unindent
 
     closeScope
