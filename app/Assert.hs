@@ -185,12 +185,12 @@ toBoolValue (ConstValue v) = toBoolValue v
 toBoolValue _ = BoolValue False  -- Fallback for unsupported types
 
 
-handleNot :: Value -> StateType (Type, Value)
-handleNot (ConstValue v) = handleNot v
-handleNot (BoolValue v) = return (BoolType, BoolValue (not v))
-handleNot (IntValue v) = return (BoolType, BoolValue (v == 0))
-handleNot (FloatValue v) = return (BoolType, BoolValue (v == 0.0))
-handleNot _ = semanticError "Invalid operand for logical 'not'."
+handleNot :: Value -> AlexPosn -> StateType (Type, Value)
+handleNot (ConstValue v) posn = handleNot v posn
+handleNot (BoolValue v) _ = return (BoolType, BoolValue (not v))
+handleNot (IntValue v) _ = return (BoolType, BoolValue (v == 0))
+handleNot (FloatValue v) _ = return (BoolType, BoolValue (v == 0.0))
+handleNot _ posn = semanticError $ "Invalid operand for logical '!' " ++ showPos posn
 
 
 handleAnd :: Value -> Value -> AlexPosn -> StateType (Type, Value)
@@ -209,6 +209,13 @@ handleOr lhs rhs _ = do
     let BoolValue lhsB = toBoolValue lhs
         BoolValue rhsB = toBoolValue rhs
     return (BoolType, BoolValue (lhsB || rhsB))
+
+
+handleUnaryMinus :: Value -> AlexPosn -> StateType (Type, Value)
+handleUnaryMinus (ConstValue v) posn = handleUnaryMinus v posn
+handleUnaryMinus (IntValue v) _ = return (IntType, IntValue (-v))
+handleUnaryMinus (FloatValue v) _ = return (FloatType, FloatValue (-v))
+handleUnaryMinus _ posn = semanticError $ "Invalid minus unary operation " ++ showPos posn
 
 
 handleAdd :: Value -> Value -> AlexPosn -> StateType (Type, Value)
