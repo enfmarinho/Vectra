@@ -358,36 +358,150 @@ expStmtList = do
     -- concat <$> (expStmt `sepBy` TT.kwComma)
     return []
 
--- TODO allow [] 
+baseExp :: StateType ([Token], Type, Value)
+baseExp = do
+    optionUnary <- optionMaybe (TT.opSub <|> TT.opNot)
+    (base, baseT, baseV) <- literal 
+                            <|> try var
+                            <|> do
+                                (a, maybeType, maybeValue) <- callStmt
+                                expValue <- case maybeValue of
+                                                Nothing -> semanticError "TODO calling procedure and expecting a value"
+                                                Just v -> return v
+                                expType <- case maybeType of 
+                                                Nothing -> semanticError "TODO calling procedure and expecting a return type" -- will never reach this
+                                                Just t -> return t
+                                return (a, expType, expValue)
+                            <|> do 
+                                a <- TT.openParen
+                                (b, expType, expValue) <- expStmt
+                                c <- TT.closeParen
+                                return ([a] ++ b ++ [c], expType, expValue)
+                            -- <|> do
+                            --     a <- TT.kwCast
+                            --     b <- TT.opSmaller
+                            --     (c, t) <- typeStmt
+                            --     d <- TT.opGreater
+                            --     e <- TT.openParen
+                            --     f <- var
+                            --     g <- TT.closeParen
+                                -- return ([a] ++ [b] ++ c ++ [d], t, Maybe)
+                            -- <|> do -- TODO derefVar
+                            --     a <- TT.kwDeref
+                            --     b <- TT.openParen
+                            --     (c, varType, _varValue) <- var
+                            --     let OPEN_PAREN posn = b
+                            --     derefType <- case varType of
+                            --                     RefType derefType -> return derefType
+                            --                     _ -> semanticError $ "Trying to deref a non reference type " ++ showPos posn
+                            --     d <- TT.closeParen
+                            --
+                                -- derefValue <- case varValue of
+                                --                 RefValue key refId -> return 
+                                --                 _ -> semanticError $ "Trying to deref a non reference type " ++ showPos posn
+                                -- return ([a] ++ [b] ++ c ++ [d], derefType, IntValue 1)
+
+    case optionUnary of
+        Nothing -> return (base, baseT, baseV)
+        Just unary ->
+            case unary of
+                OP_SUB posn -> do
+                    (_, resultV) <- handleUnaryMinus baseV posn
+                    return (unary : base, baseT, resultV)
+                OP_NOT posn -> do
+                    (_, resultV) <- handleNot baseV posn
+                    return (unary : base, baseT, resultV)
+                _ -> return (base, baseT, baseV)
+
+
+orExpStmt :: StateType ([Token], Type, Value)
+orExpStmt = do
+    (a, at, av) <- andExpStmt
+    option (a, at, av) (do
+            b <- TT.opOr 
+            let OP_OR posn = b
+            (c, _, v) <- orExpStmt
+
+            (resultT, resultV) <- handleOr av v posn
+            return (a ++ [b] ++ c, resultT, resultV)
+        )
+            
+
+andExpStmt :: StateType ([Token], Type, Value)
+andExpStmt = do
+    (a, at, av) <- addSubExpStmt 
+    option (a, at, av) (do
+            b <- TT.opAnd 
+            let OP_ADD posn = b
+            (c, _, v) <- andExpStmt
+
+            (resultT, resultV) <- handleAnd av v posn
+            return (a ++ [b] ++ c, resultT, resultV)
+        )
+
+addSubExpStmt :: StateType ([Token], Type, Value)
+addSubExpStmt = do
+    (a, at, av) <- multDivExpStmt 
+    option (a, at, av) (do 
+            (b, posn, isAdd) <- do
+                            b <- TT.opAdd 
+                            let OP_ADD posn = b
+                            return (b, posn, True)
+                        <|> do
+                            b <- TT.opSub
+                            let OP_SUB posn = b
+                            return (b, posn, False)
+            (c, _, v) <- addSubExpStmt
+
+            (resultT, resultV) <- if isAdd
+                                    then handleAdd av v posn
+                                    else handleSub av v posn
+            return (a ++ [b] ++ c, resultT, resultV)
+        )
+
+multDivExpStmt :: StateType ([Token], Type, Value)
+multDivExpStmt = do
+    (a, at, av) <- baseExp 
+    option (a, at, av) (do
+            (b, posn, isMult) <- do
+                            b <- TT.opMult 
+                            let OP_MULT posn = b
+                            return (b, posn, True)
+                        <|> do
+                            b <- TT.opDiv
+                            let OP_DIV posn = b
+                            return (b, posn, False)
+            (c, _, v) <- multDivExpStmt
+
+            (resultT, resultV) <- if isMult
+                                    then handleMult av v posn
+                                    else handleDiv av v posn
+            return (a ++ [b] ++ c, resultT, resultV)
+        )
+
+
+stringExpStmt :: StateType ([Token], Type, Value)
+stringExpStmt = do
+    (a, at, av) <- baseExp 
+    option (a, at, av) (do
+            b <- TT.opAdd
+            c <- TT.opAdd
+
+            let OP_ADD posn = c
+            as <- getStringFromValueString av posn
+            bs <- getStringFromValueString av posn
+
+            return (a ++ [b] ++ [c], at, StringValue $ as ++ bs)
+        )
+    where 
+        getStringFromValueString (StringValue v) _posn = return v
+        getStringFromValueString _ posn = semanticError $ "Concat operation should only be perform with a string type" ++ showPos posn
+            
+
 expStmt :: StateType ([Token], Type, Value)
 expStmt = do
-    literal
-    -- <|> do -- ComparisonExp
-    --     a <- expDecl
-    --     b <- TT.opCompare
-    --     c <- expDecl
-    --     return (a ++ [b] ++ c)
-    -- <|> do -- refVarExp
-    --     a <- TT.kwRef
-    --     _ <- TT.openParen
-    --     b <- TT.id
-    --     _ <- TT.closeParen
-    --     return $ a:[b] 
-    -- <|> do -- derefVarExp
-    --     a <- TT.kwRef
-    --     _ <- TT.openParen
-    --     b <- TT.id
-    --     _ <- TT.closeParen
-    --     return $ a:[b] 
-    -- <|> do -- varExp
-    --     -- TODO
-    --     return []
-    -- <|> do -- (exp)
-    --     _ <- TT.openParen
-    --     a <- expDecl
-    --     _ <- TT.closeParen
-    --     return a
-    -- <|> callStmt
+    orExpStmt
+    <|> try stringExpStmt 
 
 stmtList :: StateType ([Token], InterpreterState)
 stmtList = do
