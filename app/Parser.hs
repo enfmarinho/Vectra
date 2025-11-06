@@ -637,14 +637,12 @@ ifStmt = do
         -- The Bool indicates whether the conditional was executed
         elseIfStmt :: StateType ([Token], Bool)
         elseIfStmt = do
-            a <- TT.newLine
             b <- TT.kwElse
             (c, executed) <- ifStmt
-            return ([a] ++ [b] ++ c, executed)
+            return (b:c, executed)
         elseStmt :: StateType [Token]
         elseStmt = do
             openScope True
-            a <- TT.newLine
             b <- TT.kwElse
             c <- TT.kwColumn
             d <- TT.newLine
@@ -652,7 +650,7 @@ ifStmt = do
             (f, _) <- stmtList
             g <- TT.unindent
             closeScope
-            return $ [a] ++ [b] ++ [c] ++ [d] ++ [e] ++ f ++ [g]
+            return $ [b] ++ [c] ++ [d] ++ [e] ++ f ++ [g]
 
 
 evaluateBooleanExp :: [Token] -> StateType (Value, InterpreterState)
