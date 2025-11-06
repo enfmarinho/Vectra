@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module Assert where
 
 import Scanner
@@ -36,6 +37,7 @@ consultType symbolId posn = do
     consultResult <- consultSymbol symbolId
     case consultResult of
         Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
+        -- improve error message
         Just [] -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
         Just [h] -> return h
         Just (_:_) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
@@ -284,3 +286,52 @@ handleDiv (FloatValue lhsV) (FloatValue rhsV) posn =
         else return (FloatType, FloatValue (lhsV / rhsV))
 handleDiv _ _ posn =
     semanticError $ "Invalid operands for division at " ++ showPos posn
+
+castValueToType :: Type -> (Type, Value) -> AlexPosn -> StateType Value
+--- IntType target ---
+castValueToType IntType (_, IntValue i) _ = return (IntValue i)
+castValueToType IntType (_, FloatValue f) _ = return (IntValue (floor f))
+castValueToType IntType (_, BoolValue b) _ = return (IntValue (if b then 1 else 0))
+castValueToType IntType (_, StringValue s) posn =
+    case reads s :: [(Int, String)] of
+        [(i, "")] -> return (IntValue i)
+        _         -> runtimeError $ 
+                        "unsuccessful casting between " ++ show IntType ++ " and " ++ show StringType ++ 
+                        ". Not possible to get an int from this string " ++ showPos posn
+castValueToType IntType (srcT, ConstValue v) posn =
+    castValueToType IntType (srcT, v) posn
+
+--- FloatType target ---
+castValueToType FloatType (_, IntValue i) _ = return (FloatValue (fromIntegral i))
+castValueToType FloatType (_, FloatValue f) _ = return (FloatValue f)
+castValueToType FloatType (_, BoolValue b) _ = return (FloatValue (if b then 1.0 else 0.0))
+castValueToType FloatType (_, StringValue s) posn =
+    case reads s :: [(Float, String)] of
+        [(f, "")] -> return (FloatValue f)
+        _         -> runtimeError $ 
+                        "unsuccessful casting between " ++ show FloatType ++ " and " ++ show StringType ++ 
+                        ". Not possible to get a float from this string " ++ showPos posn
+castValueToType FloatType (srcT, ConstValue v) posn =
+    castValueToType FloatType (srcT, v) posn
+
+--- BoolType target ---
+castValueToType BoolType (_, BoolValue b) _ = return (BoolValue b)
+castValueToType BoolType (_, IntValue i) _ = return (BoolValue (i /= 0))
+castValueToType BoolType (_, FloatValue f) _ = return (BoolValue (f /= 0))
+castValueToType BoolType (srcT, ConstValue v) posn =
+    castValueToType BoolType (srcT, v) posn
+
+--- StringType target ---
+castValueToType StringType (_, StringValue s) _ = return (StringValue s)
+castValueToType StringType (_, IntValue i) _ = return (StringValue (show i))
+castValueToType StringType (_, FloatValue f) _ = return (StringValue (show f))
+castValueToType StringType (_, BoolValue b) _ = return (StringValue (show b))
+castValueToType StringType (srcT, ConstValue v) posn =
+    castValueToType StringType (srcT, v) posn
+
+--- Unsupported cast ---
+castValueToType targetType (srcT, value) posn =
+    semanticError $
+        "Invalid cast operation, casting between incompatible types: " ++ 
+        show targetType ++ " and " ++ show srcT ++ " " ++ showPos posn
+
