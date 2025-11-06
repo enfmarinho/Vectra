@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-missing-fields #-}
 module Parser
   ( parser
   ) where
@@ -248,6 +249,7 @@ varDecl = do
 var :: StateType ([Token], Type, Value)
 var = do
     -- TODO this in bugged
+    -- TODO allow [] 
     a <- TT.id
     next <- optionMaybe $ do
         _ <- TT.kwDot
@@ -462,14 +464,16 @@ assignStmt = do
                                 value <- case maybeValue of
                                     Nothing -> semanticError $ "Trying to use " ++ symbolId ++ " without initializing it " ++ showPos posn
                                     Just value -> return value
-                                resultValue <- case op of
-                                            OP_ADD _ -> handleAdd value dValue
-                                            OP_SUB _ -> handleSub value dValue
-                                            OP_MULT _ -> handleMult value dValue
-                                            OP_DIV _ -> handleDiv value dValue
-                                            OP_AND _ -> handleAnd value dValue
-                                            OP_OR _ -> handleOr value dValue
-                                            _ -> semanticError $ "Invalid operation on assignment operation for " ++ symbolId ++ " " ++ showPos posn
+                                resultValue <- do
+                                    resultValue <- case op of
+                                        OP_ADD _ -> handleAdd value dValue posn
+                                        OP_SUB _ -> handleSub value dValue posn
+                                        OP_MULT _ -> handleMult value dValue posn
+                                        OP_DIV _ -> handleDiv value dValue posn
+                                        OP_AND _ -> handleAnd value dValue posn
+                                        OP_OR _ -> handleOr value dValue posn
+                                        _ -> semanticError $ "Invalid operation on assignment operation for " ++ symbolId ++ " " ++ showPos posn
+                                    castValueToType symbolType resultValue posn
                                 return ([op], resultValue)
     updateValue (symbolId, value)
 
