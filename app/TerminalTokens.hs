@@ -264,6 +264,11 @@ kwConst = tokenPrim show updatePos getToken where
   getToken (KW_CONST pos) = Just (KW_CONST pos)
   getToken _       = Nothing
 
+kwCast :: StateType Token
+kwCast = tokenPrim show updatePos getToken where
+  getToken (KW_CAST pos) = Just (KW_CAST pos)
+  getToken _       = Nothing
+
 kwImpl :: StateType Token
 kwImpl = tokenPrim show updatePos getToken where
   getToken (KW_IMPL pos) = Just (KW_IMPL pos)
