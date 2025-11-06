@@ -432,7 +432,7 @@ andExpStmt = do
     (a, at, av) <- addSubExpStmt 
     option (a, at, av) (do
             b <- TT.opAnd 
-            let OP_ADD posn = b
+            let OP_AND posn = b
             (c, _, v) <- andExpStmt
 
             (resultT, resultV) <- handleAnd av v posn
