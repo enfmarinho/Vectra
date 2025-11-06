@@ -429,7 +429,7 @@ orExpStmt = do
 
 andExpStmt :: StateType ([Token], Type, Value)
 andExpStmt = do
-    (a, at, av) <- addSubExpStmt 
+    (a, at, av) <- compareExpStmt 
     option (a, at, av) (do
             b <- TT.opAnd 
             let OP_AND posn = b
@@ -438,6 +438,43 @@ andExpStmt = do
             (resultT, resultV) <- handleAnd av v posn
             return (a ++ [b] ++ c, resultT, resultV)
         )
+
+compareExpStmt :: StateType ([Token], Type, Value)
+compareExpStmt = do
+    (a, at, av) <- addSubExpStmt 
+    option (a, at, av) (do
+            -- TODO Yeap, I was wrong... It's better to have only one token for every comparison and make it store the lexeme
+            (b, _posn) <- do
+                            b <- TT.opSmaller 
+                            let OP_SMALLER posn = b
+                            return (b, posn)
+                        <|> do
+                            b <- TT.opSmallerEq
+                            let OP_SMALLER_EQ posn = b
+                            return (b, posn)
+                        <|> do
+                            b <- TT.opGreater
+                            let OP_GREATER posn = b
+                            return (b, posn)
+                        <|> do
+                            b <- TT.opGreaterEq
+                            let OP_GREATER_EQ posn = b
+                            return (b, posn)
+                        <|> do
+                            b <- TT.opEq
+                            let OP_EQ posn = b
+                            return (b, posn)
+                        <|> do
+                            b <- TT.opNotEq
+                            let OP_NOT_EQ posn = b
+                            return (b, posn)
+            (c, _, _v) <- addSubExpStmt
+
+            -- (resultT, resultV) <- handleComparison av v posn
+            -- return (a ++ [b] ++ c, resultT, resultV)
+            return (a ++ [b] ++ c, at, av)
+        )
+    
 
 addSubExpStmt :: StateType ([Token], Type, Value)
 addSubExpStmt = do
