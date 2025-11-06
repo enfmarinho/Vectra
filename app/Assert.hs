@@ -176,37 +176,104 @@ checkShadowing symbolId posn = do
         Nothing -> return ()
         Just _ -> warningMsg $ "Declaring " ++ symbolId ++ " shadows and exists symbol " ++ showPos posn
 
-handleAdd :: Value -> Value -> StateType Value
-handleAdd lhs _rhs = do
-    -- TODO
-    return lhs
 
-handleSub :: Value -> Value -> StateType Value
-handleSub lhs _rhs = do
-    -- TODO
-    return lhs
+toBoolValue :: Value -> Value
+toBoolValue (BoolValue b) = BoolValue b
+toBoolValue (IntValue i) = BoolValue (i /= 0)
+toBoolValue (FloatValue f) = BoolValue (f /= 0)
+toBoolValue (ConstValue v) = toBoolValue v
+toBoolValue _ = BoolValue False  -- Fallback for unsupported types
 
-handleMult :: Value -> Value -> StateType Value
-handleMult lhs _rhs = do
-    -- TODO
-    return lhs
 
-handleDiv :: Value -> Value -> StateType Value
-handleDiv lhs _rhs = do
-    -- TODO
-    return lhs
+handleNot :: Value -> StateType (Type, Value)
+handleNot (ConstValue v) = handleNot v
+handleNot (BoolValue v) = return (BoolType, BoolValue (not v))
+handleNot (IntValue v) = return (BoolType, BoolValue (v == 0))
+handleNot (FloatValue v) = return (BoolType, BoolValue (v == 0.0))
+handleNot _ = semanticError "Invalid operand for logical 'not'."
 
-handleAnd :: Value -> Value -> StateType Value
-handleAnd lhs _rhs = do
-    -- TODO
-    return lhs
 
-handleOr :: Value -> Value -> StateType Value
-handleOr lhs _rhs = do
-    -- TODO
-    return lhs
+handleAnd :: Value -> Value -> AlexPosn -> StateType (Type, Value)
+handleAnd (ConstValue lhs) rhs posn = handleAnd lhs rhs posn
+handleAnd lhs (ConstValue rhs) posn = handleAnd lhs rhs posn
+handleAnd lhs rhs _ = do
+    let BoolValue lhsB = toBoolValue lhs
+        BoolValue rhsB = toBoolValue rhs
+    return (BoolType, BoolValue (lhsB && rhsB))
 
-handleNot :: Value -> StateType Value
-handleNot lhs = do
-    -- TODO
-    return lhs
+
+handleOr :: Value -> Value -> AlexPosn -> StateType (Type, Value)
+handleOr (ConstValue lhs) rhs posn = handleOr lhs rhs posn
+handleOr lhs (ConstValue rhs) posn = handleOr lhs rhs posn
+handleOr lhs rhs _ = do
+    let BoolValue lhsB = toBoolValue lhs
+        BoolValue rhsB = toBoolValue rhs
+    return (BoolType, BoolValue (lhsB || rhsB))
+
+
+handleAdd :: Value -> Value -> AlexPosn -> StateType (Type, Value)
+handleAdd (ConstValue lhs) rhs posn = handleAdd lhs rhs posn
+handleAdd lhs (ConstValue rhs) posn = handleAdd lhs rhs posn
+handleAdd (IntValue lhsV) (IntValue rhsV) _ =
+    return (IntType, IntValue (lhsV + rhsV))
+handleAdd (IntValue lhsV) (FloatValue rhsV) _ =
+    return (FloatType, FloatValue (fromIntegral lhsV + rhsV))
+handleAdd (FloatValue lhsV) (IntValue rhsV) _ =
+    return (FloatType, FloatValue (lhsV + fromIntegral rhsV))
+handleAdd (FloatValue lhsV) (FloatValue rhsV) _ =
+    return (FloatType, FloatValue (lhsV + rhsV))
+handleAdd _ _ posn =
+    semanticError $ "Invalid operands for addition at " ++ showPos posn
+
+
+handleSub :: Value -> Value -> AlexPosn -> StateType (Type, Value)
+handleSub (ConstValue lhs) rhs posn = handleSub lhs rhs posn
+handleSub lhs (ConstValue rhs) posn = handleSub lhs rhs posn
+handleSub (IntValue lhsV) (IntValue rhsV) _ =
+    return (IntType, IntValue (lhsV - rhsV))
+handleSub (IntValue lhsV) (FloatValue rhsV) _ =
+    return (FloatType, FloatValue (fromIntegral lhsV - rhsV))
+handleSub (FloatValue lhsV) (IntValue rhsV) _ =
+    return (FloatType, FloatValue (lhsV - fromIntegral rhsV))
+handleSub (FloatValue lhsV) (FloatValue rhsV) _ =
+    return (FloatType, FloatValue (lhsV - rhsV))
+handleSub _ _ posn =
+    semanticError $ "Invalid operands for subtraction at " ++ showPos posn
+
+
+handleMult :: Value -> Value -> AlexPosn -> StateType (Type, Value)
+handleMult (ConstValue lhs) rhs posn = handleMult lhs rhs posn
+handleMult lhs (ConstValue rhs) posn = handleMult lhs rhs posn
+handleMult (IntValue lhsV) (IntValue rhsV) _ =
+    return (IntType, IntValue (lhsV * rhsV))
+handleMult (IntValue lhsV) (FloatValue rhsV) _ =
+    return (FloatType, FloatValue (fromIntegral lhsV * rhsV))
+handleMult (FloatValue lhsV) (IntValue rhsV) _ =
+    return (FloatType, FloatValue (lhsV * fromIntegral rhsV))
+handleMult (FloatValue lhsV) (FloatValue rhsV) _ =
+    return (FloatType, FloatValue (lhsV * rhsV))
+handleMult _ _ posn =
+    semanticError $ "Invalid operands for multiplication at " ++ showPos posn
+
+
+handleDiv :: Value -> Value -> AlexPosn -> StateType (Type, Value)
+handleDiv (ConstValue lhs) rhs posn = handleDiv lhs rhs posn
+handleDiv lhs (ConstValue rhs) posn = handleDiv lhs rhs posn
+handleDiv (IntValue lhsV) (IntValue rhsV) posn =
+    if rhsV == 0
+        then semanticError $ "Division by zero at " ++ showPos posn
+        else return (FloatType, FloatValue (fromIntegral lhsV / fromIntegral rhsV))
+handleDiv (IntValue lhsV) (FloatValue rhsV) posn =
+    if rhsV == 0
+        then semanticError $ "Division by zero at " ++ showPos posn
+        else return (FloatType, FloatValue (fromIntegral lhsV / rhsV))
+handleDiv (FloatValue lhsV) (IntValue rhsV) posn =
+    if rhsV == 0
+        then semanticError $ "Division by zero at " ++ showPos posn
+        else return (FloatType, FloatValue (lhsV / fromIntegral rhsV))
+handleDiv (FloatValue lhsV) (FloatValue rhsV) posn =
+    if rhsV == 0
+        then semanticError $ "Division by zero at " ++ showPos posn
+        else return (FloatType, FloatValue (lhsV / rhsV))
+handleDiv _ _ posn =
+    semanticError $ "Invalid operands for division at " ++ showPos posn
