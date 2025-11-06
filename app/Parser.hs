@@ -506,12 +506,15 @@ expStmt = do
 stmtList :: StateType ([Token], InterpreterState)
 stmtList = do
     _ <- optionMaybe TT.newLine
-    a <- concat <$> many (do
-        a <- stmt
-        b <- TT.newLine
-        return (a ++ [b]))
+    a <- stmt
+    b <- concat <$> many (try $ do 
+            b <- TT.newLine
+            c <- stmt
+            return (b:c)
+        )
+    _ <- optionMaybe TT.newLine
     st <- getState
-    return (a, st)
+    return (a ++ b, st)
 
 stmt :: StateType [Token]
 stmt = do
