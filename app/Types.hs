@@ -26,7 +26,7 @@ data InterpreterState = InterpreterState
 type StateType = ParsecT [Token] InterpreterState IO
 
 data ParserState = GlobalScope
-                 | Method
+                 | Method (Maybe Type) -- Target return type
                  | Loop
                  | Conditional
                  deriving (Eq)
@@ -36,7 +36,7 @@ data ProgramState = Starting
                   | Skip
                   | Continue
                   | Break
-                  | Return (Type, Value)
+                  | Return (Maybe Value) -- Return value
                   | Finished
 
 data Type = IntType
