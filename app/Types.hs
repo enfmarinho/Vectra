@@ -12,6 +12,8 @@ type MemoryType = (String, Value)
 type MemoryTableType = H.BasicHashTable String Value
 type MemoryTableStackType = [MemoryTableType]
 
+type LibMethodSignature = [Value] -> AlexPosn -> StateType (Maybe Value)
+
 data InterpreterState = InterpreterState
   { parserState :: ParserState
   , programState :: ProgramState
@@ -45,19 +47,19 @@ data Type = IntType
           | StringType
           | TemplateType
           | RefType Type
-          | ConstType Type                                            -- (internal_type)
-          | ArrayType Int Type                                        -- (size, type)                 
-          | EnumType [String]                                         -- (valid_labels)
-          | ProcType [String] [(String, Type)] [Token]                -- (template_ids, param_types, method_body)
-          | FuncType [String] [(String, Type)] Type [Token]           -- (template_ids, (param_ids, param_types), return_type, method_body)
-          | StructType [String] SymbolTableType                       -- (template_ids, table_for_data)
-          | StructInstanceType String                                 -- (struct_type_id)
-          | EnumInstanceType String                                   -- (enum_type_id)
-          | FuncRefType [String] [Type] Type                          -- (templates_ids, param_types, return_type)
-          | ProcRefType [String] [Type]                               -- (templates_ids, param_types)
-          | NamespaceType SymbolTableType                             -- (symbol_table)
-          | ImplNamespaceType SymbolTableType                         -- (symbol_table)
-          | HaskellMethod [Type] ([Value] -> StateType (Maybe Value)) -- (param_types, internal_method)
+          | ConstType Type                                  -- (internal_type)
+          | ArrayType Int Type                              -- (size, type)                 
+          | EnumType [String]                               -- (valid_labels)
+          | ProcType [String] [(String, Type)] [Token]      -- (template_ids, param_types, method_body)
+          | FuncType [String] [(String, Type)] Type [Token] -- (template_ids, (param_ids, param_types), return_type, method_body)
+          | StructType [String] SymbolTableType             -- (template_ids, table_for_data)
+          | StructInstanceType String                       -- (struct_type_id)
+          | EnumInstanceType String                         -- (enum_type_id)
+          | FuncRefType [String] [Type] Type                -- (templates_ids, param_types, return_type)
+          | ProcRefType [String] [Type]                     -- (templates_ids, param_types)
+          | NamespaceType SymbolTableType                   -- (symbol_table)
+          | ImplNamespaceType SymbolTableType               -- (symbol_table)
+          | HaskellMethod [Type] LibMethodSignature         -- (param_types, internal_method)
 
 data Value = IntValue Int
            | FloatValue Float

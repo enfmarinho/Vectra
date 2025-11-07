@@ -13,6 +13,9 @@ import Assert
 import Control.Monad
 import Data.Maybe
 import Control.Monad.IO.Class
+import VectraLib
+
+-- TODO some functions shouldn't return [Token], but yet do. Fix this...
 
 vectraLanguage :: StateType [Token]
 vectraLanguage = do
