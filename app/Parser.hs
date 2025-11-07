@@ -23,8 +23,17 @@ vectraLanguage = do
         importCommand :: StateType [Token]
         importCommand = do
             a <- TT.kwImport
-            b <- TT.id
-                <|> TT.stringLiteral
+            b <- do 
+                    b <- TT.id
+                    let ID posn symbolId = b
+                    importSpecialMethod symbolId posn
+                    return b
+                <|> do
+                    b <- TT.stringLiteral 
+                    let STRING_LITERAL posn filePath = b
+                    importFile filePath posn
+                    return b
+
             return $ a:[b]
 
         globalDecl :: StateType [Token]
