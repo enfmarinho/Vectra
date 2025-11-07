@@ -325,7 +325,8 @@ callStmt = do
         runFuncBody :: [Token] -> StateType (Maybe Value)
         runFuncBody funcBody = do
             previousProgramState <- getProgramState
-            if previousProgramState == Running then 
+            isRunning' <- isRunning
+            if not isRunning' then 
                 return Nothing
                 else do
                     st <- getState
@@ -335,13 +336,15 @@ callStmt = do
                                                 Right (_, finalInterpreterState) -> return finalInterpreterState
                     setState finalInterpreterState
                     currProgramState <- getProgramState
-                    case currProgramState of
-                                Return (_returnType, returnValue) -> do
-                                    -- TODO check for mismatch between expected type and returned type
-                                    return $ Just returnValue
-                                _ -> do
-                                    -- TODO confirm its a call for a procedure, otherwise emit warning for function with no return on control path
-                                    return Nothing 
+                    maybeReturnV <- case currProgramState of
+                                        Return returnValue -> do
+                                            -- TODO check for mismatch between expected type and returned type
+                                            return returnValue
+                                        _ -> do
+                                            -- TODO confirm its a call for a procedure, otherwise emit warning for function with no return on control path
+                                            return Nothing 
+                    setProgramState previousProgramState
+                    return maybeReturnV
             
 
 literal :: StateType ([Token], Type, Value)
@@ -596,57 +599,67 @@ stmt = do
         return [a]
     <|> do
         a <- TT.kwReturn 
-        (b, expType, expValue) <- expStmt
+        optionB <- optionMaybe expStmt
         let KW_RETURN posn = a
         assertReturnable posn
-        setProgramState $ Return (expType, expValue)
+        b <- case optionB of
+                Nothing -> return []
+                Just (b, expType, expValue) -> do
+                    assertReturnType expType posn
+                    isRunning' <- isRunning
+                    when isRunning' $ do setProgramState $ Return (Just expValue)
+                    return b
+
         return $ a:b
         
 
-mathOpSymbol :: StateType Token
+mathOpSymbol :: StateType [Token]
 mathOpSymbol = do
-    TT.opAdd
-    <|> TT.opSub
-    <|> TT.opMult
-    <|> TT.opDiv
-    <|> TT.opAnd
-    <|> TT.opOr
-    <|> TT.opNot
+    t <- TT.opAdd
+        <|> TT.opSub
+        <|> TT.opMult
+        <|> TT.opDiv
+        <|> TT.opAnd
+        <|> TT.opOr
+        <|> TT.opNot
+    return [t]
 
 assignStmt :: StateType ([Token], InterpreterState)
 assignStmt = do
     a <- TT.id
     optionB <- optionMaybe mathOpSymbol
     c <- TT.kwAssingment
-    (d, dType, dValue) <- expStmt
+    (d, expType, expValue) <- expStmt
 
     let ID posn symbolId = a
     symbolType <- consultType symbolId posn
 
-    assertTypesEq symbolType dType posn
+    assertTypesEq symbolType expType posn
 
-    (b, value) <- case optionB of
-                    Nothing -> return ([], dValue)
-                    Just op -> do
-                                maybeValue <- consultValue symbolId
-                                value <- case maybeValue of
-                                    Nothing -> semanticError $ "Trying to use " ++ symbolId ++ " without initializing it " ++ showPos posn
-                                    Just value -> return value
-                                resultValue <- do
-                                    resultValue <- case op of
-                                        OP_ADD _ -> handleAdd value dValue posn
-                                        OP_SUB _ -> handleSub value dValue posn
-                                        OP_MULT _ -> handleMult value dValue posn
-                                        OP_DIV _ -> handleDiv value dValue posn
-                                        OP_AND _ -> handleAnd value dValue posn
-                                        OP_OR _ -> handleOr value dValue posn
-                                        _ -> semanticError $ "Invalid operation on assignment operation for " ++ symbolId ++ " " ++ showPos posn
-                                    castValueToType symbolType resultValue posn
-                                return ([op], resultValue)
-    updateValue (symbolId, value)
+    isRunning' <- isRunning
+    when isRunning' $ do
+        value <- case optionB of
+                        Nothing -> return expValue
+                        Just [op] -> do
+                                    maybeValue <- consultValue symbolId
+                                    value <- case maybeValue of
+                                        Nothing -> semanticError $ "Trying to use " ++ symbolId ++ " without initializing it " ++ showPos posn
+                                        Just value -> return value
+                                    do
+                                        resultValue <- case op of
+                                            OP_ADD _ -> handleAdd value expValue posn
+                                            OP_SUB _ -> handleSub value expValue posn
+                                            OP_MULT _ -> handleMult value expValue posn
+                                            OP_DIV _ -> handleDiv value expValue posn
+                                            OP_AND _ -> handleAnd value expValue posn
+                                            OP_OR _ -> handleOr value expValue posn
+                                            _ -> semanticError $ "Invalid operation on assignment operation for " ++ symbolId ++ " " ++ showPos posn
+                                        castValueToType symbolType resultValue posn
+                        Just _ -> fail "<assignStmt>"
+        updateValue (symbolId, value)
 
     currInterpreterState <- getState
-    return ([a] ++ b ++ [c] ++ d, currInterpreterState)
+    return ([a] ++ fromMaybe [] optionB ++ [c] ++ d, currInterpreterState)
 
 -- The Bool indicates whether the conditional was executed
 ifStmt :: StateType ([Token], Bool)
