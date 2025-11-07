@@ -22,6 +22,7 @@ executable Vectra
                       Scanner
                       TerminalTokens
                       Assert
+                      VectraLib
     build-depends:    base ^>=4.18.2.1,
                       hashtables,
                       mtl,
