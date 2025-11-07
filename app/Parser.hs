@@ -4,7 +4,7 @@ module Parser
   ( parser
   ) where
 
-import InterpreterState
+import InterpreterState 
 import TerminalTokens as TT
 import Scanner
 import Text.Parsec
@@ -169,6 +169,7 @@ paramDeclList = do
 
 methodDecl :: StateType [Token]
 methodDecl = do
+    previousParserBlock <- getParserBlock
     openScope False
     a <- TT.kwProc
         <|> TT.kwFunc
@@ -187,17 +188,9 @@ methodDecl = do
     e <- TT.closeParen
     optionF <- optionMaybe returnDecl
 
-    returnType <- case a of
-                    KW_PROC _ -> do
-                        when (isJust optionF) $ semanticError $
-                            "A procedure cannot return a value, only functions can. Considerer declaring " ++ symbolId ++
-                            " as a functions instead " ++ showPos posn
-                        return TemplateType -- Just a workaround, if its a procedure this type won't be used anyway
-                    _         -> do
-                                    case optionF of
-                                        Nothing -> semanticError $ "A function must return something. Consider declaring "
-                                                                    ++ symbolId ++ " as a procedure instead " ++ showPos posn
-                                        Just (_, returnType) -> return returnType
+    case optionF of
+        Nothing -> setParserBlock(Method Nothing)
+        Just (_, t) -> setParserBlock(Method $ Just t)
 
     _ <- TT.kwColumn
     _ <- TT.newLine
@@ -208,12 +201,21 @@ methodDecl = do
     closeScope
     assertMethodDeclNotAmbiguous symbolId (map snd dParams) posn
     case a of
-        KW_PROC _ -> insertSymbol (symbolId, ProcType bIds dParams g) True
-        KW_FUNC _ -> insertSymbol (symbolId, FuncType bIds dParams returnType g) True
-        _ -> return () -- Impossible to get here, this is just to avoid warnings  
+        KW_PROC _ -> do
+            when (isJust optionF) $ semanticError $
+                "A procedure cannot return a value, only functions can. Considerer declaring " ++ symbolId ++
+                " as a functions instead " ++ showPos posn
+
+            insertSymbol (symbolId, ProcType bIds dParams g) True
+        KW_FUNC _ -> case optionF of
+                        Nothing -> semanticError $ "A function must return something. Consider declaring "
+                                                    ++ symbolId ++ " as a procedure instead " ++ showPos posn
+                        Just (_, returnType) -> insertSymbol (symbolId, FuncType bIds dParams returnType g) True
+        _ ->  fail "<methodDecl>" -- Impossible to get here, this is just to avoid warnings  
 
     when (symbolId == "main") $
         setProgramState Finished
+    setParserBlock previousParserBlock
     return ([a] ++ bTokens ++ [c] ++ dTokens ++ [e] ++ maybe [] fst optionF ++ g)
 
 arrayDecl :: StateType ([Token], Int)
@@ -650,8 +652,10 @@ assignStmt = do
 ifStmt :: StateType ([Token], Bool)
 ifStmt = do
     previousProgramState <- getProgramState
+    previousParserBlock <- getParserBlock
     openScope True
     a <- TT.kwIf
+    setParserBlock Conditional
     (b, expType, expValue) <- expStmt
 
     let KW_IF posn = a
@@ -681,6 +685,7 @@ ifStmt = do
 
     closeScope
     setProgramState previousProgramState
+    setParserBlock previousParserBlock
     return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g] ++ h ++ i, conditional)
     where
         -- The Bool indicates whether the conditional was executed
@@ -716,8 +721,11 @@ evaluateBooleanExp tokenList = do
 whileStmt :: StateType [Token]
 whileStmt = do
     previousProgramState <- getProgramState
+    previousParserBlock <- getParserBlock
     openScope True
+
     a <- TT.kwWhile
+    setParserBlock Loop
     (b, expType, expValue) <- expStmt
 
     let KW_WHILE posn = a
@@ -732,7 +740,7 @@ whileStmt = do
     (f, _) <- stmtList
     g <- TT.unindent
 
-    let runWhile = do
+    let _runWhile = do
             currProgramState <- getProgramState
             when (currProgramState == Break || currProgramState == Return {} || previousProgramState /= Running) $ return () -- TODO bug
             setProgramState previousProgramState
@@ -747,10 +755,11 @@ whileStmt = do
                 case parserResult of
                     Left _ -> fail "<while>"
                     Right (_, resultState') -> putState resultState'
-                runWhile
+                _runWhile
 
-    when condition runWhile
+    -- when condition runWhile
     setProgramState previousProgramState
+    setParserBlock previousParserBlock
     closeScope
 
     return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g])
@@ -804,9 +813,11 @@ typeStmt = do
 
 forStmt :: StateType [Token]
 forStmt = do
+    previousParserBlock <- getParserBlock
     previousProgramState <- getProgramState
     openScope True
     a <- TT.kwFor
+    setParserBlock Loop
     b <- option [] varDecl
     c <- TT.kwSemicolumn
     optionD <- optionMaybe expStmt
@@ -837,7 +848,7 @@ forStmt = do
     (j, _) <- stmtList
     k <- TT.unindent
 
-    let runFor = do
+    let _runFor = do
             currProgramState <- getProgramState
             when (currProgramState == Break || currProgramState == Return {} || previousProgramState /= Running) $ return () -- TODO bug
             setProgramState previousProgramState
@@ -860,18 +871,21 @@ forStmt = do
                     Left _ -> fail "<for>"
                     Right (_, resultState') -> putState resultState'
 
-                runFor
+                _runFor
 
-    when condition runFor
+    -- when condition runFor
     setProgramState previousProgramState
+    setParserBlock previousParserBlock
     closeScope
 
     return ([a] ++ b  ++ [c] ++ d ++ [e] ++ f ++ [g] ++ [h] ++ [i] ++ j ++ [k])
 
 foreachStmt :: StateType [Token]
 foreachStmt = do
+    previousParserBlock <- getParserBlock
     openScope True
     a <- TT.kwForeach
+    setParserBlock Loop
     b <- TT.id
     c <- TT.kwIn
     d <- TT.id
@@ -891,6 +905,7 @@ foreachStmt = do
     i <- TT.unindent
 
     closeScope
+    setParserBlock previousParserBlock
     return $ [a] ++ [b] ++ [c] ++ [d] ++ [e] ++ [f] ++ [g] ++ h ++ [i]
 
 parser :: [Token] -> IO (Either ParseError [Token])

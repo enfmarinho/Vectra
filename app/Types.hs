@@ -15,7 +15,7 @@ type MemoryTableStackType = [MemoryTableType]
 type LibMethodSignature = [Value] -> AlexPosn -> StateType (Maybe Value)
 
 data InterpreterState = InterpreterState
-  { parserState :: ParserState
+  { parserBlock :: ParserBlock
   , programState :: ProgramState
   , symbolTableStack :: SymbolTableStackType
   , memoryTableStack :: MemoryTableStackType
@@ -25,7 +25,7 @@ data InterpreterState = InterpreterState
 
 type StateType = ParsecT [Token] InterpreterState IO
 
-data ParserState = GlobalScope
+data ParserBlock = GlobalScope
                  | Method (Maybe Type) -- Target return type
                  | Loop
                  | Conditional

@@ -25,7 +25,7 @@ initInterpreterState = do
         , memoryTableStack=[]
         , symbolTableStack=[]
         , programState=Starting
-        , parserState=GlobalScope
+        , parserBlock=GlobalScope
         }
     
 
@@ -75,13 +75,13 @@ setProgramState pst = do
   st <- getState
   putState st { programState = pst }
 
-getParserState :: StateType ParserState
-getParserState = parserState <$> getState
+getParserBlock :: StateType ParserBlock
+getParserBlock = parserBlock <$> getState
 
-setParserState :: ParserState -> StateType ()
-setParserState pst = do
+setParserBlock :: ParserBlock -> StateType ()
+setParserBlock pst = do
   st <- getState
-  putState st { parserState = pst }
+  putState st { parserBlock = pst }
 
 addImplMethods :: SymbolType -> StateType ()
 addImplMethods (symbolId, NamespaceType st) = do
