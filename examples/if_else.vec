@@ -3,9 +3,11 @@ import println
 proc main():
     int x = 80
     string msg
-    if true:
+    if x > 80:
 	    msg = "x maior que 80"
-    else if false:
+    else if x > 40:
 	    msg = "x maior que 40"
-    else:
+    else if x < 40 :
 	    msg = "x menor que 40"
+    else:
+	    msg = "x é 40"
