@@ -7,6 +7,7 @@ import Types
 import Control.Monad (when, unless)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Data.Maybe
+import VectraLib
 
 warningMsg :: String -> StateType ()
 warningMsg msg = liftIO $ putStrLn $ "Warning: " ++ msg
@@ -329,9 +330,24 @@ castValueToType StringType (_, BoolValue b) _ = return (StringValue (show b))
 castValueToType StringType (srcT, ConstValue v) posn =
     castValueToType StringType (srcT, v) posn
 
+-- TODO what about TemplateType ? 
 --- Unsupported cast ---
-castValueToType targetType (srcT, value) posn =
+castValueToType targetType (srcT, _) posn =
     semanticError $
         "Invalid cast operation, casting between incompatible types: " ++ 
         show targetType ++ " and " ++ show srcT ++ " " ++ showPos posn
 
+
+importSpecialMethod :: String -> AlexPosn -> StateType ()
+importSpecialMethod symbolId posn = do
+    case symbolId of
+        "print" -> insertSymbol ("print", HaskellMethod [TemplateType] vectraPrint) True 
+        "println" -> insertSymbol ("println", HaskellMethod [TemplateType] vectraPrintln) True 
+        -- TODO make stdlib richer
+        _ -> semanticError $ "Invalid import: " ++ symbolId ++ "doesn't exist " ++ showPos posn
+    return ()
+
+importFile :: String -> AlexPosn -> StateType ()
+importFile _filePath _posn = do
+    -- TODO
+    return ()
