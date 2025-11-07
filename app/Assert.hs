@@ -77,13 +77,22 @@ assertBreakable posn = do
 assertContinuable :: AlexPosn -> StateType ()
 assertContinuable posn = do
     currProgramState <- getParserState
-    when (currProgramState /= Loop && currProgramState /= Conditional) 
+    when (currProgramState /= Loop) 
         $ semanticError $ "Trying to use continue outside a loop " ++ showPos posn
 
 assertReturnable :: AlexPosn -> StateType ()
 assertReturnable posn = do
     currProgramState <- getParserState
     when (currProgramState == GlobalScope) $ semanticError $ "Trying to use return outside a method " ++ showPos posn
+
+assertReturnType :: Type -> AlexPosn -> StateType ()
+assertReturnType returnT posn = do
+    s <- getParserState
+    case s of
+        Method maybeT -> case maybeT of
+                        Nothing -> semanticError $ "returning a value inside a procedure " ++ showPos posn
+                        Just t -> assertTypesEq returnT t posn
+        _ -> semanticError $ "return statement outside a method " ++ showPos posn
 
 assertIterableType :: String -> Type -> AlexPosn -> StateType ()
 assertIterableType symbolId t posn = do
