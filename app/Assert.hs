@@ -83,7 +83,7 @@ assertContinuable posn = do
 assertReturnable :: AlexPosn -> StateType ()
 assertReturnable posn = do
     currProgramState <- getParserState
-    when (currProgramState /= Method) $ semanticError $ "Trying to use return outside a method " ++ showPos posn
+    when (currProgramState == GlobalScope) $ semanticError $ "Trying to use return outside a method " ++ showPos posn
 
 assertIterableType :: String -> Type -> AlexPosn -> StateType ()
 assertIterableType symbolId t posn = do

@@ -26,7 +26,6 @@ data InterpreterState = InterpreterState
 type StateType = ParsecT [Token] InterpreterState IO
 
 data ParserState = GlobalScope
-                 | InnerScope
                  | Method
                  | Loop
                  | Conditional
