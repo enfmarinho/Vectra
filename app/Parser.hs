@@ -683,6 +683,7 @@ ifStmt = do
     e <- TT.indent
     (f, _) <- stmtList
     g <- TT.unindent
+    _ <- TT.newLine
 
     if conditional then
         setProgramState Skip
