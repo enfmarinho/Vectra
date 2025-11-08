@@ -534,28 +534,9 @@ multDivExpStmt = do
         )
 
 
-stringExpStmt :: StateType ([Token], Type, Value)
-stringExpStmt = do
-    (a, at, av) <- baseExp 
-    option (a, at, av) (do
-            b <- TT.opAdd
-            c <- TT.opAdd
-
-            let OP_ADD posn = c
-            as <- getStringFromValueString av posn
-            bs <- getStringFromValueString av posn
-
-            return (a ++ [b] ++ [c], at, StringValue $ as ++ bs)
-        )
-    where 
-        getStringFromValueString (StringValue v) _posn = return v
-        getStringFromValueString _ posn = semanticError $ "Concat operation should only be perform with a string type" ++ showPos posn
-            
-
 expStmt :: StateType ([Token], Type, Value)
 expStmt = do
     orExpStmt
-    <|> try stringExpStmt 
 
 stmtList :: StateType ([Token], InterpreterState)
 stmtList = do

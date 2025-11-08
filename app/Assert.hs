@@ -240,6 +240,8 @@ handleAdd (FloatValue lhsV) (IntValue rhsV) _ =
     return (FloatType, FloatValue (lhsV + fromIntegral rhsV))
 handleAdd (FloatValue lhsV) (FloatValue rhsV) _ =
     return (FloatType, FloatValue (lhsV + rhsV))
+handleAdd (StringValue lhsV) (StringValue rhsV) _ =
+    return (StringType, StringValue (lhsV ++ rhsV))
 handleAdd _ _ posn =
     semanticError $ "Invalid operands for addition at " ++ showPos posn
 
