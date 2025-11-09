@@ -177,9 +177,9 @@ methodDecl = do
     c <- TT.id
 
     let ID posn symbolId = c
-    z <- getProgramState
-    when (symbolId == "main") $
-        if z /= Starting
+    when (symbolId == "main") $ do
+        isRunning' <- isRunning
+        if isRunning'
             then semanticError $ "A second main method is declared here, it must exist only one " ++ showPos posn
             else setProgramState Running
 
@@ -223,7 +223,9 @@ arrayDecl = do
     a <- TT.openBracket
     (b, _bType, bValue) <- expStmt
     let OPEN_BRACKET posn = a
-    arraySize <- assertNumberTypeReturnInt bValue posn
+    arraySize <- case bValue of 
+            Nothing -> return 0
+            Just v -> assertNumberTypeReturnInt v posn
     c <- TT.closeBracket
     return ([a] ++ b ++ [c], arraySize)
 
@@ -252,9 +254,14 @@ varDecl = do
     insertSymbol (symbolId, varType) False
     e <- do
             e <- TT.kwAssingment
-            (f, fType, fValue) <- expStmt
-            assertTypesEq varType fType posn
-            insertValue (symbolId, fValue)
+            (f, expType, maybeExpValue) <- expStmt
+            isRunning' <- isRunning
+            when isRunning' $ do
+                case maybeExpValue of 
+                    Nothing -> semanticError $ "TODO varDecl " ++ showPos posn
+                    Just v -> do
+                        finalValue <- castValueToType varType (expType, v) posn
+                        insertValue (symbolId, finalValue)
             return $ e:f
         <|> return []
 
@@ -347,26 +354,26 @@ callStmt = do
                     return maybeReturnV
             
 
-literal :: StateType ([Token], Type, Value)
+literal :: StateType ([Token], Type, Maybe Value)
 literal = do
     do
         a <- TT.intLiteral
         let INT_LITERAL _ v = a
-        return ([a], IntType, IntValue v)
+        return ([a], IntType, Just $ IntValue v)
     <|> do
         a <- TT.floatLiteral
         let FLOAT_LITERAL _ v = a
-        return ([a], FloatType, FloatValue v)
+        return ([a], FloatType, Just $ FloatValue v)
     <|> do
         a <- TT.stringLiteral
         let STRING_LITERAL _ v = a
-        return ([a], StringType, StringValue v)
+        return ([a], StringType, Just $ StringValue v)
     <|> do
         a <- TT.kwTrue
-        return ([a], BoolType, BoolValue True)
+        return ([a], BoolType, Just $ BoolValue True)
     <|> do
         a <- TT.kwFalse
-        return ([a], BoolType, BoolValue False)
+        return ([a], BoolType, Just $ BoolValue False)
         -- TODO implement literal for list 
 
 expStmtList :: StateType [([Token], Type, Value)]
@@ -375,20 +382,17 @@ expStmtList = do
     -- concat <$> (expStmt `sepBy` TT.kwComma)
     return []
 
-baseExp :: StateType ([Token], Type, Value)
+baseExp :: StateType ([Token], Type, Maybe Value)
 baseExp = do
     optionUnary <- optionMaybe (TT.opSub <|> TT.opNot)
-    (base, baseT, baseV) <- literal 
+    (base, baseT, baseV) <- literal
                             <|> try var
                             <|> do
                                 (a, maybeType, maybeValue) <- callStmt
-                                expValue <- case maybeValue of
-                                                Nothing -> semanticError "TODO calling procedure and expecting a value"
-                                                Just v -> return v
                                 expType <- case maybeType of 
-                                                Nothing -> semanticError "TODO calling procedure and expecting a return type" -- will never reach this
+                                                Nothing -> semanticError "TODO calling procedure and expecting a return type"
                                                 Just t -> return t
-                                return (a, expType, expValue)
+                                return (a, expType, maybeValue)
                             <|> do 
                                 a <- TT.openParen
                                 (b, expType, expValue) <- expStmt
@@ -420,43 +424,57 @@ baseExp = do
 
     case optionUnary of
         Nothing -> return (base, baseT, baseV)
-        Just unary ->
-            case unary of
-                OP_SUB posn -> do
-                    (_, resultV) <- handleUnaryMinus baseV posn
-                    return (unary : base, baseT, resultV)
-                OP_NOT posn -> do
-                    (_, resultV) <- handleNot baseV posn
-                    return (unary : base, baseT, resultV)
-                _ -> return (base, baseT, baseV)
+        Just unary -> do
+            isRunning' <- isRunning
+            if not isRunning' then do
+                return (unary : base, baseT, Nothing)
+            else do
+                case unary of
+                    OP_SUB posn -> do
+                        (_, resultV) <- handleUnaryMinus baseV posn
+                        return (unary : base, baseT, Just resultV)
+                    OP_NOT posn -> do
+                        (_, resultV) <- handleNot baseV posn
+                        return (unary : base, baseT, Just resultV)
+                    _ -> fail "<baseExp>" -- Will never reach this, just to avoid warnings
 
 
-orExpStmt :: StateType ([Token], Type, Value)
+orExpStmt :: StateType ([Token], Type, Maybe Value)
 orExpStmt = do
     (a, at, av) <- andExpStmt
     option (a, at, av) (do
             b <- TT.opOr 
             let OP_OR posn = b
-            (c, _, v) <- orExpStmt
+            (c, t, v) <- orExpStmt
 
-            (resultT, resultV) <- handleOr av v posn
-            return (a ++ [b] ++ c, resultT, resultV)
+            isRunning' <- isRunning
+            if isRunning' then do
+                (resultT, resultV) <- handleOr av v posn
+                return (a ++ [b] ++ c, resultT, Just resultV)
+            else do
+                resultT <- resultOpType at t posn
+                return (a ++ [b] ++ c, resultT, Nothing)
         )
             
 
-andExpStmt :: StateType ([Token], Type, Value)
+andExpStmt :: StateType ([Token], Type, Maybe Value)
 andExpStmt = do
     (a, at, av) <- compareExpStmt 
     option (a, at, av) (do
             b <- TT.opAnd 
             let OP_AND posn = b
-            (c, _, v) <- andExpStmt
+            (c, t, v) <- andExpStmt
 
-            (resultT, resultV) <- handleAnd av v posn
-            return (a ++ [b] ++ c, resultT, resultV)
+            isRunning' <- isRunning
+            if isRunning' then do
+                (resultT, resultV) <- handleAnd av v posn
+                return (a ++ [b] ++ c, resultT, Just resultV)
+            else do
+                resultT <- resultOpType at t posn
+                return (a ++ [b] ++ c, resultT, Nothing)
         )
 
-compareExpStmt :: StateType ([Token], Type, Value)
+compareExpStmt :: StateType ([Token], Type, Maybe Value)
 compareExpStmt = do
     (a, at, av) <- addSubExpStmt 
     option (a, at, av) (do
@@ -493,7 +511,7 @@ compareExpStmt = do
         )
     
 
-addSubExpStmt :: StateType ([Token], Type, Value)
+addSubExpStmt :: StateType ([Token], Type, Maybe Value)
 addSubExpStmt = do
     (a, at, av) <- multDivExpStmt 
     option (a, at, av) (do 
@@ -505,15 +523,20 @@ addSubExpStmt = do
                             b <- TT.opSub
                             let OP_SUB posn = b
                             return (b, posn, False)
-            (c, _, v) <- addSubExpStmt
+            (c, t, v) <- addSubExpStmt
 
-            (resultT, resultV) <- if isAdd
-                                    then handleAdd av v posn
-                                    else handleSub av v posn
-            return (a ++ [b] ++ c, resultT, resultV)
+            isRunning' <- isRunning
+            if isRunning' then do
+                (resultT, resultV) <- if isAdd
+                                        then handleAdd av v posn
+                                        else handleSub av v posn
+                return (a ++ [b] ++ c, resultT, Just resultV)
+            else do
+                resultT <- resultOpType at t posn
+                return (a ++ [b] ++ c, resultT, Nothing)
         )
 
-multDivExpStmt :: StateType ([Token], Type, Value)
+multDivExpStmt :: StateType ([Token], Type, Maybe Value)
 multDivExpStmt = do
     (a, at, av) <- baseExp 
     option (a, at, av) (do
@@ -525,16 +548,21 @@ multDivExpStmt = do
                             b <- TT.opDiv
                             let OP_DIV posn = b
                             return (b, posn, False)
-            (c, _, v) <- multDivExpStmt
+            (c, t, v) <- multDivExpStmt
 
-            (resultT, resultV) <- if isMult
-                                    then handleMult av v posn
-                                    else handleDiv av v posn
-            return (a ++ [b] ++ c, resultT, resultV)
+            isRunning' <- isRunning
+            if isRunning' then do
+                (resultT, resultV) <- if isMult
+                                        then handleMult av v posn
+                                        else handleDiv av v posn
+                return (a ++ [b] ++ c, resultT, Just resultV)
+            else do
+                resultT <- resultOpType at t posn
+                return (a ++ [b] ++ c, resultT, Nothing)
         )
 
 
-expStmt :: StateType ([Token], Type, Value)
+expStmt :: StateType ([Token], Type, Maybe Value)
 expStmt = do
     orExpStmt
 
@@ -588,22 +616,21 @@ stmt = do
                 Just (b, expType, expValue) -> do
                     assertReturnType expType posn
                     isRunning' <- isRunning
-                    when isRunning' $ do setProgramState $ Return (Just expValue)
+                    when isRunning' $ do setProgramState $ Return expValue
                     return b
 
         return $ a:b
         
 
-mathOpSymbol :: StateType [Token]
+mathOpSymbol :: StateType Token
 mathOpSymbol = do
-    t <- TT.opAdd
-        <|> TT.opSub
-        <|> TT.opMult
-        <|> TT.opDiv
-        <|> TT.opAnd
-        <|> TT.opOr
-        <|> TT.opNot
-    return [t]
+    TT.opAdd
+    <|> TT.opSub
+    <|> TT.opMult
+    <|> TT.opDiv
+    <|> TT.opAnd
+    <|> TT.opOr
+    <|> TT.opNot
 
 assignStmt :: StateType ([Token], InterpreterState)
 assignStmt = do
@@ -617,30 +644,28 @@ assignStmt = do
 
     assertTypesEq symbolType expType posn
 
-    isRunning' <- isRunning
-    when isRunning' $ do
-        value <- case optionB of
-                        Nothing -> return expValue
-                        Just [op] -> do
-                                    maybeValue <- consultValue symbolId
-                                    value <- case maybeValue of
-                                        Nothing -> semanticError $ "Trying to use " ++ symbolId ++ " without initializing it " ++ showPos posn
-                                        Just value -> return value
-                                    do
-                                        resultValue <- case op of
-                                            OP_ADD _ -> handleAdd value expValue posn
-                                            OP_SUB _ -> handleSub value expValue posn
-                                            OP_MULT _ -> handleMult value expValue posn
-                                            OP_DIV _ -> handleDiv value expValue posn
-                                            OP_AND _ -> handleAnd value expValue posn
-                                            OP_OR _ -> handleOr value expValue posn
-                                            _ -> semanticError $ "Invalid operation on assignment operation for " ++ symbolId ++ " " ++ showPos posn
-                                        castValueToType symbolType resultValue posn
-                        Just _ -> fail "<assignStmt>"
-        updateValue (symbolId, value)
+    b <- case optionB of
+            Nothing -> return []
+            Just op -> do
+                isRunning' <- isRunning
+                when isRunning' $ do
+                    maybeValue <- consultValue symbolId
+                    resultValue <- case op of
+                        OP_ADD _ -> handleAdd maybeValue expValue posn
+                        OP_SUB _ -> handleSub maybeValue expValue posn
+                        OP_MULT _ -> handleMult maybeValue expValue posn
+                        OP_DIV _ -> handleDiv maybeValue expValue posn
+                        OP_AND _ -> handleAnd maybeValue expValue posn
+                        OP_OR _ -> handleOr maybeValue expValue posn
+                        _ -> semanticError $ "Invalid operation on assignment operation for " ++ symbolId ++ " " ++ showPos posn
+                    castedValue <- castValueToType symbolType resultValue posn
+                    updateValue (symbolId, castedValue)
+                    return ()
+                    
+                return [op]
 
     currInterpreterState <- getState
-    return ([a] ++ fromMaybe [] optionB ++ [c] ++ d, currInterpreterState)
+    return ([a] ++ b ++ [c] ++ d, currInterpreterState)
 
 -- The Bool indicates whether the conditional was executed
 ifStmt :: StateType ([Token], Bool)
@@ -654,10 +679,13 @@ ifStmt = do
 
     let KW_IF posn = a
     assertBooleanCompatible expType posn
-    expBool <- getBooleanValue expValue
 
-    let conditional = expBool && previousProgramState == Running
-    unless conditional $ do setProgramState Skip
+    isRunning' <- isRunning
+    condition <- if isRunning' then do
+                        getBooleanValue expValue posn
+                        else return False
+            
+    unless condition $ do setProgramState Skip
 
     c <- TT.kwColumn
     d <- TT.newLine
@@ -666,7 +694,7 @@ ifStmt = do
     g <- TT.unindent
     _ <- TT.newLine
 
-    if conditional then
+    if condition then
         setProgramState Skip
         else setProgramState previousProgramState
 
@@ -681,7 +709,7 @@ ifStmt = do
     closeScope
     setProgramState previousProgramState
     setParserBlock previousParserBlock
-    return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g] ++ h ++ i, conditional)
+    return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g] ++ h ++ i, condition)
     where
         -- The Bool indicates whether the conditional was executed
         elseIfStmt :: StateType ([Token], Bool)
@@ -702,7 +730,7 @@ ifStmt = do
             return $ [b] ++ [c] ++ [d] ++ [e] ++ f ++ [g]
 
 
-evaluateBooleanExp :: [Token] -> StateType (Value, InterpreterState)
+evaluateBooleanExp :: [Token] -> StateType (Maybe Value, InterpreterState)
 evaluateBooleanExp tokenList = do
     previusState <- getState
 
@@ -712,6 +740,11 @@ evaluateBooleanExp tokenList = do
                         Right (_, _, expValue) -> return expValue
     resultState <- getState
     return (expValue, resultState)
+
+endLoopEarly :: StateType Bool
+endLoopEarly = do
+    currProgramState <- getProgramState
+    return (currProgramState == Break || currProgramState == Return {})
 
 whileStmt :: StateType [Token]
 whileStmt = do
@@ -726,7 +759,10 @@ whileStmt = do
     let KW_WHILE posn = a
 
     assertBooleanCompatible expType posn
-    condition <- getBooleanValue expValue
+    isRunning' <- isRunning
+    condition <- if isRunning' then do
+                        getBooleanValue expValue posn
+                        else return False
     unless condition $ setProgramState Skip
 
     c <- TT.kwColumn
@@ -735,24 +771,24 @@ whileStmt = do
     (f, _) <- stmtList
     g <- TT.unindent
 
-    let _runWhile = do
-            currProgramState <- getProgramState
-            when (currProgramState == Break || currProgramState == Return {} || previousProgramState /= Running) $ return () -- TODO bug
-            setProgramState previousProgramState
+    let runWhile = do
+            endEarly <- endLoopEarly
+            unless endEarly $ do
+                setProgramState previousProgramState
 
-            (expValue', resultState) <- evaluateBooleanExp b
-            condition' <- getBooleanValue expValue'
-            setState resultState
-            
-            when condition' $ do
-                st <- getState
-                parserResult <- liftIO $ runParserT stmtList st "<while>" f
-                case parserResult of
-                    Left _ -> fail "<while>"
-                    Right (_, resultState') -> putState resultState'
-                _runWhile
+                (expValue', resultState) <- evaluateBooleanExp b
+                condition' <- getBooleanValue expValue' posn
+                setState resultState
+                
+                when condition' $ do
+                    st <- getState
+                    parserResult <- liftIO $ runParserT stmtList st "<while>" f
+                    case parserResult of
+                        Left _ -> fail "<while>"
+                        Right (_, resultState') -> putState resultState'
+                    runWhile
 
-    -- when condition runWhile
+    when condition runWhile
     setProgramState previousProgramState
     setParserBlock previousParserBlock
     closeScope
@@ -820,7 +856,7 @@ forStmt = do
     let KW_SEMICOLUMN posn = c
 
     (d, expType, expValue) <- case optionD of
-                Nothing -> return ([KW_TRUE posn], BoolType, BoolValue True) -- if conditional is empty True will be used
+                Nothing -> return ([KW_TRUE posn], BoolType, Just $ BoolValue True) -- if condition is empty True will be used
                 Just (d, dType, dValue) -> return (d, dType, dValue)
 
     assertBooleanCompatible expType posn
@@ -834,7 +870,10 @@ forStmt = do
             Nothing -> return []
             Just (f, _) -> return f
 
-    condition <- getBooleanValue expValue
+    isRunning' <- isRunning
+    condition <- if isRunning' then do
+                        getBooleanValue expValue posn
+                        else return False
     unless condition $ setProgramState Skip
 
     g <- TT.kwColumn
@@ -843,32 +882,32 @@ forStmt = do
     (j, _) <- stmtList
     k <- TT.unindent
 
-    let _runFor = do
-            currProgramState <- getProgramState
-            when (currProgramState == Break || currProgramState == Return {} || previousProgramState /= Running) $ return () -- TODO bug
-            setProgramState previousProgramState
+    let runFor = do
+            endEarly <- endLoopEarly
+            unless endEarly $ do
+                setProgramState previousProgramState
 
-            -- Perform assignStmt, i.e. operation to be performed after loop
-            st <- getState
-            parserResultAssingStmt <- liftIO $ runParserT assignStmt st "<for>" f
-            case parserResultAssingStmt of
-                Left _ -> fail "<for>"
-                Right (_, resultState') -> putState resultState'
-
-            (expValue', resultState) <- evaluateBooleanExp d
-            condition' <- getBooleanValue expValue'
-            setState resultState
-            
-            when condition' $ do
-                st' <- getState
-                parserResult <- liftIO $ runParserT stmtList st' "<for>" f
-                case parserResult of
+                -- Perform assignStmt, i.e. operation to be performed after loop
+                st <- getState
+                parserResultAssingStmt <- liftIO $ runParserT assignStmt st "<for>" f
+                case parserResultAssingStmt of
                     Left _ -> fail "<for>"
                     Right (_, resultState') -> putState resultState'
 
-                _runFor
+                (expValue', resultState) <- evaluateBooleanExp d
+                condition' <- getBooleanValue expValue' posn
+                setState resultState
+                
+                when condition' $ do
+                    st' <- getState
+                    parserResult <- liftIO $ runParserT stmtList st' "<for>" f
+                    case parserResult of
+                        Left _ -> fail "<for>"
+                        Right (_, resultState') -> putState resultState'
 
-    -- when condition runFor
+                    runFor
+
+    when condition runFor
     setProgramState previousProgramState
     setParserBlock previousParserBlock
     closeScope
