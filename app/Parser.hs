@@ -267,32 +267,35 @@ varDecl = do
 
     return (b ++ [c] ++ d ++ e)
 
-var :: StateType ([Token], Type, Value)
-var = do
-    -- TODO this in bugged
-    -- TODO allow [] 
-    a <- TT.id
-    next <- optionMaybe $ do
-        _ <- TT.kwDot
-        var
-    let ID posn symbolId = a
-    case next of
-        Nothing -> do
-            t <- consultType symbolId posn
-            maybeValue <- consultValue symbolId
-            value <- case maybeValue of
-                        Nothing -> semanticError $ "Trying to use uninitialized symbol " ++ symbolId ++ " " ++ showPos posn
-                        Just v -> return v
+-- memberAccess :: StateType ([Token], [String])
+-- memberAccess = do
+--     a <- TT.kwDot
+--     b <- TT.id
+--     (ct, cs) <- option ([], []) memberAccess
+--
+--     let ID _posn symbolId = b
+--     return ([a] ++ [b] ++ ct, symbolId:cs)
 
-            return ([a], t, value)
-        Just (bTokens, bType, bValue) ->
-            return (a:bTokens, bType, bValue)
+-- TODO var is incomplete, this is just a STUB
+var :: StateType ([Token], Type, Maybe Value)
+var = do
+    a <- TT.id
+    -- (b, symbolList) <- option ([], []) memberAccess
+
+    let ID posn symbolId = a
+    t <- consultType symbolId posn
+    isRunning' <- isRunning
+    value <- if isRunning' 
+                then consultValue symbolId
+                else return Nothing
+
+    return ([a], t, value)
 
 callStmt :: StateType ([Token], Maybe Type, Maybe Value)
 callStmt = do
     previousProgramState <- getProgramState
     openScope False
-    (a, symbolType, _) <- var -- TODO maybe create a new rule for this, since it's a bit different than var itself
+    (a, symbolType, _) <- var
     (b, templateTypeList) <- option ([], []) templateInstanciation
     c <- TT.openParen
 
@@ -390,7 +393,7 @@ baseExp = do
                             <|> do
                                 (a, maybeType, maybeValue) <- callStmt
                                 expType <- case maybeType of 
-                                                Nothing -> semanticError "TODO calling procedure and expecting a return type"
+                                                Nothing -> semanticError "called a procedure expecting a returned value"
                                                 Just t -> return t
                                 return (a, expType, maybeValue)
                             <|> do 
