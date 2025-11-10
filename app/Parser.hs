@@ -14,6 +14,7 @@ import Control.Monad
 import Data.Maybe
 import Control.Monad.IO.Class
 import VectraLib
+import Data.List (genericLength)
 
 -- TODO some functions shouldn't return [Token], but yet do. Fix this...
 
@@ -69,8 +70,8 @@ templateDecl = do
         insertSymbol (symbolId, TemplateType) False
         return (a, symbolId)
 
-templateInstanciation :: StateType ([Token], [Type])
-templateInstanciation = do
+templateInstantiation :: StateType ([Token], [Type])
+templateInstantiation = do
     _ <- TT.opSmaller
     (a, aType) <- typeStmt
     rest <- many $ do
@@ -261,7 +262,7 @@ varDecl = do
                     Nothing -> semanticError $ "TODO varDecl " ++ showPos posn
                     Just v -> do
                         finalValue <- castValueToType varType (expType, v) posn
-                        insertValue (symbolId, finalValue)
+                        updateValue (symbolId, finalValue)
             return $ e:f
         <|> return []
 
@@ -286,7 +287,7 @@ var = do
     t <- consultTypeList symbolId posn
     isRunning' <- isRunning
     value <- if isRunning' 
-                then consultMemory symbolId
+                then consultValue symbolId
                 else return Nothing
 
     return ([a], t, value)
@@ -294,37 +295,59 @@ var = do
 callStmt :: StateType ([Token], Maybe Type, Maybe Value)
 callStmt = do
     previousProgramState <- getProgramState
-    openScope False
-    (a, symbolType, _) <- var
-    (b, templateTypeList) <- option ([], []) templateInstanciation
+    (a, symbolTypeList, _) <- var
+    (b, templateTypeList) <- option ([], []) templateInstantiation
     c <- TT.openParen
-
-    -- TODO this is wrong, must search [Type] for valid method to allow method override
-    let OPEN_PAREN posn = c
-    (templateIds, paramList, maybeReturnType, funcBody) <- case symbolType of
-                        FuncType _templateIds paramList returnType _funcBody -> return (_templateIds, paramList, Just returnType, _funcBody)
-                        ProcType _templateIds paramList _funcBody -> return (_templateIds, paramList, Nothing, _funcBody)
-                        _ -> semanticError $ "Trying to call type " ++ show symbolType ++ ", it must be a function or procedure "  ++ showPos posn
-
-    -- Check and instantiate templates and parameters
-    (d, typeList, valueList) <- unzip3 <$> expStmtList
-    let (idList, expectedParamTypes) = unzip paramList
-    assertValidParamList expectedParamTypes typeList posn
-    instatiateArgs idList typeList valueList
-    insertTemplateInstantiation templateTypeList templateIds
-
+    (d, typeList, maybeValueList) <- unzip3 <$> expStmtList
     e <- TT.closeParen
 
-    returnValue <- runFuncBody funcBody
+    openScope True -- TODO this cannot be True
 
+    let OPEN_PAREN posn = c
+    let runMethod templateIds paramList funcBody = do
+            let (idList, expectedParamTypes) = unzip paramList
+            assertValidParamList expectedParamTypes typeList posn
+            valueList <- valueListFromMaybeValue maybeValueList posn
+            instatiateArgs idList typeList valueList
+            insertTemplateInstantiation templateTypeList templateIds
+            runFuncBody funcBody
+    let templateLen = genericLength templateTypeList
+    maybeSymbolType <- searchTypeList symbolTypeList templateLen typeList
+    symbolType <- case maybeSymbolType of
+        Nothing -> semanticError "TODO34"
+        Just t -> return t
+    (maybeReturnT, maybeReturnV) <- case symbolType of
+                            FuncType templateIds paramList returnT funcBody -> do
+                                returnV <- runMethod templateIds paramList funcBody
+                                return (Just returnT, returnV)
+                            ProcType templateIds paramList funcBody -> do
+                                _ <- runMethod templateIds paramList funcBody -- return is nothing
+                                return (Nothing, Nothing)
+                            HaskellMethod _expectedTypeList returnT libMethod -> do
+                                -- assert expectedTypeList is equivalent to typeList
+                                valueList <- valueListFromMaybeValue maybeValueList posn
+                                returnV <- libMethod valueList posn
+                                return (returnT, returnV)
+                            _ -> semanticError $ "Trying to call type " ++ show symbolType ++ ", it must be a function or procedure "  ++ showPos posn
     setProgramState previousProgramState
     closeScope
-    return (a ++  b ++ [c] ++ concat d ++ [e], maybeReturnType, returnValue)
+    return (a ++  b ++ [c] ++ concat d ++ [e], maybeReturnT, maybeReturnV)
     where 
+        valueListFromMaybeValue :: [Maybe Value] -> AlexPosn -> StateType [Value]
+        valueListFromMaybeValue [] _ = return []
+        valueListFromMaybeValue (h:t) posn = do
+            case h of
+                Nothing -> do
+                    semanticError $ "trying to use unitialized var " ++ showPos posn
+                Just v -> do
+                    rest <- valueListFromMaybeValue t posn
+                    return (v:rest)
+            
+
         instatiateArgs :: [String] -> [Type] -> [Value] -> StateType ()
         instatiateArgs (idListHead:isListTail) (typeListHead:typeListTail) (valueListHead:valueListTail) = do
             insertSymbol (idListHead, typeListHead) False
-            insertValue (idListHead, valueListHead)
+            updateValue (idListHead, valueListHead)
             instatiateArgs isListTail typeListTail valueListTail
         instatiateArgs [] [] [] = return ()
         instatiateArgs [] _ _ = fail "<callStmt>"

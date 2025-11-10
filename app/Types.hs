@@ -9,7 +9,7 @@ type SymbolTableType = H.BasicHashTable String [Type]
 type SymbolTableStackType = [(SymbolTableType, Bool)]
 
 type MemoryType = (String, Value)
-type MemoryTableType = H.BasicHashTable String Value
+type MemoryTableType = H.BasicHashTable String (Maybe Value)
 type MemoryTableStackType = [MemoryTableType]
 
 type LibMethodSignature = [Value] -> AlexPosn -> StateType (Maybe Value)
