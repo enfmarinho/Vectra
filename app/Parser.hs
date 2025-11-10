@@ -4,7 +4,7 @@ module Parser
   ( parser
   ) where
 
-import InterpreterState 
+import InterpreterState
 import TerminalTokens as TT
 import Scanner
 import Text.Parsec
@@ -27,13 +27,13 @@ vectraLanguage = do
         importCommand :: StateType [Token]
         importCommand = do
             a <- TT.kwImport
-            b <- do 
+            b <- do
                     b <- TT.id
                     let ID posn symbolId = b
                     importSpecialMethod symbolId posn
                     return b
                 <|> do
-                    b <- TT.stringLiteral 
+                    b <- TT.stringLiteral
                     let STRING_LITERAL posn filePath = b
                     importFile filePath posn
                     return b
@@ -190,8 +190,8 @@ methodDecl = do
     optionF <- optionMaybe returnDecl
 
     case optionF of
-        Nothing -> setParserBlock(Method Nothing)
-        Just (_, t) -> setParserBlock(Method $ Just t)
+        Nothing -> setParserBlock (Method Nothing)
+        Just (_, t) -> setParserBlock (Method $ Just t)
 
     _ <- TT.kwColumn
     _ <- TT.newLine
@@ -224,7 +224,7 @@ arrayDecl = do
     a <- TT.openBracket
     (b, _bType, bValue) <- expStmt
     let OPEN_BRACKET posn = a
-    arraySize <- case bValue of 
+    arraySize <- case bValue of
             Nothing -> return 0
             Just v -> assertNumberTypeReturnInt v posn
     c <- TT.closeBracket
@@ -258,7 +258,7 @@ varDecl = do
             (f, expType, maybeExpValue) <- expStmt
             isRunning' <- isRunning
             when isRunning' $ do
-                case maybeExpValue of 
+                case maybeExpValue of
                     Nothing -> semanticError $ "TODO varDecl " ++ showPos posn
                     Just v -> do
                         finalValue <- castValueToType varType (expType, v) posn
@@ -286,7 +286,7 @@ var = do
     let ID posn symbolId = a
     t <- consultTypeList symbolId posn
     isRunning' <- isRunning
-    value <- if isRunning' 
+    value <- if isRunning'
                 then consultValue symbolId
                 else return Nothing
 
@@ -323,7 +323,7 @@ callStmt = do
                                 return (Just returnT, returnV)
                             ProcType templateIds paramList funcBody -> do
                                 returnedV <- runMethod templateIds paramList funcBody
-                                when (isJust returnedV) $ semanticError 
+                                when (isJust returnedV) $ semanticError
                                     ("procedure returned a value, but it shouldn't. Consider declaring as a func instead " ++ showPos posn)
                                 return (Nothing, Nothing)
                             HaskellMethod _expectedTypeList returnT libMethod -> do
@@ -335,7 +335,7 @@ callStmt = do
     setProgramState previousProgramState
     closeScope
     return (a ++  b ++ [c] ++ concat d ++ [e], maybeReturnT, maybeReturnV)
-    where 
+    where
         valueListFromMaybeValue :: [Maybe Value] -> AlexPosn -> StateType [Value]
         valueListFromMaybeValue [] _ = return []
         valueListFromMaybeValue (h:t) posn = do
@@ -345,7 +345,7 @@ callStmt = do
                 Just v -> do
                     rest <- valueListFromMaybeValue t posn
                     return (v:rest)
-            
+
 
         instatiateArgs :: [String] -> [Type] -> [Value] -> StateType ()
         instatiateArgs (idListHead:isListTail) (typeListHead:typeListTail) (valueListHead:valueListTail) = do
@@ -357,12 +357,12 @@ callStmt = do
         instatiateArgs _ [] _ = fail "<callStmt>"
         instatiateArgs _ _ [] = fail "<callStmt>"
 
-        
+
         runFuncBody :: [Token] -> StateType (Maybe Value)
         runFuncBody funcBody = do
             previousProgramState <- getProgramState
             isRunning' <- isRunning
-            if not isRunning' then 
+            if not isRunning' then
                 return Nothing
                 else do
                     st <- getState
@@ -376,10 +376,10 @@ callStmt = do
                                         Return returnValue -> do
                                             return returnValue
                                         _ -> do
-                                            return Nothing 
+                                            return Nothing
                     setProgramState previousProgramState
                     return maybeReturnV
-            
+
 
 literal :: StateType ([Token], Type, Maybe Value)
 literal = do
@@ -406,7 +406,7 @@ literal = do
 expStmtList :: StateType [([Token], Type, Maybe Value)]
 expStmtList = do
     a <- expStmt
-    b <- many $ try (do 
+    b <- many $ try (do
             b <- TT.kwComma
             (cTokens, cT, cV) <- expStmt
             return (b:cTokens, cT, cV)
@@ -423,11 +423,11 @@ baseExp = do
                                 )
                             <|> do
                                 (a, maybeType, maybeValue) <- callStmt
-                                expType <- case maybeType of 
+                                expType <- case maybeType of
                                                 Nothing -> semanticError "called a procedure expecting a returned value"
                                                 Just t -> return t
                                 return (a, expType, maybeValue)
-                            <|> do 
+                            <|> do
                                 a <- TT.openParen
                                 (b, expType, expValue) <- expStmt
                                 c <- TT.closeParen
@@ -477,7 +477,7 @@ orExpStmt :: StateType ([Token], Type, Maybe Value)
 orExpStmt = do
     (a, at, av) <- andExpStmt
     option (a, at, av) (do
-            b <- TT.opOr 
+            b <- TT.opOr
             let OP_OR posn = b
             (c, t, v) <- orExpStmt
 
@@ -489,13 +489,13 @@ orExpStmt = do
                 resultT <- resultOpType at t posn
                 return (a ++ [b] ++ c, resultT, Nothing)
         )
-            
+
 
 andExpStmt :: StateType ([Token], Type, Maybe Value)
 andExpStmt = do
-    (a, at, av) <- compareExpStmt 
+    (a, at, av) <- compareExpStmt
     option (a, at, av) (do
-            b <- TT.opAnd 
+            b <- TT.opAnd
             let OP_AND posn = b
             (c, t, v) <- andExpStmt
 
@@ -510,11 +510,11 @@ andExpStmt = do
 
 compareExpStmt :: StateType ([Token], Type, Maybe Value)
 compareExpStmt = do
-    (a, at, av) <- addSubExpStmt 
+    (a, at, av) <- addSubExpStmt
     option (a, at, av) (do
             -- TODO Yeap, I was wrong... It's better to have only one token for every comparison and make it store the lexeme
             (b, _posn) <- do
-                            b <- TT.opSmaller 
+                            b <- TT.opSmaller
                             let OP_SMALLER posn = b
                             return (b, posn)
                         <|> do
@@ -543,14 +543,14 @@ compareExpStmt = do
             -- return (a ++ [b] ++ c, resultT, resultV)
             return (a ++ [b] ++ c, at, av)
         )
-    
+
 
 addSubExpStmt :: StateType ([Token], Type, Maybe Value)
 addSubExpStmt = do
-    (a, at, av) <- multDivExpStmt 
-    option (a, at, av) (do 
+    (a, at, av) <- multDivExpStmt
+    option (a, at, av) (do
             (b, posn, isAdd) <- do
-                            b <- TT.opAdd 
+                            b <- TT.opAdd
                             let OP_ADD posn = b
                             return (b, posn, True)
                         <|> do
@@ -572,10 +572,10 @@ addSubExpStmt = do
 
 multDivExpStmt :: StateType ([Token], Type, Maybe Value)
 multDivExpStmt = do
-    (a, at, av) <- baseExp 
+    (a, at, av) <- baseExp
     option (a, at, av) (do
             (b, posn, isMult) <- do
-                            b <- TT.opMult 
+                            b <- TT.opMult
                             let OP_MULT posn = b
                             return (b, posn, True)
                         <|> do
@@ -604,7 +604,7 @@ stmtList :: StateType ([Token], InterpreterState)
 stmtList = do
     _ <- optionMaybe TT.newLine
     a <- stmt
-    b <- concat <$> many (try $ do 
+    b <- concat <$> many (try $ do
             b <- TT.newLine
             c <- stmt
             return (b:c)
@@ -639,7 +639,7 @@ stmt = do
         setProgramState Break
         return [a]
     <|> do
-        a <- TT.kwReturn 
+        a <- TT.kwReturn
         optionB <- optionMaybe expStmt
         let KW_RETURN posn = a
         assertReturnable posn
@@ -652,7 +652,7 @@ stmt = do
                     return b
 
         return $ a:b
-        
+
 
 mathOpSymbol :: StateType Token
 mathOpSymbol = do
@@ -697,7 +697,7 @@ assignStmt = do
                     castedValue <- castValueToType symbolType resultValue posn
                     updateValue (symbolId, castedValue)
                     return ()
-                    
+
                 return [op]
 
     currInterpreterState <- getState
@@ -821,7 +821,7 @@ whileStmt = do
                 (expValue', resultState) <- evaluateBooleanExp b
                 condition' <- getBooleanValue expValue' posn
                 setState resultState
-                
+
                 when condition' $ do
                     st <- getState
                     parserResult <- liftIO $ runParserT stmtList st "<while>" f
@@ -939,7 +939,7 @@ forStmt = do
                 (expValue', resultState) <- evaluateBooleanExp d
                 condition' <- getBooleanValue expValue' posn
                 setState resultState
-                
+
                 when condition' $ do
                     st' <- getState
                     parserResult <- liftIO $ runParserT stmtList st' "<for>" f
