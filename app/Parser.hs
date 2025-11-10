@@ -612,12 +612,11 @@ stmtList :: StateType ([Token], InterpreterState)
 stmtList = do
     _ <- optionMaybe TT.newLine
     a <- stmt
-    b <- concat <$> many (try $ do
+    b <- concat <$> many (do
             b <- TT.newLine
-            c <- stmt
+            c <- option [] stmt
             return (b:c)
         )
-    _ <- optionMaybe TT.newLine
     st <- getState
     return (a ++ b, st)
 
