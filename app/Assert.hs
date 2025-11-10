@@ -18,7 +18,7 @@ showPos (AlexPn _ line col) =
 
 consultTypeList :: String -> AlexPosn -> StateType [Type]
 consultTypeList symbolId posn = do
-    consultResult <- consultSymbol symbolId
+    consultResult <- consultSymbolTable symbolId
     case consultResult of
         Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
         Just t -> return t
@@ -35,7 +35,7 @@ getEnumOrStructTypes symbolId posn [] = do
 
 consultType :: String -> AlexPosn -> StateType Type
 consultType symbolId posn = do
-    consultResult <- consultSymbol symbolId
+    consultResult <- consultSymbolTable symbolId
     case consultResult of
         Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
         -- improve error message
@@ -45,7 +45,7 @@ consultType symbolId posn = do
 
 assertMethodDeclNotAmbiguous :: String -> [Type] -> AlexPosn -> StateType ()
 assertMethodDeclNotAmbiguous symbolId paramTypeList posn = do
-    maybeTypeList <- consultSymbol symbolId
+    maybeTypeList <- consultSymbolTable symbolId
     let typeList = fromMaybe [] maybeTypeList
 
     when (ambiguous typeList paramTypeList) $
@@ -184,7 +184,7 @@ assertInBounds symbolId size idx posn = do
 
 checkShadowing :: String -> AlexPosn -> StateType ()
 checkShadowing symbolId posn = do
-    consultResult <- consultSymbol symbolId
+    consultResult <- consultSymbolTable symbolId
     case consultResult of
         Nothing -> return ()
         Just _ -> warningMsg $ "Declaring " ++ symbolId ++ " shadows and exists symbol " ++ showPos posn
@@ -253,7 +253,6 @@ handleComparison (Just lhsV) (Just rhsV) compOp posn = do
     rhsT <- typeFromValue rhsV posn
     rhsV' <- castValueToType FloatType (rhsT, rhsV) posn
     let FloatValue rhs = rhsV'
-
 
     case compOp of
         OP_SMALLER _ -> return (BoolType, BoolValue $ lhs < rhs)

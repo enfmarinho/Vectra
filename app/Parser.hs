@@ -262,7 +262,7 @@ varDecl = do
                     Nothing -> semanticError $ "TODO varDecl " ++ showPos posn
                     Just v -> do
                         finalValue <- castValueToType varType (expType, v) posn
-                        updateValue (symbolId, finalValue)
+                        updateMemory (symbolId, finalValue)
             return $ e:f
         <|> return []
 
@@ -287,7 +287,7 @@ var = do
     t <- consultTypeList symbolId posn
     isRunning' <- isRunning
     value <- if isRunning'
-                then consultValue symbolId
+                then consultMemory symbolId
                 else return Nothing
 
     return ([a], t, value)
@@ -354,7 +354,7 @@ callStmt = do
         instatiateArgs :: [String] -> [Type] -> [Value] -> StateType ()
         instatiateArgs (idListHead:isListTail) (typeListHead:typeListTail) (valueListHead:valueListTail) = do
             insertSymbol (idListHead, typeListHead) False
-            updateValue (idListHead, valueListHead)
+            updateMemory (idListHead, valueListHead)
             instatiateArgs isListTail typeListTail valueListTail
         instatiateArgs [] [] [] = return ()
         instatiateArgs [] _ _ = fail "<callStmt>"
@@ -689,11 +689,11 @@ assignStmt = do
                 when isRunning' $ do 
                         case expValue of
                             Nothing -> semanticError $ "using uninitialized var " ++ showPos posn
-                            Just v -> updateValue (symbolId, v)
+                            Just v -> updateMemory (symbolId, v)
                 return []
             Just op -> do
                 when isRunning' $ do
-                    maybeValue <- consultValue symbolId
+                    maybeValue <- consultMemory symbolId
                     resultValue <- case op of
                         OP_ADD _ -> handleAdd maybeValue expValue posn
                         OP_SUB _ -> handleSub maybeValue expValue posn
@@ -703,7 +703,7 @@ assignStmt = do
                         OP_OR _ -> handleOr maybeValue expValue posn
                         _ -> semanticError $ "Invalid operation on assignment operation for " ++ symbolId ++ " " ++ showPos posn
                     castedValue <- castValueToType symbolType resultValue posn
-                    updateValue (symbolId, castedValue)
+                    updateMemory (symbolId, castedValue)
                     return ()
 
                 return [op]
