@@ -678,7 +678,11 @@ assignStmt = do
     assertTypesEq symbolType expType posn
 
     b <- case optionB of
-            Nothing -> return []
+            Nothing -> do
+                case expValue of
+                    Nothing -> semanticError $ "using uninitialized var " ++ showPos posn
+                    Just v -> updateValue (symbolId, v)
+                return []
             Just op -> do
                 isRunning' <- isRunning
                 when isRunning' $ do
