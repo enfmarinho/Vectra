@@ -319,9 +319,12 @@ callStmt = do
     (maybeReturnT, maybeReturnV) <- case symbolType of
                             FuncType templateIds paramList returnT funcBody -> do
                                 returnV <- runMethod templateIds paramList funcBody
+                                -- TODO assure returnV doesn't cause a type mismatch with returnT
                                 return (Just returnT, returnV)
                             ProcType templateIds paramList funcBody -> do
-                                _ <- runMethod templateIds paramList funcBody -- return is nothing
+                                returnedV <- runMethod templateIds paramList funcBody
+                                when (isJust returnedV) $ semanticError 
+                                    ("procedure returned a value, but it shouldn't. Consider declaring as a func instead " ++ showPos posn)
                                 return (Nothing, Nothing)
                             HaskellMethod _expectedTypeList returnT libMethod -> do
                                 -- assert expectedTypeList is equivalent to typeList
@@ -371,10 +374,8 @@ callStmt = do
                     currProgramState <- getProgramState
                     maybeReturnV <- case currProgramState of
                                         Return returnValue -> do
-                                            -- TODO check for mismatch between expected type and returned type
                                             return returnValue
                                         _ -> do
-                                            -- TODO confirm its a call for a procedure, otherwise emit warning for function with no return on control path
                                             return Nothing 
                     setProgramState previousProgramState
                     return maybeReturnV
