@@ -18,7 +18,7 @@ showPos (AlexPn _ line col) =
 
 consultTypeList :: String -> AlexPosn -> StateType [Type]
 consultTypeList symbolId posn = do
-    consultResult <- consultSymbolTable symbolId
+    consultResult <- consultSymbol symbolId
     case consultResult of
         Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
         Just t -> return t

@@ -277,16 +277,16 @@ varDecl = do
 --     return ([a] ++ [b] ++ ct, symbolId:cs)
 
 -- TODO var is incomplete, this is just a STUB
-var :: StateType ([Token], Type, Maybe Value)
+var :: StateType ([Token], [Type], Maybe Value)
 var = do
     a <- TT.id
     -- (b, symbolList) <- option ([], []) memberAccess
 
     let ID posn symbolId = a
-    t <- consultType symbolId posn
+    t <- consultTypeList symbolId posn
     isRunning' <- isRunning
     value <- if isRunning' 
-                then consultValue symbolId
+                then consultMemory symbolId
                 else return Nothing
 
     return ([a], t, value)
@@ -393,7 +393,10 @@ baseExp :: StateType ([Token], Type, Maybe Value)
 baseExp = do
     optionUnary <- optionMaybe (TT.opSub <|> TT.opNot)
     (base, baseT, baseV) <- literal
-                            <|> try var
+                            <|> try (do
+                                    (a, t : _, maybeValue) <- var
+                                    return (a, t, maybeValue)
+                                )
                             <|> do
                                 (a, maybeType, maybeValue) <- callStmt
                                 expType <- case maybeType of 
@@ -825,9 +828,9 @@ typeStmt = do
                 return ([b] ++ [c] ++ d ++ [e], RefType t)
             <|> do -- customType
                 b <- TT.id
-                let ID posn s = b
-                t <- consultTypeList s posn >>= getEnumOrStructTypes s posn
-                return ([b], t)
+                let ID _posn _s = b
+                -- t <- consultTypeList s posn >>= getEnumOrStructTypes s posn
+                return ([b], IntType) -- TODO
             <|> do -- reference for method
                 b <- TT.openParen
                 (c, templateIds) <- option ([], []) templateDecl
