@@ -513,7 +513,7 @@ compareExpStmt = do
     (a, at, av) <- addSubExpStmt
     option (a, at, av) (do
             -- TODO Yeap, I was wrong... It's better to have only one token for every comparison and make it store the lexeme
-            (b, _posn) <- do
+            (b, posn) <- do
                             b <- TT.opSmaller
                             let OP_SMALLER posn = b
                             return (b, posn)
@@ -537,11 +537,15 @@ compareExpStmt = do
                             b <- TT.opNotEq
                             let OP_NOT_EQ posn = b
                             return (b, posn)
-            (c, _, _v) <- addSubExpStmt
+            (c, t, v) <- addSubExpStmt
 
-            -- (resultT, resultV) <- handleComparison av v posn
-            -- return (a ++ [b] ++ c, resultT, resultV)
-            return (a ++ [b] ++ c, at, av)
+            isRunning' <- isRunning
+            if isRunning' then do
+                (resultT, resultV) <- handleComparison av v b posn
+                return (a ++ [b] ++ c, resultT, Just resultV)
+            else do
+                resultT <- resultOpType at t posn
+                return (a ++ [b] ++ c, resultT, Nothing)
         )
 
 
