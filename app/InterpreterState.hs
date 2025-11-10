@@ -33,7 +33,7 @@ initInterpreterState = do
 isRunning :: StateType Bool
 isRunning = do
     programState <- getProgramState
-    return (programState /= Starting && programState /= Finished)
+    return (programState == Running)
 
 openScope :: Bool -> StateType () 
 openScope canAccessParentTables = do
