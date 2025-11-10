@@ -236,6 +236,28 @@ handleUnaryMinus (Just (IntValue v)) _ = return (IntType, IntValue (-v))
 handleUnaryMinus (Just (FloatValue v)) _ = return (FloatType, FloatValue (-v))
 handleUnaryMinus _ posn = semanticError $ "Invalid minus unary operation " ++ showPos posn
 
+handleComparison :: Maybe Value -> Maybe Value -> Token -> AlexPosn -> StateType (Type, Value)
+handleComparison Nothing _ _ posn = semanticError $ "Invalid operands for comparision at " ++ showPos posn
+handleComparison _ Nothing _ posn = semanticError $ "Invalid operands for comparision at " ++ showPos posn
+handleComparison (Just lhsV) (Just rhsV) compOp posn = do
+    lhsT <- typeFromValue lhsV posn
+    lhsV' <- castValueToType FloatType (lhsT, lhsV) posn
+    let FloatValue lhs = lhsV'
+
+    rhsT <- typeFromValue rhsV posn
+    rhsV' <- castValueToType FloatType (rhsT, rhsV) posn
+    let FloatValue rhs = rhsV'
+
+
+    case compOp of
+        OP_SMALLER _ -> return (BoolType, BoolValue $ lhs < rhs)
+        OP_SMALLER_EQ _ -> return (BoolType, BoolValue $ lhs <= rhs) 
+        OP_GREATER _ -> return (BoolType, BoolValue $ lhs > rhs) 
+        OP_GREATER_EQ _ -> return (BoolType, BoolValue $ lhs >= rhs) 
+        OP_EQ _ -> return (BoolType, BoolValue $ lhs == rhs) 
+        OP_NOT_EQ _ -> return (BoolType, BoolValue $ lhs /= rhs) 
+        _ -> fail "<handleComparison>"
+
 
 handleAdd :: Maybe Value -> Maybe Value -> AlexPosn -> StateType (Type, Value)
 handleAdd Nothing _ posn = semanticError $ "Invalid operands for addition at " ++ showPos posn
