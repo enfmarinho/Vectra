@@ -72,13 +72,13 @@ assertMethodDeclNotAmbiguous symbolId paramTypeList posn = do
 assertBreakable :: AlexPosn -> StateType ()
 assertBreakable posn = do
     currProgramState <- getParserBlock
-    when (currProgramState /= Loop && currProgramState /= Conditional) 
+    when (currProgramState /= Loop && currProgramState /= Conditional)
         $ semanticError $ "Trying to use break outside a loop " ++ showPos posn
 
 assertContinuable :: AlexPosn -> StateType ()
 assertContinuable posn = do
     currProgramState <- getParserBlock
-    when (currProgramState /= Loop) 
+    when (currProgramState /= Loop)
         $ semanticError $ "Trying to use continue outside a loop " ++ showPos posn
 
 assertReturnable :: AlexPosn -> StateType ()
@@ -105,7 +105,7 @@ assertStructType :: String -> AlexPosn -> [Type]  -> StateType ()
 assertStructType symbolId posn (h:t) = do
     case h of
         StructType {} -> assertStructType symbolId posn t
-        ImplNamespaceType {} -> assertStructType symbolId posn t 
+        ImplNamespaceType {} -> assertStructType symbolId posn t
         _ -> semanticError $ symbolId ++ " must be a struct " ++ showPos posn
 assertStructType _ _ [] = return ()
 
@@ -178,7 +178,7 @@ assertNumberTypeReturnInt value posn = do
 
 assertInBounds :: String -> Int -> Int -> AlexPosn -> StateType ()
 assertInBounds symbolId size idx posn = do
-    unless (idx >= 0 && idx < size) $ runtimeError 
+    unless (idx >= 0 && idx < size) $ runtimeError
         $ "Trying access index " ++ show idx ++ " of " ++ symbolId ++ " but it's size is " ++ show size ++ showPos posn
 
 checkShadowing :: String -> AlexPosn -> StateType ()
@@ -307,8 +307,8 @@ castValueToType IntType (_, BoolValue b) _ = return (IntValue (if b then 1 else 
 castValueToType IntType (_, StringValue s) posn =
     case reads s :: [(Int, String)] of
         [(i, "")] -> return (IntValue i)
-        _         -> runtimeError $ 
-                        "unsuccessful casting between " ++ show IntType ++ " and " ++ show StringType ++ 
+        _         -> runtimeError $
+                        "unsuccessful casting between " ++ show IntType ++ " and " ++ show StringType ++
                         ". Not possible to get an int from this string " ++ showPos posn
 castValueToType IntType (srcT, ConstValue v) posn =
     castValueToType IntType (srcT, v) posn
@@ -320,8 +320,8 @@ castValueToType FloatType (_, BoolValue b) _ = return (FloatValue (if b then 1.0
 castValueToType FloatType (_, StringValue s) posn =
     case reads s :: [(Float, String)] of
         [(f, "")] -> return (FloatValue f)
-        _         -> runtimeError $ 
-                        "unsuccessful casting between " ++ show FloatType ++ " and " ++ show StringType ++ 
+        _         -> runtimeError $
+                        "unsuccessful casting between " ++ show FloatType ++ " and " ++ show StringType ++
                         ". Not possible to get a float from this string " ++ showPos posn
 castValueToType FloatType (srcT, ConstValue v) posn =
     castValueToType FloatType (srcT, v) posn
@@ -370,3 +370,27 @@ resultOpType lhs (ConstType rhs) posn = resultOpType lhs rhs posn
 
 resultOpType _ _ posn = semanticError $ "TODO resultOpType " ++ showPos posn
 
+searchTypeList :: [Type] -> Int -> [Type] -> StateType (Maybe Type)
+searchTypeList [] _ _ = return Nothing
+searchTypeList (typesH:typesT) templateLen typeList = do
+    (templateList, expectedTypeList) <- case typesH of
+        ProcType templateList expectedParamList _ -> do
+            let (_, expectedTypeList) = unzip expectedParamList
+            return (templateList, expectedTypeList)
+        FuncType templateList expectedParamList _ _ -> do
+            let (_, expectedTypeList) = unzip expectedParamList
+            return (templateList, expectedTypeList)
+        HaskellMethod expectedTypeList _ _ -> return ([], expectedTypeList)
+        _ -> fail "what????" -- TODO
+
+    let expectedTemplateLen = genericLength templateList
+    if expectedTemplateLen == templateLen && typeListMatch expectedTypeList typeList 
+        then return $ Just typesH
+        else searchTypeList typesT templateLen typeList
+    where
+        typeListMatch :: [Type] -> [Type] -> Bool
+        typeListMatch [] [] = True
+        typeListMatch _ [] = False
+        typeListMatch [] _ = False
+        typeListMatch (lhsH:lhsT) (rhsH:rhsT) = do
+            (lhsH == rhsH) && typeListMatch lhsT rhsT
