@@ -126,15 +126,16 @@ assertBooleanCompatible t posn = do
         ConstType ct -> assertBooleanCompatible ct posn
         _ -> semanticError $ show t ++ " cannot be interpreted as a bool " ++ showPos posn
 
-getBooleanValue :: Value -> StateType Bool 
-getBooleanValue value = do
-    case value of 
+getBooleanValue :: Maybe Value -> AlexPosn -> StateType Bool
+getBooleanValue Nothing posn = semanticError $ "TODO " ++ showPos posn
+getBooleanValue (Just value) posn = do
+    case value of
         BoolValue v -> return v
         IntValue v -> return $ v /= 0
         FloatValue v -> return $ v /= 0
         -- RefValue v -> v /= 0 -- TODO return true in case ref is valid
-        ConstValue v -> getBooleanValue v
-        _ -> fail "Trying to get a bool from something that cannot be interpreted as such" -- Should not reach this, since assertBooleanCompatible should be called previously 
+        ConstValue v -> getBooleanValue (Just v) posn
+        _ -> fail $ "Trying to get a bool from something that cannot be interpreted as such " ++ showPos posn -- Should not reach this, since assertBooleanCompatible should be called previously 
 
 assertAssignableType :: String -> Type -> AlexPosn -> StateType ()
 assertAssignableType symbolId t posn = do
@@ -197,107 +198,125 @@ toBoolValue (ConstValue v) = toBoolValue v
 toBoolValue _ = BoolValue False  -- Fallback for unsupported types
 
 
-handleNot :: Value -> AlexPosn -> StateType (Type, Value)
-handleNot (ConstValue v) posn = handleNot v posn
-handleNot (BoolValue v) _ = return (BoolType, BoolValue (not v))
-handleNot (IntValue v) _ = return (BoolType, BoolValue (v == 0))
-handleNot (FloatValue v) _ = return (BoolType, BoolValue (v == 0.0))
+handleNot :: Maybe Value -> AlexPosn -> StateType (Type, Value)
+handleNot Nothing posn = semanticError $ "Invalid operand for logical '!' " ++ showPos posn
+handleNot (Just (ConstValue v)) posn = handleNot (Just v) posn
+handleNot (Just (BoolValue v)) _ = return (BoolType, BoolValue (not v))
+handleNot (Just (IntValue v)) _ = return (BoolType, BoolValue (v == 0))
+handleNot (Just (FloatValue v)) _ = return (BoolType, BoolValue (v == 0.0))
 handleNot _ posn = semanticError $ "Invalid operand for logical '!' " ++ showPos posn
 
 
-handleAnd :: Value -> Value -> AlexPosn -> StateType (Type, Value)
-handleAnd (ConstValue lhs) rhs posn = handleAnd lhs rhs posn
-handleAnd lhs (ConstValue rhs) posn = handleAnd lhs rhs posn
-handleAnd lhs rhs _ = do
+handleAnd :: Maybe Value -> Maybe Value -> AlexPosn -> StateType (Type, Value)
+handleAnd Nothing _ posn = semanticError $ "Invalid operands for logical '&&' " ++ showPos posn
+handleAnd _ Nothing posn = semanticError $ "Invalid operands for logical '&&' " ++ showPos posn
+handleAnd (Just (ConstValue lhs)) rhs posn = handleAnd (Just lhs) rhs posn
+handleAnd lhs (Just (ConstValue rhs)) posn = handleAnd lhs (Just rhs) posn
+handleAnd (Just lhs) (Just rhs) _ = do
     let BoolValue lhsB = toBoolValue lhs
         BoolValue rhsB = toBoolValue rhs
     return (BoolType, BoolValue (lhsB && rhsB))
 
 
-handleOr :: Value -> Value -> AlexPosn -> StateType (Type, Value)
-handleOr (ConstValue lhs) rhs posn = handleOr lhs rhs posn
-handleOr lhs (ConstValue rhs) posn = handleOr lhs rhs posn
-handleOr lhs rhs _ = do
+handleOr :: Maybe Value -> Maybe Value -> AlexPosn -> StateType (Type, Value)
+handleOr Nothing _ posn = semanticError $ "Invalid operands for logical '||' " ++ showPos posn
+handleOr _ Nothing posn = semanticError $ "Invalid operands for logical '||' " ++ showPos posn
+handleOr (Just (ConstValue lhs)) rhs posn = handleOr (Just lhs) rhs posn
+handleOr lhs (Just (ConstValue rhs)) posn = handleOr lhs (Just rhs) posn
+handleOr (Just lhs) (Just rhs) _ = do
     let BoolValue lhsB = toBoolValue lhs
         BoolValue rhsB = toBoolValue rhs
     return (BoolType, BoolValue (lhsB || rhsB))
 
 
-handleUnaryMinus :: Value -> AlexPosn -> StateType (Type, Value)
-handleUnaryMinus (ConstValue v) posn = handleUnaryMinus v posn
-handleUnaryMinus (IntValue v) _ = return (IntType, IntValue (-v))
-handleUnaryMinus (FloatValue v) _ = return (FloatType, FloatValue (-v))
+handleUnaryMinus :: Maybe Value -> AlexPosn -> StateType (Type, Value)
+handleUnaryMinus Nothing posn = semanticError $ "Invalid minus unary operation " ++ showPos posn
+handleUnaryMinus (Just (ConstValue v)) posn = handleUnaryMinus (Just v) posn
+handleUnaryMinus (Just (IntValue v)) _ = return (IntType, IntValue (-v))
+handleUnaryMinus (Just (FloatValue v)) _ = return (FloatType, FloatValue (-v))
 handleUnaryMinus _ posn = semanticError $ "Invalid minus unary operation " ++ showPos posn
 
 
-handleAdd :: Value -> Value -> AlexPosn -> StateType (Type, Value)
-handleAdd (ConstValue lhs) rhs posn = handleAdd lhs rhs posn
-handleAdd lhs (ConstValue rhs) posn = handleAdd lhs rhs posn
-handleAdd (IntValue lhsV) (IntValue rhsV) _ =
+handleAdd :: Maybe Value -> Maybe Value -> AlexPosn -> StateType (Type, Value)
+handleAdd Nothing _ posn = semanticError $ "Invalid operands for addition at " ++ showPos posn
+handleAdd _ Nothing posn = semanticError $ "Invalid operands for addition at " ++ showPos posn
+handleAdd (Just (ConstValue lhs)) rhs posn = handleAdd (Just lhs) rhs posn
+handleAdd lhs (Just (ConstValue rhs)) posn = handleAdd lhs (Just rhs) posn
+handleAdd (Just (IntValue lhsV)) (Just (IntValue rhsV)) _ =
     return (IntType, IntValue (lhsV + rhsV))
-handleAdd (IntValue lhsV) (FloatValue rhsV) _ =
+handleAdd (Just (IntValue lhsV)) (Just (FloatValue rhsV)) _ =
     return (FloatType, FloatValue (fromIntegral lhsV + rhsV))
-handleAdd (FloatValue lhsV) (IntValue rhsV) _ =
+handleAdd (Just (FloatValue lhsV)) (Just (IntValue rhsV)) _ =
     return (FloatType, FloatValue (lhsV + fromIntegral rhsV))
-handleAdd (FloatValue lhsV) (FloatValue rhsV) _ =
+handleAdd (Just (FloatValue lhsV)) (Just (FloatValue rhsV)) _ =
     return (FloatType, FloatValue (lhsV + rhsV))
-handleAdd (StringValue lhsV) (StringValue rhsV) _ =
+handleAdd (Just (StringValue lhsV)) (Just (StringValue rhsV)) _ =
     return (StringType, StringValue (lhsV ++ rhsV))
-handleAdd _ _ posn =
-    semanticError $ "Invalid operands for addition at " ++ showPos posn
+handleAdd (Just (StringValue lhsV)) (Just (CharValue rhsV)) _ =
+    return (StringType, StringValue (lhsV ++ [rhsV]))
+handleAdd _ _ posn = semanticError $ "Invalid operands for addition at " ++ showPos posn
 
 
-handleSub :: Value -> Value -> AlexPosn -> StateType (Type, Value)
-handleSub (ConstValue lhs) rhs posn = handleSub lhs rhs posn
-handleSub lhs (ConstValue rhs) posn = handleSub lhs rhs posn
-handleSub (IntValue lhsV) (IntValue rhsV) _ =
+handleSub :: Maybe Value -> Maybe Value -> AlexPosn -> StateType (Type, Value)
+handleSub Nothing _ posn = semanticError $ "Invalid operands for subtraction at " ++ showPos posn
+handleSub _ Nothing posn = semanticError $ "Invalid operands for subtraction at " ++ showPos posn
+handleSub (Just (ConstValue lhs)) rhs posn = handleSub (Just lhs) rhs posn
+handleSub lhs (Just (ConstValue rhs)) posn = handleSub lhs (Just rhs) posn
+handleSub (Just (IntValue lhsV)) (Just (IntValue rhsV)) _ =
     return (IntType, IntValue (lhsV - rhsV))
-handleSub (IntValue lhsV) (FloatValue rhsV) _ =
+handleSub (Just (IntValue lhsV)) (Just (FloatValue rhsV)) _ =
     return (FloatType, FloatValue (fromIntegral lhsV - rhsV))
-handleSub (FloatValue lhsV) (IntValue rhsV) _ =
+handleSub (Just (FloatValue lhsV)) (Just (IntValue rhsV)) _ =
     return (FloatType, FloatValue (lhsV - fromIntegral rhsV))
-handleSub (FloatValue lhsV) (FloatValue rhsV) _ =
+handleSub (Just (FloatValue lhsV)) (Just (FloatValue rhsV)) _ =
     return (FloatType, FloatValue (lhsV - rhsV))
-handleSub _ _ posn =
-    semanticError $ "Invalid operands for subtraction at " ++ showPos posn
+handleSub _ _ posn = semanticError $ "Invalid operands for subtraction at " ++ showPos posn
 
 
-handleMult :: Value -> Value -> AlexPosn -> StateType (Type, Value)
-handleMult (ConstValue lhs) rhs posn = handleMult lhs rhs posn
-handleMult lhs (ConstValue rhs) posn = handleMult lhs rhs posn
-handleMult (IntValue lhsV) (IntValue rhsV) _ =
+handleMult :: Maybe Value -> Maybe Value -> AlexPosn -> StateType (Type, Value)
+handleMult Nothing _ posn =
+    semanticError $ "Left operand of multiplication doesn't have a value, maybe it wasn't initialized " ++ showPos posn
+handleMult _ Nothing posn =
+    semanticError $ "Right operand of multiplication is missing at " ++ showPos posn
+handleMult (Just (ConstValue lhs)) rhs posn =
+    handleMult (Just lhs) rhs posn
+handleMult lhs (Just (ConstValue rhs)) posn =
+    handleMult lhs (Just rhs) posn
+handleMult (Just (IntValue lhsV)) (Just (IntValue rhsV)) _ =
     return (IntType, IntValue (lhsV * rhsV))
-handleMult (IntValue lhsV) (FloatValue rhsV) _ =
+handleMult (Just (IntValue lhsV)) (Just (FloatValue rhsV)) _ =
     return (FloatType, FloatValue (fromIntegral lhsV * rhsV))
-handleMult (FloatValue lhsV) (IntValue rhsV) _ =
+handleMult (Just (FloatValue lhsV)) (Just (IntValue rhsV)) _ =
     return (FloatType, FloatValue (lhsV * fromIntegral rhsV))
-handleMult (FloatValue lhsV) (FloatValue rhsV) _ =
+handleMult (Just (FloatValue lhsV)) (Just (FloatValue rhsV)) _ =
     return (FloatType, FloatValue (lhsV * rhsV))
 handleMult _ _ posn =
     semanticError $ "Invalid operands for multiplication at " ++ showPos posn
 
 
-handleDiv :: Value -> Value -> AlexPosn -> StateType (Type, Value)
-handleDiv (ConstValue lhs) rhs posn = handleDiv lhs rhs posn
-handleDiv lhs (ConstValue rhs) posn = handleDiv lhs rhs posn
-handleDiv (IntValue lhsV) (IntValue rhsV) posn =
+handleDiv :: Maybe Value -> Maybe Value -> AlexPosn -> StateType (Type, Value)
+handleDiv Nothing _ posn = semanticError $ "Invalid operands for division at " ++ showPos posn
+handleDiv _ Nothing posn = semanticError $ "Invalid operands for division at " ++ showPos posn
+handleDiv (Just (ConstValue lhs)) rhs posn = handleDiv (Just lhs) rhs posn
+handleDiv lhs (Just (ConstValue rhs)) posn = handleDiv lhs (Just rhs) posn
+handleDiv (Just (IntValue lhsV)) (Just (IntValue rhsV)) posn =
     if rhsV == 0
         then semanticError $ "Division by zero at " ++ showPos posn
         else return (FloatType, FloatValue (fromIntegral lhsV / fromIntegral rhsV))
-handleDiv (IntValue lhsV) (FloatValue rhsV) posn =
+handleDiv (Just (IntValue lhsV)) (Just (FloatValue rhsV)) posn =
     if rhsV == 0
         then semanticError $ "Division by zero at " ++ showPos posn
         else return (FloatType, FloatValue (fromIntegral lhsV / rhsV))
-handleDiv (FloatValue lhsV) (IntValue rhsV) posn =
+handleDiv (Just (FloatValue lhsV)) (Just (IntValue rhsV)) posn =
     if rhsV == 0
         then semanticError $ "Division by zero at " ++ showPos posn
         else return (FloatType, FloatValue (lhsV / fromIntegral rhsV))
-handleDiv (FloatValue lhsV) (FloatValue rhsV) posn =
+handleDiv (Just (FloatValue lhsV)) (Just (FloatValue rhsV)) posn =
     if rhsV == 0
         then semanticError $ "Division by zero at " ++ showPos posn
         else return (FloatType, FloatValue (lhsV / rhsV))
-handleDiv _ _ posn =
-    semanticError $ "Invalid operands for division at " ++ showPos posn
+handleDiv _ _ posn = semanticError $ "Invalid operands for division at " ++ showPos posn
+
 
 castValueToType :: Type -> (Type, Value) -> AlexPosn -> StateType Value
 --- IntType target ---
