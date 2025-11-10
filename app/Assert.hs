@@ -6,6 +6,7 @@ import InterpreterState
 import Types
 import Control.Monad (when, unless)
 import Control.Monad.IO.Class (MonadIO(liftIO))
+import Data.List (genericLength)
 import Data.Maybe
 
 warningMsg :: String -> StateType ()
@@ -17,7 +18,7 @@ showPos (AlexPn _ line col) =
 
 consultTypeList :: String -> AlexPosn -> StateType [Type]
 consultTypeList symbolId posn = do
-    consultResult <- consultSymbol symbolId
+    consultResult <- consultSymbolTable symbolId
     case consultResult of
         Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
         Just t -> return t
@@ -344,5 +345,28 @@ castValueToType StringType (srcT, ConstValue v) posn =
 --- Unsupported cast ---
 castValueToType targetType (srcT, _) posn =
     semanticError $
-        "Invalid cast operation, casting between incompatible types: " ++ 
+        "Invalid cast operation, casting between incompatible types: " ++
         show targetType ++ " and " ++ show srcT ++ " " ++ showPos posn
+
+resultOpType :: Type -> Type -> AlexPosn -> StateType Type
+-- Int
+resultOpType IntType IntType _ = return IntType
+resultOpType IntType FloatType _ = return FloatType
+resultOpType IntType BoolType _ = return IntType
+-- Float 
+resultOpType FloatType FloatType _ = return FloatType
+resultOpType FloatType IntType _ = return FloatType
+resultOpType FloatType BoolType _ = return FloatType
+-- String 
+resultOpType StringType StringType _ = return StringType
+resultOpType StringType CharType _ = return StringType
+-- Bool
+resultOpType BoolType BoolType _ = return BoolType
+resultOpType BoolType IntType _ = return IntType
+resultOpType BoolType FloatType _ = return FloatType
+-- Const
+resultOpType (ConstType lhs) rhs posn = resultOpType lhs rhs posn
+resultOpType lhs (ConstType rhs) posn = resultOpType lhs rhs posn
+
+resultOpType _ _ posn = semanticError $ "TODO resultOpType " ++ showPos posn
+
