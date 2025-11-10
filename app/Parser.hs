@@ -879,9 +879,11 @@ typeStmt = do
                 return ([b] ++ [c] ++ d ++ [e], RefType t)
             <|> do -- customType
                 b <- TT.id
-                let ID _posn _s = b
-                -- t <- consultTypeList s posn >>= getEnumOrStructTypes s posn
-                return ([b], IntType) -- TODO
+                let ID posn s = b
+                maybeT <- consultTypeList s posn >>= getEnumOrStructTypes
+                case maybeT of 
+                    Nothing -> semanticError $ s ++ " is not a type " ++ showPos posn 
+                    Just t -> return ([b], t)
             <|> do -- reference for method
                 b <- TT.openParen
                 (c, templateIds) <- option ([], []) templateDecl
