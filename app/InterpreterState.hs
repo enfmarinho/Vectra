@@ -7,6 +7,7 @@ import Text.Parsec
 import Control.Monad.State.Lazy
 import Data.Maybe (fromMaybe)
 import Data.Foldable
+import Control.Monad
 
 -- Aux function to emit error messages and finish execution early with err
 semanticError :: String -> StateType a
@@ -127,6 +128,7 @@ updateSymbol symbolId typeList = do
 insertSymbol :: SymbolType -> Bool -> StateType ()
 insertSymbol (symbolId, symbolType) canBeDuplicate = do
     st@InterpreterState{..} <- getState
+    -- Insert on symbol table
     case symbolTableStack of
         [] -> do
             existingSymbol <- liftIO $ H.lookup globalSymbolTable symbolId
@@ -141,35 +143,43 @@ insertSymbol (symbolId, symbolType) canBeDuplicate = do
                 liftIO $ H.insert table symbolId $ fromMaybe [] existingSymbol ++ [symbolType]
                 else liftIO $ H.insert table symbolId [symbolType]
             putState st { symbolTableStack = (table, b):rest}
-
-insertValue :: MemoryType -> StateType ()
-insertValue (symbolId, value) = do
-    st@InterpreterState{..} <- getState
+    -- Insert on memory table
     case memoryTableStack of
         [] -> do
-            liftIO $ H.insert globalMemoryTable symbolId value
+            liftIO $ H.insert globalMemoryTable symbolId Nothing
             putState st { globalMemoryTable = globalMemoryTable }
         (top : rest) -> do
-            liftIO $ H.insert top symbolId value
+            liftIO $ H.insert top symbolId Nothing
             putState st { memoryTableStack = top:rest}
 
 updateValue :: MemoryType -> StateType ()
 updateValue (symbolId, value) = do
     InterpreterState{..} <- getState
-    liftIO $ update (symbolId, value) memoryTableStack
+    result <- update (symbolId, value) memoryTableStack
+    unless result $ do
+        maybeValue <- liftIO $ H.lookup globalMemoryTable symbolId
+        case maybeValue of
+            Nothing -> fail $ "updateValue " ++ symbolId
+            Just _ -> liftIO $ H.insert globalMemoryTable symbolId (Just value)
   where
-    update :: MemoryType -> MemoryTableStackType -> IO ()
-    update (_, _) [] = return ()
+    update :: MemoryType -> MemoryTableStackType -> StateType Bool
+    update (_, _) [] = return False
     update (n, v) (top:rest) = do
-        found <- H.lookup top n
+        found <- liftIO $ H.lookup top n
         case found of
-            Just _ -> H.insert top n v
+            Just _ -> do
+                liftIO $ H.insert top n (Just v)
+                return True
             Nothing -> update (n, v) rest
 
 consultSymbol :: String -> StateType (Maybe [Type])
 consultSymbol symbol = do
     InterpreterState{..} <- getState
-    liftIO $ search symbol symbolTableStack
+    result <- liftIO $ search symbol symbolTableStack
+    -- If not found on table stack, search on global table
+    case result of
+        Nothing -> liftIO $ H.lookup globalSymbolTable symbol
+        Just _ -> return result
   where
     search :: String -> SymbolTableStackType -> IO (Maybe [Type])
     search _ [] = return Nothing
@@ -185,12 +195,20 @@ consultSymbol symbol = do
 consultValue :: String -> StateType (Maybe Value)
 consultValue symbol = do
     InterpreterState{..} <- getState
-    liftIO $ search symbol memoryTableStack
+    result <- liftIO $ search symbol memoryTableStack
+    -- If not found on memory stack, search on global memory
+    case result of
+        Nothing -> do
+            v <- liftIO $ H.lookup globalMemoryTable symbol
+            case v of
+                Nothing -> return Nothing
+                Just v' -> return v'
+        Just _ -> return result
   where
     search :: String -> MemoryTableStackType -> IO (Maybe Value)
     search _ [] = return Nothing
     search name (table:rest) = do
         result <- H.lookup table name
         case result of
-            Just ty -> return (Just ty)
+            Just ty -> return ty
             Nothing -> search name rest
