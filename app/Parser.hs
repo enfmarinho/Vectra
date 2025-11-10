@@ -379,11 +379,15 @@ literal = do
         return ([a], BoolType, Just $ BoolValue False)
         -- TODO implement literal for list 
 
-expStmtList :: StateType [([Token], Type, Value)]
+expStmtList :: StateType [([Token], Type, Maybe Value)]
 expStmtList = do
-    -- TODO
-    -- concat <$> (expStmt `sepBy` TT.kwComma)
-    return []
+    a <- expStmt
+    b <- many $ try (do 
+            b <- TT.kwComma
+            (cTokens, cT, cV) <- expStmt
+            return (b:cTokens, cT, cV)
+        )
+    return (a:b)
 
 baseExp :: StateType ([Token], Type, Maybe Value)
 baseExp = do
