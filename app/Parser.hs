@@ -914,12 +914,17 @@ forStmt = do
 
     e <- TT.kwSemicolumn
     setProgramState Skip -- Don't execute assignStmt yet no mater what
-    optionF <- optionMaybe assignStmt -- TODO this can also be a callStmt
+    optionF <- optionMaybe (
+            do
+                (f, _) <- assignStmt
+                return f
+            <|> do
+                (f, _, _) <- callStmt
+                return f
+            <?> "loop increment should be either an assignStmt or a method call"
+        )
+    let f = fromMaybe [] optionF
     setProgramState previousProgramState
-
-    f <- case optionF of
-            Nothing -> return []
-            Just (f, _) -> return f
 
     isRunning' <- isRunning
     condition <- if isRunning' then do
@@ -938,12 +943,12 @@ forStmt = do
             unless endEarly $ do
                 setProgramState previousProgramState
 
-                -- Perform assignStmt, i.e. operation to be performed after loop
+                -- Perform operation to be performed after loop
                 st <- getState
                 parserResultAssingStmt <- liftIO $ runParserT assignStmt st "<for>" f
                 case parserResultAssingStmt of
                     Left _ -> fail "<for>"
-                    Right (_, resultState') -> putState resultState'
+                    Right (_, resultState) -> putState resultState
 
                 (expValue', resultState) <- evaluateBooleanExp d
                 condition' <- getBooleanValue expValue' posn
@@ -951,7 +956,7 @@ forStmt = do
 
                 when condition' $ do
                     st' <- getState
-                    parserResult <- liftIO $ runParserT stmtList st' "<for>" f
+                    parserResult <- liftIO $ runParserT stmtList st' "<for>" j
                     case parserResult of
                         Left _ -> fail "<for>"
                         Right (_, resultState') -> putState resultState'
