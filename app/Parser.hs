@@ -98,13 +98,16 @@ structDecl = do
     _ <- TT.kwStruct
     (a, templateIds) <- option ([], []) templateDecl
     b <- TT.id
+
+    let ID posn symbolId = b
+    assertNonAmbiguous symbolId posn
+
     _ <- TT.kwColumn
     _ <- TT.indent
     c <- concat <$> many1 varDecl -- TODO handle private and public kws
     _ <- TT.unindent
     structScope <- topScope
     closeScope
-    let ID _posn symbolId = b
     insertSymbol (symbolId, StructType templateIds structScope) False
     return $ a ++ [b] ++ c
 
@@ -130,6 +133,10 @@ enumDecl :: StateType [Token]
 enumDecl = do
     _ <- TT.kwEnum
     a <- TT.id
+
+    let ID posn symbolId = a
+    assertNonAmbiguous symbolId posn
+
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
