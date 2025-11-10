@@ -9,8 +9,8 @@ import Scanner
 importSpecialMethod :: String -> AlexPosn -> StateType ()
 importSpecialMethod symbolId posn = do
     case symbolId of
-        "print" -> insertSymbol ("print", HaskellMethod [TemplateType] vectraPrint) True 
-        "println" -> insertSymbol ("println", HaskellMethod [TemplateType] vectraPrintln) True 
+        "print" -> insertSymbol ("print", HaskellMethod [TemplateType] Nothing vectraPrint) True 
+        "println" -> insertSymbol ("println", HaskellMethod [StringType] Nothing vectraPrintln) True 
         -- TODO add more methods to stdlib
         _ -> semanticError $ "Invalid import: " ++ symbolId ++ "doesn't exist " ++ showPos posn
     return ()

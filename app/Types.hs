@@ -29,7 +29,7 @@ data ParserBlock = GlobalScope
                  | Method (Maybe Type) -- Target return type
                  | Loop
                  | Conditional
-                 deriving (Eq)
+                 deriving (Eq, Show)
 
 data ProgramState = Starting
                   | Running
@@ -58,7 +58,7 @@ data Type = IntType
           | ProcRefType [String] [Type]                     -- (templates_ids, param_types)
           | NamespaceType SymbolTableType                   -- (symbol_table)
           | ImplNamespaceType SymbolTableType               -- (symbol_table)
-          | HaskellMethod [Type] LibMethodSignature         -- (param_types, internal_method)
+          | HaskellMethod [Type] (Maybe Type) LibMethodSignature         -- (param_types, return_type, internal_method)
 
 data Value = IntValue Int
            | FloatValue Float
@@ -111,8 +111,8 @@ instance Show Type where
         "(" ++ show params ++ ")"
     show (NamespaceType _) = "namespace"
     show (ImplNamespaceType _) = "impl"
-    show (HaskellMethod paramTypes _) =
-        "internalMethod(" ++ show paramTypes ++ ")"
+    show (HaskellMethod paramTypes _ _) =
+        "internalMethod" ++ show paramTypes
 
 showParams :: [(String, Type)] -> String
 showParams = concatMap (\(_, t) -> show t ++ ", ")
