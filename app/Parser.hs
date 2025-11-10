@@ -12,6 +12,7 @@ import Types
 import Assert
 import Control.Monad
 import Data.Maybe
+import qualified Data.Vector as V
 import Control.Monad.IO.Class
 import VectraLib
 import Data.List (genericLength)
@@ -219,16 +220,25 @@ methodDecl = do
     setParserBlock previousParserBlock
     return ([a] ++ bTokens ++ [c] ++ dTokens ++ [e] ++ maybe [] fst optionF ++ g)
 
-arrayDecl :: StateType ([Token], Int)
+arrayDecl :: StateType [Token]
 arrayDecl = do
     a <- TT.openBracket
-    (b, _bType, bValue) <- expStmt
-    let OPEN_BRACKET posn = a
-    arraySize <- case bValue of
-            Nothing -> return 0
-            Just v -> assertNumberTypeReturnInt v posn
+    optionB <- optionMaybe expStmt
     c <- TT.closeBracket
-    return ([a] ++ b ++ [c], arraySize)
+
+    let OPEN_BRACKET posn = a
+    case optionB of
+        Nothing -> return $ a:[c]
+        Just (b, t, _v) -> do
+            assertNumberType t posn
+            return ([a] ++ b ++ [c])
+
+    where
+        assertNumberType :: Type -> AlexPosn -> StateType ()
+        assertNumberType value posn = do
+            case value of
+                IntType -> return ()
+                _ -> semanticError $ "Array size should be either empty or a int type " ++ showPos posn
 
 returnDecl :: StateType ([Token], Type)
 returnDecl = do
@@ -238,9 +248,10 @@ returnDecl = do
     optionB <- optionMaybe arrayDecl
     (b, returnType) <- case optionB of
         Nothing -> return ([], aType)
-        Just (b, arraySize) -> return (b, ArrayType arraySize aType)
+        Just b -> return (b, ArrayType aType)
     return (a ++ b, returnType)
 
+-- TODO make arrayDecl recursive to allow multiple dimension arrays
 varDecl :: StateType [Token]
 varDecl = do
     a <- optionMaybe TT.kwLocal
@@ -249,7 +260,7 @@ varDecl = do
     optionD <- optionMaybe arrayDecl
     (d, varType) <- case optionD of
                         Nothing -> return ([], bType)
-                        Just (d, arraySize) -> return (d, ArrayType arraySize bType)
+                        Just d -> return (d, ArrayType bType)
     let ID posn symbolId = c
     when (isNothing a) $ checkShadowing symbolId posn
     insertSymbol (symbolId, varType) False
@@ -337,6 +348,7 @@ callStmt = do
                                 return (returnT, returnV)
                             _ -> semanticError $ "Trying to call type " ++ show symbolType ++ ", it must be a function or procedure "  ++ showPos posn
     setProgramState previousProgramState
+    -- TODO emit message in case main is a function and a non-zero value was returned
     closeScope
     return (a ++  b ++ [c] ++ concat d ++ [e], maybeReturnT, maybeReturnV)
     where
@@ -405,7 +417,6 @@ literal = do
     <|> do
         a <- TT.kwFalse
         return ([a], BoolType, Just $ BoolValue False)
-        -- TODO implement literal for list 
 
 expStmtList :: StateType [([Token], Type, Maybe Value)]
 expStmtList = do
@@ -884,12 +895,16 @@ typeStmt = do
                         Just (returnTokens, returnType) -> (returnTokens, FuncRefType templateIds (map snd paramList) returnType)
 
                 return ([b] ++ c ++ [d] ++ e ++ [f] ++ gTokens, t)
+    maybeC <- optionMaybe arrayDecl
 
-    (aTokens, finalType) <- case a of
+    (aTokens, afterConst) <- case a of
                     Nothing -> return ([], t)
                     Just aTokens -> return ([aTokens], ConstType t)
+    (cTokens, finalType) <- case maybeC of
+                                Nothing -> return ([], afterConst)
+                                Just c -> return (c, ArrayType afterConst)
 
-    return (aTokens ++ b, finalType)
+    return (aTokens ++ b ++ cTokens, finalType)
     where constDecl = TT.kwConst
 
 forStmt :: StateType [Token]
@@ -983,7 +998,7 @@ foreachStmt = do
     dType <- consultType dSymbol posn
     assertIterableType dSymbol dType posn
 
-    let ArrayType _size underlyingType = dType
+    let ArrayType underlyingType = dType
     let ID _ bSymbol = b
     insertSymbol (bSymbol, underlyingType) False
 

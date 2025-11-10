@@ -2,7 +2,7 @@ module Types where
 import qualified Data.HashTable.IO as H
 import Text.Parsec
 import Scanner
-import Data.Array
+import qualified Data.Vector as V
 
 type SymbolType = (String, Type)
 type SymbolTableType = H.BasicHashTable String [Type]
@@ -47,7 +47,7 @@ data Type = IntType
           | TemplateType
           | RefType Type
           | ConstType Type                                  -- (internal_type)
-          | ArrayType Int Type                              -- (size, type)                 
+          | ArrayType Type                                  -- (internal_type)                 
           | EnumType [String]                               -- (valid_labels)
           | ProcType [String] [(String, Type)] [Token]      -- (template_ids, param_types, method_body)
           | FuncType [String] [(String, Type)] Type [Token] -- (template_ids, (param_ids, param_types), return_type, method_body)
@@ -66,7 +66,7 @@ data Value = IntValue Int
            | BoolValue Bool
            | StringValue String
            | ConstValue Value
-           | ArrayValue (Array Int Value)
+           | ArrayValue (V.Vector (Maybe Value))
            | EnumValue String
            | RefValue Int String
            | FuncRefValue String
@@ -94,7 +94,7 @@ instance Show Type where
     show TemplateType = "template"
     show (RefType t) = "ref(" ++ show t ++ ")"
     show (ConstType t) = "const(" ++ show t ++ ")"
-    show (ArrayType size t) = show t ++ "[" ++ show size ++ "]"
+    show (ArrayType t) = show t ++ "[]"
     show (EnumType _labelsId) = "enumDecl"
     show (ProcType templates params _body) =
         "proc<" ++ show templates ++ ">" ++ "(" ++ showParams params ++ ")"
@@ -126,7 +126,7 @@ instance Eq Type where
     TemplateType == TemplateType = True
     RefType t1 == RefType t2 = t1 == t2
     ConstType t1 == ConstType t2 = t1 == t2
-    ArrayType _ t1 == ArrayType _ t2 = t1 == t2
+    ArrayType t1 == ArrayType t2 = t1 == t2
     EnumType _ == EnumType _ = False
     ProcType templates1 params1 _ == ProcType templates2 params2 _ =
         templates1 == templates2 && params1 == params2

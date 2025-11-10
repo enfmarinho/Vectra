@@ -98,7 +98,7 @@ assertReturnType returnT posn = do
 assertIterableType :: String -> Type -> AlexPosn -> StateType ()
 assertIterableType symbolId t posn = do
     case t of
-        ArrayType _ _ -> return ()
+        ArrayType _ -> return ()
         _ -> semanticError $ symbolId ++ " is not iterable " ++ showPos posn
 
 assertStructType :: String -> AlexPosn -> [Type]  -> StateType ()
@@ -170,12 +170,6 @@ assertValidParamList (_:_) [] posn = do
     semanticError $ "Method called with more arguments than expected " ++ showPos posn
 assertValidParamList [] [] _ = do
     return ()
-
-assertNumberTypeReturnInt :: Value -> AlexPosn -> StateType Int
-assertNumberTypeReturnInt value posn = do
-    case value of
-        IntValue intValue -> return intValue
-        _ -> semanticError $ "Array size should be declared with a int type " ++ showPos posn
 
 assertInBounds :: String -> Int -> Int -> AlexPosn -> StateType ()
 assertInBounds symbolId size idx posn = do
