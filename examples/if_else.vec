@@ -11,3 +11,5 @@ proc main():
         msg = "x menor que 40"
     else:
         msg = "x é 40"
+
+    println(msg)
