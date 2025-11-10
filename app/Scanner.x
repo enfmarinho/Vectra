@@ -49,8 +49,12 @@ tokens :-
     -- Literals
     $NUMBER+     { \aInp len -> do t <- handleIndentation (INT_LITERAL (alexPos aInp) (read (take len (alexInputStr aInp)))); return $ Just t }
     $NUMBER+\.$NUMBER* { \aInp len -> do t <- handleIndentation (FLOAT_LITERAL (alexPos aInp) (read (take len (alexInputStr aInp)))); return $ Just t }
-    \".*\"       { \aInp len -> do t <- handleIndentation (STRING_LITERAL (alexPos aInp) (take len (alexInputStr aInp))); return $ Just t }
-
+    \".*\"       { \aInp len -> do
+        let raw = take len (alexInputStr aInp)
+            val = read raw :: String  -- removes quotes + decodes escapes
+        t <- handleIndentation (STRING_LITERAL (alexPos aInp) val)
+        return $ Just t
+    }
     -- Keywords
     namespace    { \aInp _ -> do t <- handleIndentation (KW_NAMESPACE (alexPos aInp)); return $ Just t }
     const        { \aInp _ -> do t <- handleIndentation (KW_CONST (alexPos aInp)); return $ Just t }
