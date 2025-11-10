@@ -329,7 +329,11 @@ callStmt = do
                             HaskellMethod _expectedTypeList returnT libMethod -> do
                                 -- assert expectedTypeList is equivalent to typeList
                                 valueList <- valueListFromMaybeValue maybeValueList posn
-                                returnV <- libMethod valueList posn
+                                isRunning' <- isRunning
+                                returnV <- if isRunning' 
+                                                then libMethod valueList posn
+                                                else return Nothing
+
                                 return (returnT, returnV)
                             _ -> semanticError $ "Trying to call type " ++ show symbolType ++ ", it must be a function or procedure "  ++ showPos posn
     setProgramState previousProgramState
