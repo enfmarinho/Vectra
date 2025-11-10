@@ -23,14 +23,22 @@ consultTypeList symbolId posn = do
         Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
         Just t -> return t
 
-getEnumOrStructTypes :: String -> AlexPosn -> [Type] -> StateType Type
-getEnumOrStructTypes symbolId posn (h:t) = do
+
+assertNonAmbiguous :: String -> AlexPosn -> StateType ()
+assertNonAmbiguous symbolId posn = do
+    a <- consultSymbolTable symbolId 
+    case a of
+        Nothing -> return ()
+        Just _ -> semanticError $ "Ambiguous declaration for symbol " ++ symbolId ++ " " ++ showPos posn
+
+
+getEnumOrStructTypes :: [Type] -> StateType (Maybe Type)
+getEnumOrStructTypes (h:t) = do
     case h of
-        EnumType list -> return  $ EnumType list
-        StructType templateList dataList -> return $ StructType templateList dataList
-        _ -> getEnumOrStructTypes symbolId posn t
-getEnumOrStructTypes symbolId posn [] = do
-    semanticError $ symbolId ++ " should be either an Enum or a Struct " ++ showPos posn
+        EnumType list -> return $ Just $ EnumType list
+        StructType templateList dataList -> return $ Just $ StructType templateList dataList
+        _ -> getEnumOrStructTypes t
+getEnumOrStructTypes [] = return Nothing
 
 
 consultType :: String -> AlexPosn -> StateType Type
