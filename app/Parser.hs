@@ -617,9 +617,7 @@ stmt = do
     try $ do
         (a, _) <- assignStmt
         return a
-    <|> do
-        (a, _) <- ifStmt
-        return a
+    <|> ifElseStmt
     <|> whileStmt
     <|> forStmt
     <|> foreachStmt
@@ -704,59 +702,65 @@ assignStmt = do
     currInterpreterState <- getState
     return ([a] ++ b ++ [c] ++ d, currInterpreterState)
 
--- The Bool indicates whether the conditional was executed
-ifStmt :: StateType ([Token], Bool)
-ifStmt = do
+ifElseStmt :: StateType [Token]
+ifElseStmt = do
     previousProgramState <- getProgramState
     previousParserBlock <- getParserBlock
-    openScope True
-    a <- TT.kwIf
+
     setParserBlock Conditional
-    (b, expType, expValue) <- expStmt
 
-    let KW_IF posn = a
-    assertBooleanCompatible expType posn
-
-    isRunning' <- isRunning
-    condition <- if isRunning' then do
-                        getBooleanValue expValue posn
-                        else return False
-            
-    unless condition $ do setProgramState Skip
-
-    c <- TT.kwColumn
-    d <- TT.newLine
-    e <- TT.indent
-    (f, _) <- stmtList
-    g <- TT.unindent
-    _ <- TT.newLine
-
-    if condition then
+    (a, ifExecuted) <- ifStmt
+    if ifExecuted then
         setProgramState Skip
         else setProgramState previousProgramState
 
-    h <- concat <$> many (try $ do
+    b <- concat <$> many (try $ do
             (h, executed) <- elseIfStmt
             when executed $ setProgramState Skip
             return h
         )
+    c <- option [] elseStmt
 
-    i <- option [] elseStmt
-
-    closeScope
     setProgramState previousProgramState
     setParserBlock previousParserBlock
-    return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g] ++ h ++ i, condition)
+    return (a ++ b ++ c)
     where
         -- The Bool indicates whether the conditional was executed
+        ifStmt :: StateType ([Token], Bool)
+        ifStmt = do
+            openScope True
+            a <- TT.kwIf
+            (b, expType, expValue) <- expStmt
+
+            let KW_IF posn = a
+            assertBooleanCompatible expType posn
+
+            isRunning' <- isRunning
+            condition <- if isRunning' then do
+                                getBooleanValue expValue posn
+                                else return False
+            unless condition $ do setProgramState Skip
+
+            c <- TT.kwColumn
+            d <- TT.newLine
+            e <- TT.indent
+            (f, _) <- stmtList
+            g <- TT.unindent
+
+            closeScope
+            return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g], condition)
+
         elseIfStmt :: StateType ([Token], Bool)
         elseIfStmt = do
+            _ <- optionMaybe TT.newLine -- Ignore newLine in case there is one
             b <- TT.kwElse
             (c, executed) <- ifStmt
             return (b:c, executed)
+
         elseStmt :: StateType [Token]
         elseStmt = do
             openScope True
+            _ <- optionMaybe TT.newLine -- Ignore newLine in case there is one
             b <- TT.kwElse
             c <- TT.kwColumn
             d <- TT.newLine
