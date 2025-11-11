@@ -23,7 +23,12 @@ vectraLanguage :: StateType [Token]
 vectraLanguage = do
     a <- concat <$> (importCommand `sepEndBy` TT.newLine)
     b <- concat <$> (globalDecl `sepEndBy` TT.newLine)
-    return $ a ++ b
+
+    programState <- getProgramState
+    case programState of
+        Finished -> return (a ++ b)
+        _ -> semanticError "missing main method"
+
     where
         importCommand :: StateType [Token]
         importCommand = do
