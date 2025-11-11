@@ -439,16 +439,16 @@ baseExp :: StateType ([Token], Type, Maybe Value)
 baseExp = do
     optionUnary <- optionMaybe (TT.opSub <|> TT.opNot)
     (base, baseT, baseV) <- literal
-                            <|> try (do
-                                    (a, t : _, maybeValue) <- var
-                                    return (a, t, maybeValue)
-                                )
                             <|> do
                                 (a, maybeType, maybeValue) <- callStmt
                                 expType <- case maybeType of
                                                 Nothing -> semanticError "called a procedure expecting a returned value"
                                                 Just t -> return t
                                 return (a, expType, maybeValue)
+                            <|> try (do
+                                    (a, t : _, maybeValue) <- var
+                                    return (a, t, maybeValue)
+                                )
                             <|> do
                                 a <- TT.openParen
                                 (b, expType, expValue) <- expStmt
