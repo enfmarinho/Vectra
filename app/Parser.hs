@@ -28,18 +28,18 @@ vectraLanguage = do
         importCommand :: StateType [Token]
         importCommand = do
             a <- TT.kwImport
-            b <- do
-                    b <- TT.id
-                    let ID posn symbolId = b
+            b <- importList `sepEndBy1` TT.kwComma
+            return $ a:b
+            where importList = do 
+                    a <- TT.id
+                    let ID posn symbolId = a
                     importSpecialMethod symbolId posn
-                    return b
-                <|> do
-                    b <- TT.stringLiteral
-                    let STRING_LITERAL posn filePath = b
-                    importFile filePath posn
-                    return b
-
-            return $ a:[b]
+                    return a
+                    <|> do
+                        a <- TT.stringLiteral
+                        let STRING_LITERAL posn filePath = a
+                        importFile filePath posn
+                        return a
 
         globalDecl :: StateType [Token]
         globalDecl = do
