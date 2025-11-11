@@ -316,7 +316,7 @@ callStmt = do
     (a, symbolTypeList, _) <- var
     (b, templateTypeList) <- option ([], []) templateInstantiation
     c <- TT.openParen
-    (d, typeList, maybeValueList) <- unzip3 <$> expStmtList
+    (d, typeList, maybeValueList) <- unzip3 <$> option [] expStmtList
     e <- TT.closeParen
 
     openScope True -- TODO this cannot be True
