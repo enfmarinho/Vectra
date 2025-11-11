@@ -21,6 +21,8 @@ data InterpreterState = InterpreterState
   , memoryTableStack :: MemoryTableStackType
   , globalSymbolTable :: SymbolTableType
   , globalMemoryTable :: MemoryTableType
+  , imports :: H.BasicHashTable String Bool
+  , nestedImportCounter :: Int
   }
 
 type StateType = ParsecT [Token] InterpreterState IO

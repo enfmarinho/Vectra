@@ -19,15 +19,36 @@ import Data.List (genericLength)
 
 -- TODO some functions shouldn't return [Token], but yet do. Fix this...
 
-vectraLanguage :: StateType [Token]
+importFile :: String -> AlexPosn -> StateType ()
+importFile filePath _posn = do
+    result <- searchImport filePath
+    case result of
+        Nothing -> return ()
+        Just b -> unless b $ semanticError $ "cyclic importing " ++ filePath
+
+    addImport filePath
+    currState <- getState
+
+    fileTokens <- liftIO $ getTokens filePath
+    importTokens <- case fileTokens of 
+                        Left _ -> fail $ "syntax failure on file " ++ filePath
+                        Right t -> return t
+
+    parserResult <- liftIO $ runParserT vectraLanguage currState "<import>" importTokens
+    case parserResult of
+        Left _ -> fail $ "semantic failure on file " ++ filePath 
+        Right (_, finalState) -> do
+
+            putState finalState
+            finishImport filePath
+
+vectraLanguage :: StateType ([Token], InterpreterState)
 vectraLanguage = do
     a <- concat <$> (importCommand `sepEndBy` TT.newLine)
     b <- concat <$> (globalDecl `sepEndBy` TT.newLine)
 
-    programState <- getProgramState
-    case programState of
-        Finished -> return (a ++ b)
-        _ -> semanticError "missing main method"
+    currState <- getState
+    return (a ++ b, currState)
 
     where
         importCommand :: StateType [Token]
@@ -193,9 +214,13 @@ methodDecl = do
     let ID posn symbolId = c
     when (symbolId == "main") $ do
         isRunning' <- isRunning
-        if isRunning'
-            then semanticError $ "A second main method is declared here, it must exist only one " ++ showPos posn
-            else setProgramState Running
+        when isRunning' $ semanticError $ "A second main method is declared here, it must exist only one " ++ showPos posn
+
+        nestedImportCounter <- getNestedImportCounter
+        when (nestedImportCounter >= 0) $ 
+            semanticError $ "importing a file that contains a main method, an imported file should not contain it " ++ showPos posn
+
+        setProgramState Running
 
     _ <- TT.openParen
     (dTokens, dParams) <- optParamDeclList
@@ -1035,5 +1060,13 @@ foreachStmt = do
 parser :: [Token] -> IO (Either ParseError [Token])
 parser tokenList = do
     interpreterState <- initInterpreterState
-    -- TODO improve error message
-    runParserT vectraLanguage interpreterState "Error message" tokenList
+    parserResult <- runParserT vectraLanguage interpreterState "Error message" tokenList
+    case parserResult of
+        Left a -> return $ Left a
+        Right (t, finalState) -> do
+            let finalProgramState = programState finalState
+            case finalProgramState of
+                Finished -> return $ Right t
+                _ -> do
+                    putStrLn "Error: no main method"
+                    return $ Right [] -- TODO should be Left

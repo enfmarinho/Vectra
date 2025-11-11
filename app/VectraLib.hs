@@ -9,7 +9,7 @@ import Data.Char (isSpace, toLower)
 import Text.Read (readMaybe)
 
 import Scanner
-import Control.Monad (when)
+import Control.Monad
 
 importSpecialMethod :: String -> AlexPosn -> StateType ()
 importSpecialMethod symbolId posn = do
@@ -23,11 +23,6 @@ importSpecialMethod symbolId posn = do
         "read_line" -> insertSymbol ("read_line", HaskellMethod [] (Just StringType) vectraReadLine) True
         -- TODO add more methods to stdlib
         _ -> semanticError $ "Invalid import: " ++ symbolId ++ " doesn't exist " ++ showPos posn
-    return ()
-
-importFile :: String -> AlexPosn -> StateType ()
-importFile _filePath _posn = do
-    -- TODO
     return ()
 
 vectraPrint :: LibMethodSignature
@@ -79,7 +74,7 @@ vectraReadInt [] _ = do
     case readMaybe tok :: Maybe Int of
         Just n  -> return (Just $ IntValue n)
         Nothing -> runtimeError $ "Invalid integer input: " ++ tok
-vectraReadInt _ posn = 
+vectraReadInt _ posn =
     semanticError $ "read_int called with arguments, but it doesn't take any " ++ showPos posn
 
 

@@ -9,6 +9,8 @@ import Data.Maybe (fromMaybe)
 import Data.Foldable
 import Control.Monad
 
+-- TODO check if calling putState is necessary considering that the HashTables are mutable
+
 -- Aux function to emit error messages and finish execution early with err
 semanticError :: String -> StateType a
 semanticError msg = parserFail ("Semantic Error: " ++ msg)
@@ -19,6 +21,7 @@ initInterpreterState :: IO InterpreterState
 initInterpreterState = do
     globalMemory <- liftIO H.new
     globalSymbolTable <- liftIO H.new
+    importTable <- liftIO H.new
 
     return InterpreterState 
         { globalMemoryTable=globalMemory
@@ -27,13 +30,33 @@ initInterpreterState = do
         , symbolTableStack=[]
         , programState=Starting
         , parserBlock=GlobalScope
+        , imports=importTable
+        , nestedImportCounter=0
         }
     
 
 isRunning :: StateType Bool
 isRunning = do
     programState <- getProgramState
-    return (programState == Running)
+    return (programState == Running && nestedImportCounter == 0)
+
+addImport :: String -> StateType ()
+addImport fileName = do
+    st@InterpreterState{..} <- getState
+    liftIO $ H.insert imports fileName False
+    putState st{nestedImportCounter = nestedImportCounter + 1}
+
+finishImport :: String -> StateType()
+finishImport fileName = do
+    st@InterpreterState{..} <- getState
+    liftIO $ H.insert imports fileName True
+    putState st{nestedImportCounter = nestedImportCounter - 1}
+
+searchImport :: String -> StateType (Maybe Bool)
+searchImport fileName = do
+    InterpreterState{..} <- getState
+    liftIO $ H.lookup imports fileName
+
 
 openScope :: Bool -> StateType () 
 openScope canAccessParentTables = do
@@ -72,6 +95,9 @@ topScope = do
         (top : _) -> do
             let (table, _) = top
             return table
+
+getNestedImportCounter :: StateType Int
+getNestedImportCounter = nestedImportCounter <$> getState
 
 getProgramState :: StateType ProgramState
 getProgramState = programState <$> getState
