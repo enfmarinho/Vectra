@@ -37,6 +37,7 @@ initInterpreterState = do
 
 isRunning :: StateType Bool
 isRunning = do
+    nestedImportCounter <- getNestedImportCounter
     programState <- getProgramState
     return (programState == Running && nestedImportCounter == 0)
 
@@ -233,7 +234,8 @@ consultMemory symbol = do
   where
     search :: String -> MemoryTableStackType -> IO (Maybe Value)
     search _ [] = return Nothing
-    search name (table:rest) = do
+    search name (top:rest) = do
+        let (table, _) = top
         result <- H.lookup table name
         case result of
             Just ty -> return ty
