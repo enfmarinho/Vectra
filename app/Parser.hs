@@ -277,7 +277,7 @@ varDecl = do
             isRunning' <- isRunning
             when isRunning' $ do
                 case maybeExpValue of
-                    Nothing -> semanticError $ "TODO varDecl " ++ showPos posn
+                    Nothing -> runtimeError $ "trying to use unitialized variable " ++ showPos posn
                     Just v -> do
                         finalValue <- castValueToType varType (expType, v) posn
                         updateMemory (symbolId, finalValue)
