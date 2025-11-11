@@ -779,7 +779,10 @@ ifElseStmt = do
 
         elseIfStmt :: StateType ([Token], Bool)
         elseIfStmt = do
-            _ <- optionMaybe TT.newLine -- Ignore newLine in case there is one
+            -- Only consume the newline if the next token is 'else'
+            _ <- try $ do
+                _ <- TT.newLine
+                lookAhead TT.kwElse
             b <- TT.kwElse
             (c, executed) <- ifStmt
             return (b:c, executed)
@@ -787,7 +790,10 @@ ifElseStmt = do
         elseStmt :: StateType [Token]
         elseStmt = do
             openScope True
-            _ <- optionMaybe TT.newLine -- Ignore newLine in case there is one
+            -- Only consume the newline if the next token is 'else'
+            _ <- try $ do
+                _ <- TT.newLine
+                lookAhead TT.kwElse
             b <- TT.kwElse
             c <- TT.kwColumn
             d <- TT.newLine
