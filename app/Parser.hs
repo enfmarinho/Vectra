@@ -30,13 +30,13 @@ importFile filePath _posn = do
     currState <- getState
 
     fileTokens <- liftIO $ getTokens filePath
-    importTokens <- case fileTokens of 
+    importTokens <- case fileTokens of
                         Left _ -> fail $ "syntax failure on file " ++ filePath
                         Right t -> return t
 
     parserResult <- liftIO $ runParserT vectraLanguage currState "<import>" importTokens
     case parserResult of
-        Left _ -> fail $ "semantic failure on file " ++ filePath 
+        Left _ -> fail $ "semantic failure on file " ++ filePath
         Right (_, finalState) -> do
 
             putState finalState
@@ -56,7 +56,7 @@ vectraLanguage = do
             a <- TT.kwImport
             b <- importList `sepEndBy1` TT.kwComma
             return $ a:b
-            where importList = do 
+            where importList = do
                     a <- TT.id
                     let ID posn symbolId = a
                     importSpecialMethod symbolId posn
@@ -217,7 +217,7 @@ methodDecl = do
         when isRunning' $ semanticError $ "A second main method is declared here, it must exist only one " ++ showPos posn
 
         nestedImportCounter <- getNestedImportCounter
-        when (nestedImportCounter > 0) $ 
+        when (nestedImportCounter > 0) $
             semanticError $ "importing a file that contains a main method, an imported file should not contain it " ++ showPos posn
 
         setProgramState Running
@@ -378,7 +378,7 @@ callStmt = do
                                 -- assert expectedTypeList is equivalent to typeList
                                 valueList <- valueListFromMaybeValue maybeValueList posn
                                 isRunning' <- isRunning
-                                returnV <- if isRunning' 
+                                returnV <- if isRunning'
                                                 then libMethod valueList posn
                                                 else return Nothing
 
@@ -734,7 +734,7 @@ assignStmt = do
     isRunning' <- isRunning
     b <- case optionB of
             Nothing -> do
-                when isRunning' $ do 
+                when isRunning' $ do
                         case expValue of
                             Nothing -> semanticError $ "using uninitialized var " ++ showPos posn
                             Just v -> updateMemory (symbolId, v)
@@ -770,17 +770,11 @@ ifElseStmt = do
     if ifExecuted then
         setProgramState Skip
         else setProgramState previousProgramState
-
-    b <- concat <$> many (try $ do
-            (h, executed) <- elseIfStmt
-            when executed $ setProgramState Skip
-            return h
-        )
-    c <- option [] elseStmt
+    b <- elseIfElseRecursion
 
     setProgramState previousProgramState
     setParserBlock previousParserBlock
-    return (a ++ b ++ c)
+    return (a ++ b)
     where
         -- The Bool indicates whether the conditional was executed
         ifStmt :: StateType ([Token], Bool)
@@ -807,31 +801,33 @@ ifElseStmt = do
             closeScope
             return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g], condition)
 
-        elseIfStmt :: StateType ([Token], Bool)
-        elseIfStmt = do
+        elseIfElseRecursion :: StateType [Token]
+        elseIfElseRecursion = do
             -- Only consume the newline if the next token is 'else'
-            _ <- try $ do
-                _ <- TT.newLine
-                lookAhead TT.kwElse
-            b <- TT.kwElse
-            (c, executed) <- ifStmt
-            return (b:c, executed)
-
-        elseStmt :: StateType [Token]
-        elseStmt = do
+            a <- try $ do
+                a <- TT.newLine
+                _ <- lookAhead TT.kwElse
+                return a
             openScope True
-            -- Only consume the newline if the next token is 'else'
-            _ <- try $ do
-                _ <- TT.newLine
-                lookAhead TT.kwElse
             b <- TT.kwElse
-            c <- TT.kwColumn
-            d <- TT.newLine
-            e <- TT.indent
-            (f, _) <- stmtList
-            g <- TT.unindent
+            c <- do
+                liftIO $ putStrLn "on elseif"
+                (c, executed) <- ifStmt
+                liftIO $ putStrLn "succesd elseif"
+                when executed $ setProgramState Skip
+                d <- option [] elseIfElseRecursion
+                return $ c ++ d
+                <|> (do
+                    liftIO $ putStrLn "on else"
+                    c <- TT.kwColumn
+                    d <- TT.newLine
+                    e <- TT.indent
+                    (f, _) <- stmtList
+                    g <- TT.unindent
+                    return $ [c] ++ [d] ++ [e] ++ f ++ [g])
+
             closeScope
-            return $ [b] ++ [c] ++ [d] ++ [e] ++ f ++ [g]
+            return ([a] ++ [b] ++ c)
 
 
 evaluateBooleanExp :: [Token] -> StateType (Maybe Value, InterpreterState)
@@ -924,8 +920,8 @@ typeStmt = do
                 b <- TT.id
                 let ID posn s = b
                 maybeT <- consultTypeList s posn >>= getEnumOrStructTypes
-                case maybeT of 
-                    Nothing -> semanticError $ s ++ " is not a type " ++ showPos posn 
+                case maybeT of
+                    Nothing -> semanticError $ s ++ " is not a type " ++ showPos posn
                     Just t -> return ([b], t)
             <|> do -- reference for method
                 b <- TT.openParen
