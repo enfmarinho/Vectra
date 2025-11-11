@@ -217,7 +217,7 @@ methodDecl = do
         when isRunning' $ semanticError $ "A second main method is declared here, it must exist only one " ++ showPos posn
 
         nestedImportCounter <- getNestedImportCounter
-        when (nestedImportCounter >= 0) $ 
+        when (nestedImportCounter > 0) $ 
             semanticError $ "importing a file that contains a main method, an imported file should not contain it " ++ showPos posn
 
         setProgramState Running
