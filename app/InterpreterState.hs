@@ -65,8 +65,8 @@ openScope canAccessParentTables = do
     newTable <- liftIO H.new -- st stands for symbol table
     newMemory <- liftIO H.new 
     putState st {
-        symbolTableStack = (newTable, canAccessParentTables) : symbolTableStack,
-        memoryTableStack = newMemory : memoryTableStack
+            symbolTableStack = (newTable, canAccessParentTables) : symbolTableStack,
+            memoryTableStack = (newMemory, canAccessParentTables) : memoryTableStack
         }
 
 closeScope :: StateType ()
@@ -164,8 +164,9 @@ insertSymbol (symbolId, symbolType) canBeDuplicate = do
             liftIO $ H.insert globalMemoryTable symbolId Nothing
             putState st { globalMemoryTable = globalMemoryTable }
         (top : rest) -> do
-            liftIO $ H.insert top symbolId Nothing
-            putState st { memoryTableStack = top:rest}
+            let (table, b) = top
+            liftIO $ H.insert table symbolId Nothing
+            putState st { memoryTableStack = (table, b):rest}
             
 updateSymbolTable :: String -> [Type] -> StateType ()
 updateSymbolTable symbolId typeList = do
@@ -192,10 +193,11 @@ updateMemory (symbolId, value) = do
     update :: MemoryType -> MemoryTableStackType -> StateType Bool
     update (_, _) [] = return False
     update (n, v) (top:rest) = do
-        found <- liftIO $ H.lookup top n
+        let (table, _) = top
+        found <- liftIO $ H.lookup table n
         case found of
             Just _ -> do
-                liftIO $ H.insert top n (Just v)
+                liftIO $ H.insert table n (Just v)
                 return True
             Nothing -> update (n, v) rest
 
