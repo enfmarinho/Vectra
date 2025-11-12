@@ -471,7 +471,7 @@ baseExp = do
                             <|> (do
                                     (a, symbolId, typeList, varValue) <- var
                                     (do
-                                        (b, maybeType, maybeValue) <- callStmt typeList
+                                        (b, maybeType, maybeValue) <- try $ callStmt typeList -- TODO remove this try
                                         expType <- case maybeType of
                                                         Nothing -> semanticError $ "called the procedure " ++ symbolId ++ " expecting a value"
                                                         Just t -> return t
