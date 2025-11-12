@@ -442,3 +442,8 @@ searchTypeList (typesH:typesT) templateLen typeList = do
         typeListMatch [] _ = False
         typeListMatch (lhsH:lhsT) (rhsH:rhsT) = do
             (lhsH == rhsH) && typeListMatch lhsT rhsT
+
+getTypeFromTypeList :: [Type] -> StateType Type
+getTypeFromTypeList [h] = return h
+getTypeFromTypeList [] = fail "<getTypeFromTypeList> empty list"
+getTypeFromTypeList _ = fail "<getTypeFromTypeList> ambiguity"

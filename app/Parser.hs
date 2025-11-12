@@ -326,7 +326,7 @@ varDecl = do
 --     return ([a] ++ [b] ++ ct, symbolId:cs)
 
 -- TODO var is incomplete, this is just a STUB
-var :: StateType ([Token], [Type], Maybe Value)
+var :: StateType ([Token], String, [Type], Maybe Value)
 var = do
     a <- TT.id
     -- (b, symbolList) <- option ([], []) memberAccess
@@ -338,12 +338,11 @@ var = do
                 then consultMemory symbolId
                 else return Nothing
 
-    return ([a], t, value)
+    return ([a], symbolId, t, value)
 
-callStmt :: StateType ([Token], Maybe Type, Maybe Value)
-callStmt = do
+callStmt :: [Type] -> StateType ([Token], Maybe Type, Maybe Value)
+callStmt symbolTypeList = do
     previousProgramState <- getProgramState
-    (a, symbolTypeList, _) <- var
     (b, templateTypeList) <- option ([], []) templateInstantiation
     c <- TT.openParen
     (d, typeList, maybeValueList) <- unzip3 <$> option [] expStmtList
@@ -387,7 +386,7 @@ callStmt = do
     setProgramState previousProgramState
     -- TODO emit message in case main is a function and a non-zero value was returned
     closeScope
-    return (a ++  b ++ [c] ++ concat d ++ [e], maybeReturnT, maybeReturnV)
+    return (b ++ [c] ++ concat d ++ [e], maybeReturnT, maybeReturnV)
     where
         valueListFromMaybeValue :: [Maybe Value] -> AlexPosn -> StateType [Value]
         valueListFromMaybeValue [] _ = return []
@@ -458,7 +457,7 @@ literal = do
 expStmtList :: StateType [([Token], Type, Maybe Value)]
 expStmtList = do
     a <- expStmt
-    b <- many $ try (do
+    b <- many (do
             b <- TT.kwComma
             (cTokens, cT, cV) <- expStmt
             return (b:cTokens, cT, cV)
@@ -469,16 +468,18 @@ baseExp :: StateType ([Token], Type, Maybe Value)
 baseExp = do
     optionUnary <- optionMaybe (TT.opSub <|> TT.opNot)
     (base, baseT, baseV) <- literal
-                            <|> try ( do
-                                    (a, maybeType, maybeValue) <- callStmt
-                                    expType <- case maybeType of
-                                                    Nothing -> semanticError "called a procedure expecting a returned value"
-                                                    Just t -> return t
-                                    return (a, expType, maybeValue)
+                            <|> (do
+                                    (a, symbolId, typeList, varValue) <- var
+                                    (do
+                                        (b, maybeType, maybeValue) <- callStmt typeList
+                                        expType <- case maybeType of
+                                                        Nothing -> semanticError $ "called the procedure " ++ symbolId ++ " expecting a value"
+                                                        Just t -> return t
+                                        return (a ++ b, expType, maybeValue)) 
+                                     <|> (do
+                                            t <- getTypeFromTypeList typeList
+                                            return (a, t, varValue))
                                 )
-                            <|> do
-                                (a, t : _, maybeValue) <- var
-                                return (a, t, maybeValue)
                             <|> do
                                 a <- TT.openParen
                                 (b, expType, expValue) <- expStmt
@@ -670,17 +671,19 @@ stmtList = do
 
 stmt :: StateType [Token]
 stmt = do
-    try $ do
-        (a, _) <- assignStmt
-        return a
+    try varDecl -- TODO remove this try to improve errs
+    <|> (do
+        (a, symbolId, typeList, _varV) <- var
+        b <- assignStmt symbolId typeList 
+            <|> (do
+                    (b, _, _) <- callStmt typeList
+                    return b
+                )
+        return $ a ++ b)
     <|> ifElseStmt
     <|> whileStmt
     <|> forStmt
     <|> foreachStmt
-    <|> try (do
-        (a, _, _) <- callStmt
-        return a)
-    <|> varDecl
     <|> do
         a <- TT.kwContinue
         let KW_CONTINUE posn = a
@@ -719,16 +722,14 @@ mathOpSymbol = do
     <|> TT.opOr
     <|> TT.opNot
 
-assignStmt :: StateType ([Token], InterpreterState)
-assignStmt = do
-    a <- TT.id
+assignStmt :: String -> [Type] -> StateType [Token]
+assignStmt symbolId typeList = do
     optionB <- optionMaybe mathOpSymbol
     c <- TT.kwAssingment
     (d, expType, expValue) <- expStmt
 
-    let ID posn symbolId = a
-    symbolType <- consultType symbolId posn
-
+    let KW_ASSIGNMENT posn = c
+    symbolType <- getTypeFromTypeList typeList
     assertTypesEq symbolType expType posn
 
     isRunning' <- isRunning
@@ -756,8 +757,7 @@ assignStmt = do
 
                 return [op]
 
-    currInterpreterState <- getState
-    return ([a] ++ b ++ [c] ++ d, currInterpreterState)
+    return $ b ++ [c] ++ d
 
 ifElseStmt :: StateType [Token]
 ifElseStmt = do
@@ -770,7 +770,7 @@ ifElseStmt = do
     if ifExecuted then
         setProgramState Skip
         else setProgramState previousProgramState
-    b <- elseIfElseRecursion
+    b <- option [] elseIfElseRecursion
 
     setProgramState previousProgramState
     setParserBlock previousParserBlock
@@ -969,15 +969,10 @@ forStmt = do
 
     e <- TT.kwSemicolumn
     setProgramState Skip -- Don't execute assignStmt yet no mater what
-    optionF <- optionMaybe (
-            do
-                (f, _) <- assignStmt
-                return f
-            <|> do
-                (f, _, _) <- callStmt
-                return f
-            <?> "loop increment should be either an assignStmt or a method call"
-        )
+    optionF <- optionMaybe (do
+                                (f, _) <- loopIncrementStmt
+                                return f
+                            )
     let f = fromMaybe [] optionF
     setProgramState previousProgramState
 
@@ -1000,7 +995,7 @@ forStmt = do
 
                 -- Perform operation to be performed after loop
                 st <- getState
-                parserResultAssingStmt <- liftIO $ runParserT assignStmt st "<for>" f
+                parserResultAssingStmt <- liftIO $ runParserT loopIncrementStmt st "<for>" f
                 case parserResultAssingStmt of
                     Left _ -> fail "<for>"
                     Right (_, resultState) -> putState resultState
@@ -1024,6 +1019,20 @@ forStmt = do
     closeScope
 
     return ([a] ++ b  ++ [c] ++ d ++ [e] ++ f ++ [g] ++ [h] ++ [i] ++ j ++ [k])
+    where 
+        loopIncrementStmt :: StateType ([Token], InterpreterState)
+        loopIncrementStmt = do
+                                (f, symbolId, typeList, _varV) <- var 
+                                g <- assignStmt symbolId typeList 
+                                    <|> (do 
+                                            (g, _, _) <- callStmt typeList
+                                            return g
+                                        )
+                                    <?> "loop increment should be either an assignStmt or a method call"
+                                finalState <- getState
+                                return (f ++ g, finalState)
+
+        
 
 foreachStmt :: StateType [Token]
 foreachStmt = do
