@@ -346,6 +346,54 @@ handleDiv (Just (FloatValue lhsV)) (Just (FloatValue rhsV)) posn =
         else return (FloatType, FloatValue (lhsV / rhsV))
 handleDiv _ _ posn = semanticError $ "Invalid operands for division at " ++ showPos posn
 
+castType :: Type -> Type -> AlexPosn -> StateType Type
+
+-- IntType target
+castType IntType IntType _ = return IntType
+castType IntType FloatType _ = return IntType
+castType IntType BoolType _ = return IntType
+castType IntType StringType _ = return IntType
+castType IntType (ConstType srcT) posn = castType IntType srcT posn
+
+-- FloatType target
+castType FloatType IntType _ = return FloatType
+castType FloatType FloatType _ = return FloatType
+castType FloatType BoolType _ = return FloatType
+castType FloatType StringType _ = return FloatType
+castType FloatType (ConstType srcT) posn = castType FloatType srcT posn
+
+-- BoolType target
+castType BoolType BoolType _ = return BoolType
+castType BoolType IntType _ = return BoolType
+castType BoolType FloatType _ = return BoolType
+castType BoolType (ConstType srcT) posn = castType BoolType srcT posn
+
+-- StringType target
+castType StringType StringType _ = return StringType
+castType StringType IntType _ = return StringType
+castType StringType FloatType _ = return StringType
+castType StringType BoolType _ = return StringType
+castType StringType (ConstType srcT) posn = castType StringType srcT posn
+
+-- Const Target
+castType (ConstType targetT) srcT posn = do
+    result <- castType targetT srcT posn
+    return (ConstType result)
+
+-- ArrayType target
+castType (ArrayType t1) (ArrayType t2) posn = do
+    finalT <- castType t1 t2 posn
+    return (ArrayType finalT)
+
+-- EnumType target
+castType (EnumType names1) (EnumType names2) posn
+    | names1 == names2 = return (EnumType names1)
+    | otherwise =
+        semanticError $ "Incompatible enum types at " ++ showPos posn
+
+castType target src posn =
+    semanticError $ "Cannot cast from " ++ show src ++ " to " ++ show target ++ " at " ++ showPos posn
+
 
 castValueToType :: Type -> (Type, Value) -> AlexPosn -> StateType Value
 --- IntType target ---
