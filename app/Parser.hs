@@ -816,7 +816,6 @@ ifElseStmt = do
                 d <- option [] elseIfElseRecursion
                 return $ c ++ d
                 <|> (do
-                    liftIO $ putStrLn "on else"
                     c <- TT.kwColumn
                     d <- TT.newLine
                     e <- TT.indent
