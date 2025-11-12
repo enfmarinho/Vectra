@@ -29,8 +29,8 @@ type StateType = ParsecT [Token] InterpreterState IO
 
 data ParserBlock = GlobalScope
                  | Method (Maybe Type) -- Target return type
-                 | Loop
-                 | Conditional
+                 | Loop (Maybe Type) -- Target return type
+                 | Conditional (Maybe Type) -- Target return type
                  deriving (Eq, Show)
 
 data ProgramState = Starting
@@ -38,7 +38,7 @@ data ProgramState = Starting
                   | Skip
                   | Continue
                   | Break
-                  | Return (Maybe Value) -- Return value
+                  | Return (Maybe (Type, Value)) -- Return value
                   | Finished
 
 data Type = IntType
@@ -74,7 +74,6 @@ data Value = IntValue Int
            | FuncRefValue String
            | ProcRefValue String
            | StructValue SymbolTableType MemoryTableType    -- (internal_symbol_table, internal_memory)
-           | NamespaceValue SymbolTableType MemoryTableType -- (internal_symbol_table, internal_memory)
 
 instance Eq ProgramState where
     Starting == Starting = True

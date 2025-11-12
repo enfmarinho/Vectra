@@ -366,8 +366,13 @@ callStmt symbolTypeList = do
     (maybeReturnT, maybeReturnV) <- case symbolType of
                             FuncType templateIds paramList returnT funcBody -> do
                                 returnV <- runMethod templateIds paramList funcBody
-                                -- TODO assure returnV doesn't cause a type mismatch with returnT
-                                return (Just returnT, returnV)
+                                case returnV of
+                                    Nothing -> do
+                                        warningMsg "function did not return a value"
+                                        return (Just returnT, Nothing)
+                                    Just returnedTV -> do
+                                        value <- castValueToType returnT returnedTV posn
+                                        return (Just returnT, Just value)
                             ProcType templateIds paramList funcBody -> do
                                 returnedV <- runMethod templateIds paramList funcBody
                                 when (isJust returnedV) $ semanticError
@@ -411,7 +416,7 @@ callStmt symbolTypeList = do
         instatiateArgs _ _ [] = fail "<callStmt>"
 
 
-        runFuncBody :: [Token] -> StateType (Maybe Value)
+        runFuncBody :: [Token] -> StateType (Maybe (Type, Value))
         runFuncBody funcBody = do
             previousProgramState <- getProgramState
             isRunning' <- isRunning
@@ -425,13 +430,13 @@ callStmt symbolTypeList = do
                                                 Right (_, finalInterpreterState) -> return finalInterpreterState
                     setState finalInterpreterState
                     currProgramState <- getProgramState
-                    maybeReturnV <- case currProgramState of
+                    maybeReturn <- case currProgramState of
                                         Return returnValue -> do
                                             return returnValue
                                         _ -> do
                                             return Nothing
                     setProgramState previousProgramState
-                    return maybeReturnV
+                    return maybeReturn
 
 
 literal :: StateType ([Token], Type, Maybe Value)
@@ -689,25 +694,36 @@ stmt = do
         a <- TT.kwContinue
         let KW_CONTINUE posn = a
         assertContinuable posn
-        setProgramState Skip
+        isRunning' <- isRunning
+        when isRunning' $ setProgramState Skip
         return [a]
     <|> do
         a <- TT.kwBreak
         let KW_BREAK posn = a
         assertBreakable posn
-        setProgramState Break
+        isRunning' <- isRunning
+        when isRunning' $ setProgramState Break
         return [a]
     <|> do
         a <- TT.kwReturn
         optionB <- optionMaybe expStmt
-        let KW_RETURN posn = a
-        assertReturnable posn
         b <- case optionB of
-                Nothing -> return []
-                Just (b, expType, expValue) -> do
-                    assertReturnType expType posn
+                Nothing -> do
+                    let KW_RETURN posn = a
+                    assertReturnType Nothing posn
                     isRunning' <- isRunning
-                    when isRunning' $ do setProgramState $ Return expValue
+                    when isRunning' $ setProgramState $ Return Nothing
+                    return []
+                Just (b, expType, expValue) -> do
+                    let KW_RETURN posn = a
+                    assertReturnType (Just expType) posn
+                    isRunning' <- isRunning
+                    when isRunning' $ do 
+                        case expValue of
+                            Nothing -> do
+                                 -- Should not reach this, since this would be handled beforehand
+                                semanticError $ "returning uintialized value " ++ showPos posn
+                            Just v -> setProgramState $ Return $ Just (expType, v)
                     return b
 
         return $ a:b
@@ -765,7 +781,8 @@ ifElseStmt = do
     previousProgramState <- getProgramState
     previousParserBlock <- getParserBlock
 
-    setParserBlock Conditional
+    expectedReturnT <- getExpectedReturnT 
+    setParserBlock $ Conditional expectedReturnT
 
     (a, ifExecuted) <- ifStmt
     if ifExecuted then
@@ -851,7 +868,8 @@ whileStmt = do
     openScope True
 
     a <- TT.kwWhile
-    setParserBlock Loop
+    expectedReturnT <- getExpectedReturnT 
+    setParserBlock $ Loop expectedReturnT
     (b, expType, expValue) <- expStmt
 
     let KW_WHILE posn = a
@@ -952,7 +970,8 @@ forStmt = do
     previousProgramState <- getProgramState
     openScope True
     a <- TT.kwFor
-    setParserBlock Loop
+    expectedReturnT <- getExpectedReturnT 
+    setParserBlock $ Loop expectedReturnT
     b <- option [] varDecl
     c <- TT.kwSemicolumn
     optionD <- optionMaybe expStmt
@@ -1037,7 +1056,8 @@ foreachStmt = do
     previousParserBlock <- getParserBlock
     openScope True
     a <- TT.kwForeach
-    setParserBlock Loop
+    expectedReturnT <- getExpectedReturnT 
+    setParserBlock $ Loop expectedReturnT
     b <- TT.id
     c <- TT.kwIn
     d <- TT.id

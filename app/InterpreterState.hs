@@ -97,6 +97,15 @@ topScope = do
             let (table, _) = top
             return table
 
+getExpectedReturnT :: StateType (Maybe Type)
+getExpectedReturnT = do
+    st <- getParserBlock 
+    case st of
+        Method t -> return t
+        Conditional t -> return t
+        Loop t -> return t
+        _ -> return Nothing
+
 getNestedImportCounter :: StateType Int
 getNestedImportCounter = nestedImportCounter <$> getState
 

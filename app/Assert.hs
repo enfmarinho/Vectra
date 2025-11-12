@@ -80,28 +80,34 @@ assertMethodDeclNotAmbiguous symbolId paramTypeList posn = do
 assertBreakable :: AlexPosn -> StateType ()
 assertBreakable posn = do
     currProgramState <- getParserBlock
-    when (currProgramState /= Loop && currProgramState /= Conditional)
-        $ semanticError $ "Trying to use break outside a loop " ++ showPos posn
+    case currProgramState of
+        Loop _ -> return ()
+        Conditional _ -> return ()
+        _ -> semanticError $ "Trying to use break outside a loop " ++ showPos posn
 
 assertContinuable :: AlexPosn -> StateType ()
 assertContinuable posn = do
     currProgramState <- getParserBlock
-    when (currProgramState /= Loop)
-        $ semanticError $ "Trying to use continue outside a loop " ++ showPos posn
+    case currProgramState of
+        Loop _ -> return ()
+        _ -> semanticError $ "Trying to use continue outside a loop " ++ showPos posn
 
-assertReturnable :: AlexPosn -> StateType ()
-assertReturnable posn = do
-    currProgramState <- getParserBlock
-    when (currProgramState == GlobalScope) $ semanticError $ "Trying to use return outside a method " ++ showPos posn
 
-assertReturnType :: Type -> AlexPosn -> StateType ()
-assertReturnType returnT posn = do
+assertReturnType :: Maybe Type -> AlexPosn -> StateType ()
+assertReturnType maybeReturnT posn = do
     s <- getParserBlock
-    case s of
-        Method maybeT -> case maybeT of
-                        Nothing -> semanticError $ "returning a value inside a procedure " ++ showPos posn
-                        Just t -> assertTypesEq returnT t posn
-        _ -> semanticError $ "return statement outside a method " ++ showPos posn
+    expectedMaybeT <- case s of
+                Method maybeT -> return maybeT 
+                Conditional maybeT -> return maybeT
+                Loop maybeT -> return maybeT
+                _ -> semanticError $ "return statement outside a method " ++ showPos posn
+
+    case maybeReturnT of
+        Nothing -> when (isJust expectedMaybeT) $ semanticError "Missing return value"
+        Just returnT -> do
+            case expectedMaybeT of
+                Nothing -> semanticError $ "returning a value inside a procedure " ++ showPos posn
+                Just expectedT -> assertTypesEq returnT expectedT posn
 
 assertIterableType :: String -> Type -> AlexPosn -> StateType ()
 assertIterableType symbolId t posn = do
@@ -495,3 +501,35 @@ getTypeFromTypeList :: [Type] -> StateType Type
 getTypeFromTypeList [h] = return h
 getTypeFromTypeList [] = fail "<getTypeFromTypeList> empty list"
 getTypeFromTypeList _ = fail "<getTypeFromTypeList> ambiguity"
+
+typeFromValue :: Value -> AlexPosn -> StateType Type
+typeFromValue (IntValue _) _ = return IntType
+typeFromValue (FloatValue _) _ = return FloatType
+typeFromValue (CharValue _) _ = return CharType
+typeFromValue (BoolValue _) _ = return BoolType
+typeFromValue (StringValue _) _ = return StringType
+typeFromValue (ConstValue v) posn = do
+    t <- typeFromValue v posn
+    return (ConstType t)
+
+typeFromValue (ArrayValue _) _ = return $ ArrayType TemplateType
+
+typeFromValue (EnumValue _) _ = return (EnumInstanceType "")
+typeFromValue (RefValue _ symbolId) posn = do
+    symbolType <- consultType symbolId posn
+    return (RefType symbolType)
+
+-- Function/procedure references
+typeFromValue (FuncRefValue symbolId) posn = do
+    t <- consultType symbolId posn
+    case t of
+        FuncType templates paramPairs ret _ -> return (FuncRefType templates (map snd paramPairs) ret)
+        _ -> semanticError $ "Invalid function reference type for symbol " ++ symbolId
+
+typeFromValue (ProcRefValue symbolId) posn = do
+    t <- consultType symbolId posn
+    case t of
+        ProcType templates paramPairs _ -> return (ProcRefType templates (map snd paramPairs))
+        _ -> semanticError $ "Invalid procedure reference type for symbol " ++ symbolId
+
+typeFromValue (StructValue _symbolTable _memoryTable) _ = return (StructInstanceType "")
