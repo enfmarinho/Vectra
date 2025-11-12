@@ -211,17 +211,6 @@ methodDecl = do
     (bTokens, bIds) <- option ([], []) templateDecl
     c <- TT.id
 
-    let ID posn symbolId = c
-    when (symbolId == "main") $ do
-        isRunning' <- isRunning
-        when isRunning' $ semanticError $ "A second main method is declared here, it must exist only one " ++ showPos posn
-
-        nestedImportCounter <- getNestedImportCounter
-        when (nestedImportCounter > 0) $
-            semanticError $ "importing a file that contains a main method, an imported file should not contain it " ++ showPos posn
-
-        setProgramState Running
-
     _ <- TT.openParen
     (dTokens, dParams) <- optParamDeclList
     e <- TT.closeParen
@@ -230,6 +219,23 @@ methodDecl = do
     case optionF of
         Nothing -> setParserBlock (Method Nothing)
         Just (_, t) -> setParserBlock (Method $ Just t)
+
+    let ID posn symbolId = c
+    when (symbolId == "main") $ do
+        programState <- getProgramState
+        when (programState == Finished) $ semanticError $ "A second main method is declared here, it must exist only one " ++ showPos posn
+
+        nestedImportCounter <- getNestedImportCounter
+        when (nestedImportCounter > 0) $
+            semanticError $ "importing a file that contains a main method, an imported file should not contain it " ++ showPos posn
+
+        returnT <- getExpectedReturnT
+        case returnT of
+            Nothing -> return ()
+            Just t | t `elem` [IntType, BoolType] -> return ()
+                   | otherwise -> semanticError "main method must either return an int, a bool, or be a procedure"
+
+        setProgramState Running
 
     _ <- TT.kwColumn
     _ <- TT.newLine
@@ -252,7 +258,17 @@ methodDecl = do
                         Just (_, returnType) -> insertSymbol (symbolId, FuncType bIds dParams returnType g) True
         _ ->  fail "<methodDecl>" -- Impossible to get here, this is just to avoid warnings  
 
-    when (symbolId == "main") $
+    when (symbolId == "main") $ do
+        currProgramState <- getProgramState
+        case currProgramState of
+            Return maybeTV -> do
+                case maybeTV of
+                    Nothing -> return ()
+                    Just (_returnT, returnV) -> case returnV of 
+                                                    IntValue v -> when (v /= 0) $ warningMsg "main returned a non-zero int"
+                                                    BoolValue v -> unless v $ warningMsg "main return false"
+                                                    _ -> return ()
+            _ -> return ()
         setProgramState Finished
     setParserBlock previousParserBlock
     return ([a] ++ bTokens ++ [c] ++ dTokens ++ [e] ++ maybe [] fst optionF ++ g)
@@ -360,8 +376,8 @@ callStmt symbolTypeList = do
             runFuncBody funcBody
     let templateLen = genericLength templateTypeList
     maybeSymbolType <- searchTypeList symbolTypeList templateLen typeList
-    symbolType <- case maybeSymbolType of
-        Nothing -> semanticError "TODO34"
+    symbolType <- case maybeSymbolType of 
+        Nothing -> semanticError "no mathing function for call" -- TODO add symbolId to err msg
         Just t -> return t
     (maybeReturnT, maybeReturnV) <- case symbolType of
                             FuncType templateIds paramList returnT funcBody -> do
@@ -390,7 +406,6 @@ callStmt symbolTypeList = do
                                 return (returnT, returnV)
                             _ -> semanticError $ "Trying to call type " ++ show symbolType ++ ", it must be a function or procedure "  ++ showPos posn
     setProgramState previousProgramState
-    -- TODO emit message in case main is a function and a non-zero value was returned
     closeScope
     return (b ++ [c] ++ concat d ++ [e], maybeReturnT, maybeReturnV)
     where
@@ -571,7 +586,6 @@ compareExpStmt :: StateType ([Token], Type, Maybe Value)
 compareExpStmt = do
     (a, at, av) <- addSubExpStmt
     option (a, at, av) (do
-            -- TODO Yeap, I was wrong... It's better to have only one token for every comparison and make it store the lexeme
             (b, posn) <- do
                             b <- TT.opSmaller
                             let OP_SMALLER posn = b
