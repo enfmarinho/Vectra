@@ -374,11 +374,12 @@ callStmt symbolTypeList = do
                                     ("procedure returned a value, but it shouldn't. Consider declaring as a func instead " ++ showPos posn)
                                 return (Nothing, Nothing)
                             HaskellMethod _expectedTypeList returnT libMethod -> do
-                                -- assert expectedTypeList is equivalent to typeList
-                                valueList <- valueListFromMaybeValue maybeValueList posn
+                                -- TODO assert expectedTypeList is equivalent to typeList
                                 isRunning' <- isRunning
                                 returnV <- if isRunning'
-                                                then libMethod valueList posn
+                                                then do
+                                                    valueList <- valueListFromMaybeValue maybeValueList posn
+                                                    libMethod valueList posn
                                                 else return Nothing
 
                                 return (returnT, returnV)
