@@ -811,9 +811,7 @@ ifElseStmt = do
             openScope True
             b <- TT.kwElse
             c <- do
-                liftIO $ putStrLn "on elseif"
                 (c, executed) <- ifStmt
-                liftIO $ putStrLn "succesd elseif"
                 when executed $ setProgramState Skip
                 d <- option [] elseIfElseRecursion
                 return $ c ++ d
