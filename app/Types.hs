@@ -4,13 +4,9 @@ import Text.Parsec
 import Scanner
 import qualified Data.Vector as V
 
-type SymbolType = (String, Type)
-type SymbolTableType = H.BasicHashTable String [Type]
-type SymbolTableStackType = [(SymbolTableType, Bool)]
-
-type MemoryType = (String, Value)
-type MemoryTableType = H.BasicHashTable String (Maybe Value)
-type MemoryTableStackType = [(MemoryTableType, Bool)]
+type SymbolType = (String, Type, Maybe Value)
+type SymbolTableType = H.BasicHashTable String ([Type], Maybe Value)
+type SymbolTableStackType = [(SymbolTableType, Bool, Int)]
 
 type LibMethodSignature = [Value] -> AlexPosn -> StateType (Maybe Value)
 
@@ -18,9 +14,7 @@ data InterpreterState = InterpreterState
   { parserBlock :: ParserBlock
   , programState :: ProgramState
   , symbolTableStack :: SymbolTableStackType
-  , memoryTableStack :: MemoryTableStackType
   , globalSymbolTable :: SymbolTableType
-  , globalMemoryTable :: MemoryTableType
   , imports :: H.BasicHashTable String Bool
   , nestedImportCounter :: Int
   }
@@ -73,7 +67,7 @@ data Value = IntValue Int
            | RefValue Int String
            | FuncRefValue String
            | ProcRefValue String
-           | StructValue SymbolTableType MemoryTableType    -- (internal_symbol_table, internal_memory)
+           | StructValue SymbolTableType    -- (internal_symbol_table)
 
 instance Eq ProgramState where
     Starting == Starting = True

@@ -21,7 +21,7 @@ consultTypeList symbolId posn = do
     consultResult <- consultSymbolTable symbolId
     case consultResult of
         Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
-        Just t -> return t
+        Just (t, _) -> return t
 
 
 assertNonAmbiguous :: String -> AlexPosn -> StateType ()
@@ -47,14 +47,16 @@ consultType symbolId posn = do
     case consultResult of
         Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
         -- improve error message
-        Just [] -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
-        Just [h] -> return h
-        Just (_:_) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
+        Just ([], _) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
+        Just ([h], _) -> return h
+        Just (_:_, _) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
 
 assertMethodDeclNotAmbiguous :: String -> [Type] -> AlexPosn -> StateType ()
 assertMethodDeclNotAmbiguous symbolId paramTypeList posn = do
     maybeTypeList <- consultSymbolTable symbolId
-    let typeList = fromMaybe [] maybeTypeList
+    typeList <- case maybeTypeList of
+                    Nothing -> return []
+                    Just (t, _) -> return t
 
     when (ambiguous typeList paramTypeList) $
         semanticError $
@@ -532,4 +534,4 @@ typeFromValue (ProcRefValue symbolId) posn = do
         ProcType templates paramPairs _ -> return (ProcRefType templates (map snd paramPairs))
         _ -> semanticError $ "Invalid procedure reference type for symbol " ++ symbolId
 
-typeFromValue (StructValue _symbolTable _memoryTable) _ = return (StructInstanceType "")
+typeFromValue (StructValue _symbolTable) _ = return (StructInstanceType "")

@@ -94,7 +94,7 @@ templateDecl = do
     idSymbol = do
         a <- TT.id
         let ID _posn symbolId = a
-        insertSymbol (symbolId, TemplateType) False
+        insertSymbol (symbolId, TemplateType, Nothing) False
         return (a, symbolId)
 
 templateInstantiation :: StateType ([Token], [Type])
@@ -115,7 +115,7 @@ insertTemplateInstantiation [] [] = return ()
 insertTemplateInstantiation (_:_) [] = semanticError "Template instantiation: missing symbols"
 insertTemplateInstantiation [] (_:_) = semanticError "Template instantiation: missing types"
 insertTemplateInstantiation (t:typeRest) (s:symbolRest) = do
-    insertSymbol (s, t) False
+    insertSymbol (s, t, Nothing) False
     insertTemplateInstantiation typeRest symbolRest
 
 structDecl :: StateType [Token]
@@ -129,12 +129,13 @@ structDecl = do
     assertNonAmbiguous symbolId posn
 
     _ <- TT.kwColumn
+    _ <- TT.newLine
     _ <- TT.indent
     c <- concat <$> many1 varDecl -- TODO handle private and public kws
     _ <- TT.unindent
     structScope <- topScope
     closeScope
-    insertSymbol (symbolId, StructType templateIds structScope) False
+    insertSymbol (symbolId, StructType templateIds structScope, Nothing) False
     return $ a ++ [b] ++ c
 
 implDecl :: StateType [Token]
@@ -142,17 +143,20 @@ implDecl = do
     openScope False
     _ <- TT.kwImpl
     a <- TT.id
+    -- TODO Get existing impl scope for id if there is, and push it to top of the stack
 
     let ID posn symbolId = a
     consultTypeList symbolId posn >>= assertStructType symbolId posn
 
     _ <- TT.kwColumn
+    _ <- TT.newLine
     _ <- TT.indent
     _ <- concat <$> many1 methodDecl -- TODO handle private and public kws
     _ <- TT.unindent
-    implScope <- topScope
+    -- implScope <- topScope
     closeScope
-    addImplMethods (symbolId, ImplNamespaceType implScope)
+    -- TODO
+    return []
     return []
 
 enumDecl :: StateType [Token]
@@ -169,7 +173,7 @@ enumDecl = do
     b <- idList
 
     let ID _posn enumId = a
-    insertSymbol (enumId, EnumType b) False
+    insertSymbol (enumId, EnumType b, Nothing) False
     return [a]
     where
         idList :: StateType [String]
@@ -199,7 +203,7 @@ paramDeclList = do
             (a, varType) <- typeStmt
             b <- TT.id
             let ID _posn symbolId = b
-            insertSymbol (symbolId, varType) False
+            insertSymbol (symbolId, varType, Nothing) False -- TODO insert correct value in case running
             return (a ++ [b], (symbolId, varType))
 
 methodDecl :: StateType [Token]
@@ -251,11 +255,11 @@ methodDecl = do
                 "A procedure cannot return a value, only functions can. Considerer declaring " ++ symbolId ++
                 " as a functions instead " ++ showPos posn
 
-            insertSymbol (symbolId, ProcType bIds dParams g) True
+            insertSymbol (symbolId, ProcType bIds dParams g, Nothing) True
         KW_FUNC _ -> case optionF of
                         Nothing -> semanticError $ "A function must return something. Consider declaring "
                                                     ++ symbolId ++ " as a procedure instead " ++ showPos posn
-                        Just (_, returnType) -> insertSymbol (symbolId, FuncType bIds dParams returnType g) True
+                        Just (_, returnType) -> insertSymbol (symbolId, FuncType bIds dParams returnType g, Nothing) True
         _ ->  fail "<methodDecl>" -- Impossible to get here, this is just to avoid warnings  
 
     when (symbolId == "main") $ do
@@ -316,7 +320,7 @@ varDecl = do
                         Just d -> return (d, ArrayType bType)
     let ID posn symbolId = c
     when (isNothing a) $ checkShadowing symbolId posn
-    insertSymbol (symbolId, varType) False
+    insertSymbol (symbolId, varType, Nothing) False
     e <- do
             e <- TT.kwAssingment
             (f, expType, maybeExpValue) <- expStmt
@@ -326,7 +330,7 @@ varDecl = do
                     Nothing -> runtimeError $ "trying to use unitialized variable " ++ showPos posn
                     Just v -> do
                         finalValue <- castValueToType varType (expType, v) posn
-                        updateMemory (symbolId, finalValue)
+                        updateSymbolTable symbolId ([varType], Just finalValue)
             return $ e:f
         <|> return []
 
@@ -350,9 +354,13 @@ var = do
     let ID posn symbolId = a
     t <- consultTypeList symbolId posn
     isRunning' <- isRunning
-    value <- if isRunning'
-                then consultMemory symbolId
+    maybeTV <- if isRunning'
+                then consultSymbolTable symbolId
                 else return Nothing
+
+    value <- case maybeTV of
+                Nothing -> return Nothing
+                Just (_, v) -> return v
 
     return ([a], symbolId, t, value)
 
@@ -422,8 +430,7 @@ callStmt symbolTypeList = do
 
         instatiateArgs :: [String] -> [Type] -> [Value] -> StateType ()
         instatiateArgs (idListHead:isListTail) (typeListHead:typeListTail) (valueListHead:valueListTail) = do
-            insertSymbol (idListHead, typeListHead) False
-            updateMemory (idListHead, valueListHead)
+            insertSymbol (idListHead, typeListHead, Just valueListHead) False
             instatiateArgs isListTail typeListTail valueListTail
         instatiateArgs [] [] [] = return ()
         instatiateArgs [] _ _ = fail "<callStmt>"
@@ -769,11 +776,14 @@ assignStmt symbolId typeList = do
                 when isRunning' $ do
                         case expValue of
                             Nothing -> semanticError $ "using uninitialized var " ++ showPos posn
-                            Just v -> updateMemory (symbolId, v)
+                            Just v -> updateSymbolTable symbolId (typeList, Just v)
                 return []
             Just op -> do
                 when isRunning' $ do
-                    maybeValue <- consultMemory symbolId
+                    maybeTV <- consultSymbolTable symbolId
+                    maybeValue <- case maybeTV of
+                                Nothing -> return Nothing
+                                Just (_, v) -> return v
                     resultValue <- case op of
                         OP_ADD _ -> handleAdd maybeValue expValue posn
                         OP_SUB _ -> handleSub maybeValue expValue posn
@@ -783,7 +793,7 @@ assignStmt symbolId typeList = do
                         OP_OR _ -> handleOr maybeValue expValue posn
                         _ -> semanticError $ "Invalid operation on assignment operation for " ++ symbolId ++ " " ++ showPos posn
                     castedValue <- castValueToType symbolType resultValue posn
-                    updateMemory (symbolId, castedValue)
+                    updateSymbolTable symbolId ([symbolType], Just castedValue)
                     return ()
 
                 return [op]
@@ -1082,7 +1092,7 @@ foreachStmt = do
 
     let ArrayType underlyingType = dType
     let ID _ bSymbol = b
-    insertSymbol (bSymbol, underlyingType) False
+    insertSymbol (bSymbol, underlyingType, Nothing) False
 
     e <- TT.kwColumn
     f <- TT.newLine

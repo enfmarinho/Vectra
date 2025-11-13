@@ -14,13 +14,13 @@ import Control.Monad
 importSpecialMethod :: String -> AlexPosn -> StateType ()
 importSpecialMethod symbolId posn = do
     case symbolId of
-        "print" -> insertSymbol ("print", HaskellMethod [TemplateType] Nothing vectraPrint) True
-        "println" -> insertSymbol ("println", HaskellMethod [TemplateType] Nothing vectraPrintln) True
-        "read_int" -> insertSymbol ("read_int", HaskellMethod [] (Just IntType) vectraReadInt) True
-        "read_float" -> insertSymbol ("read_float", HaskellMethod [] (Just FloatType) vectraReadFloat) True
-        "read_bool" -> insertSymbol ("read_bool", HaskellMethod [] (Just BoolType) vectraReadBool) True
-        "read_string" -> insertSymbol ("read_string", HaskellMethod [] (Just StringType) vectraReadString) True
-        "read_line" -> insertSymbol ("read_line", HaskellMethod [] (Just StringType) vectraReadLine) True
+        "print" -> insertSymbol ("print", HaskellMethod [TemplateType] Nothing vectraPrint, Nothing) True
+        "println" -> insertSymbol ("println", HaskellMethod [TemplateType] Nothing vectraPrintln, Nothing) True
+        "read_int" -> insertSymbol ("read_int", HaskellMethod [] (Just IntType) vectraReadInt, Nothing) True
+        "read_float" -> insertSymbol ("read_float", HaskellMethod [] (Just FloatType) vectraReadFloat, Nothing) True
+        "read_bool" -> insertSymbol ("read_bool", HaskellMethod [] (Just BoolType) vectraReadBool, Nothing) True
+        "read_string" -> insertSymbol ("read_string", HaskellMethod [] (Just StringType) vectraReadString, Nothing) True
+        "read_line" -> insertSymbol ("read_line", HaskellMethod [] (Just StringType) vectraReadLine, Nothing) True
         -- TODO add more methods to stdlib
         _ -> semanticError $ "Invalid import: " ++ symbolId ++ " doesn't exist " ++ showPos posn
     return ()

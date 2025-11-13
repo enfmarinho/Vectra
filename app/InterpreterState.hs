@@ -5,8 +5,7 @@ import qualified Data.HashTable.IO as H
 import Types
 import Text.Parsec
 import Control.Monad.State.Lazy
-import Data.Maybe (fromMaybe)
-import Data.Foldable
+import Data.Maybe (fromMaybe, isJust)
 import Control.Monad
 
 -- TODO check if calling putState is necessary considering that the HashTables are mutable
@@ -19,19 +18,17 @@ runtimeError msg = parserFail ("Error: " ++ msg)
 
 initInterpreterState :: IO InterpreterState
 initInterpreterState = do
-    globalMemory <- liftIO H.new
     globalSymbolTable <- liftIO H.new
     importTable <- liftIO H.new
 
     return InterpreterState 
-        { globalMemoryTable=globalMemory
-        , globalSymbolTable=globalSymbolTable
-        , memoryTableStack=[]
-        , symbolTableStack=[]
-        , programState=Starting
-        , parserBlock=GlobalScope
-        , imports=importTable
-        , nestedImportCounter=0
+        { globalSymbolTable = globalSymbolTable
+        , symbolTableStack = []
+        , programState = Starting
+        , parserBlock = GlobalScope
+        , imports = importTable
+        , nestedImportCounter = 0
+        , nextScopeId = 0
         }
     
 
@@ -58,34 +55,33 @@ searchImport fileName = do
     InterpreterState{..} <- getState
     liftIO $ H.lookup imports fileName
 
+pushScope :: SymbolTableType -> StateType () 
+pushScope table = do
+    st@InterpreterState{..} <- getState
+    putState st {
+            symbolTableStack = (table, False, nextScopeId) : symbolTableStack,
+            nextScopeId = nextScopeId + 1
+        }
 
 openScope :: Bool -> StateType () 
 openScope canAccessParentTables = do
     st@InterpreterState{..} <- getState
-    newTable <- liftIO H.new -- st stands for symbol table
-    newMemory <- liftIO H.new 
+    newTable <- liftIO H.new 
     putState st {
-            symbolTableStack = (newTable, canAccessParentTables) : symbolTableStack,
-            memoryTableStack = (newMemory, canAccessParentTables) : memoryTableStack
+            symbolTableStack = (newTable, canAccessParentTables, nextScopeId) : symbolTableStack,
+            nextScopeId = nextScopeId + 1
         }
 
 closeScope :: StateType ()
 closeScope = do
     st@InterpreterState{..} <- getState
 
-    let newSymbolStack =
-          case symbolTableStack of
-            []        -> []  -- nothing to pop
-            (_:rest)  -> rest
-
-    let newMemoryStack =
-          case memoryTableStack of
-            []        -> []  -- nothing to pop
-            (_:rest)  -> rest
+    let newSymbolStack = case symbolTableStack of
+                                []        -> []  -- nothing to pop
+                                (_:rest)  -> rest
 
     putState st
       { symbolTableStack = newSymbolStack
-      , memoryTableStack = newMemoryStack
       }
 
 topScope :: StateType SymbolTableType
@@ -94,7 +90,7 @@ topScope = do
     case symbolTableStack of
         [] -> return globalSymbolTable
         (top : _) -> do
-            let (table, _) = top
+            let (table, _, _) = top -- TODO
             return table
 
 getExpectedReturnT :: StateType (Maybe Type)
@@ -125,92 +121,133 @@ setParserBlock pst = do
   st <- getState
   putState st { parserBlock = pst }
 
-addImplMethods :: SymbolType -> StateType ()
-addImplMethods (symbolId, NamespaceType st) = do
-    result <- consultSymbolTable symbolId
-    case result of
-        Nothing -> semanticError "TODO How did we get here ??????" 
-        Just typeList -> findUpdateNamespace typeList []
-    where 
-        findUpdateNamespace (ImplNamespaceType currSt:t) carry = do
-            liftIO $ mergeSymbolTables currSt st
-            updateSymbolTable symbolId $ carry ++ [NamespaceType currSt] ++ t
-        findUpdateNamespace (h:t) carry = findUpdateNamespace t (h:carry)
-        findUpdateNamespace [] _ = 
-            insertSymbol (symbolId, ImplNamespaceType st) True
-addImplMethods (_, _) = fail "TODO write errmsg: should not get into this"
-
-mergeSymbolTables :: SymbolTableType -> SymbolTableType -> IO ()
-mergeSymbolTables dst src = do
-    pairs <- liftIO $ H.toList src
-    forM_ pairs $ \(k, v) -> do
-        existing <- liftIO $ H.lookup dst k
-        case existing of
-            Nothing -> liftIO $ H.insert dst k v
-            Just existingList -> liftIO $ H.insert dst k (existingList ++ v)
+-- addImplMethods :: SymbolType -> StateType ()
+-- addImplMethods (symbolId, NamespaceType st) = do
+--     result <- consultSymbolTable symbolId
+--     case result of
+--         Nothing -> semanticError "TODO How did we get here ??????" 
+--         Just typeList -> findUpdateNamespace typeList []
+--     where 
+--         findUpdateNamespace (ImplNamespaceType currSt:t) carry = do
+--             liftIO $ mergeSymbolTables currSt st
+--             updateSymbolTable symbolId $ carry ++ [NamespaceType currSt] ++ t
+--         findUpdateNamespace (h:t) carry = findUpdateNamespace t (h:carry)
+--         findUpdateNamespace [] _ = 
+--             insertSymbol (symbolId, ImplNamespaceType st) True
+-- addImplMethods (_, _) = fail "TODO write errmsg: should not get into this"
+--
+-- mergeSymbolTables :: SymbolTableType -> SymbolTableType -> IO ()
+-- mergeSymbolTables dst src = do
+--     pairs <- liftIO $ H.toList src
+--     forM_ pairs $ \(k, (s, v)) -> do
+--         existing <- liftIO $ H.lookup dst k
+--         case existing of
+--             Nothing -> liftIO $ H.insert dst k (s, v)
+--             Just (existingList, value) -> do
+--                 when (isJust value) $ -- 
+--                     putStrLn $ "Unexpected non-Nothing value for key: " ++ k -- TODO should not be putStrLn
+--                 liftIO $ H.insert dst k (existingList ++ s, Nothing)
+--
+assertEmptyValue :: Maybe Value -> StateType ()
+assertEmptyValue m = do
+    case m of
+        Nothing -> return ()
+        Just _ -> semanticError "TODO 3"
 
 insertSymbol :: SymbolType -> Bool -> StateType ()
-insertSymbol (symbolId, symbolType) canBeDuplicate = do
+insertSymbol (symbolId, symbolType, maybeValue) canBeDuplicate = do
     st@InterpreterState{..} <- getState
     -- Insert on symbol table
     case symbolTableStack of
         [] -> do
             existingSymbol <- liftIO $ H.lookup globalSymbolTable symbolId
-            if canBeDuplicate then
-                liftIO $ H.insert globalSymbolTable symbolId $ fromMaybe [] existingSymbol ++ [symbolType]
-                else liftIO $ H.insert globalSymbolTable symbolId [symbolType]
+            if canBeDuplicate then do
+                let (existingSymbolTypeList, existingSymbolMaybeValue) = fromMaybe ([], Nothing) existingSymbol
+                assertEmptyValue existingSymbolMaybeValue
+                assertEmptyValue maybeValue
+
+                liftIO $ H.insert globalSymbolTable symbolId  (existingSymbolTypeList ++ [symbolType], Nothing)
+            else 
+                liftIO $ H.insert globalSymbolTable symbolId ([symbolType], maybeValue)
+
             putState st { globalSymbolTable = globalSymbolTable }
         (top : rest) -> do
-            let (table, b) = top
+            let (table, b, scopeId) = top
             existingSymbol <- liftIO $ H.lookup table symbolId
-            if canBeDuplicate then
-                liftIO $ H.insert table symbolId $ fromMaybe [] existingSymbol ++ [symbolType]
-                else liftIO $ H.insert table symbolId [symbolType]
-            putState st { symbolTableStack = (table, b):rest}
-    -- Insert on memory table
-    case memoryTableStack of
-        [] -> do
-            liftIO $ H.insert globalMemoryTable symbolId Nothing
-            putState st { globalMemoryTable = globalMemoryTable }
-        (top : rest) -> do
-            let (table, b) = top
-            liftIO $ H.insert table symbolId Nothing
-            putState st { memoryTableStack = (table, b):rest}
+            if canBeDuplicate then do
+                let (existingSymbolTypeList, existingSymbolMaybeValue) = fromMaybe ([], Nothing) existingSymbol
+                assertEmptyValue existingSymbolMaybeValue
+                assertEmptyValue maybeValue
+
+                liftIO $ H.insert table symbolId (existingSymbolTypeList ++ [symbolType], Nothing)
+            else 
+                liftIO $ H.insert table symbolId ([symbolType], maybeValue)
+
+            putState st { symbolTableStack = (table, b, scopeId):rest}
+
+
+-- TODO remove this before "realising"
+-- either [type] has only one element is Nothign
+assertCorrectness :: [Type] -> Maybe Value -> StateType ()
+assertCorrectness types maybeValue =
+    case (types, maybeValue) of
+        (_:_:_, Just _) -> liftIO $ putStrLn "<updateSymbolTable>"
+        _               -> return ()
+
             
-updateSymbolTable :: String -> [Type] -> StateType ()
-updateSymbolTable symbolId typeList = do
+updateSymbolTable :: String -> ([Type], Maybe Value) -> StateType ()
+updateSymbolTable symbolId (typeList, value) = do
     st@InterpreterState{..} <- getState
+    assertCorrectness typeList value
+    result <- searchUpdate symbolTableStack
+    unless result $ do
+        maybeValue <- liftIO $ H.lookup globalSymbolTable symbolId
+        case maybeValue of
+            Nothing -> fail $ "<updateSymbolTable> symbolId: " ++ symbolId
+            Just _ -> liftIO $ H.insert globalSymbolTable symbolId (typeList, value)
+
     case symbolTableStack of
         [] -> do
-            liftIO $ H.insert globalSymbolTable symbolId typeList
+            liftIO $ H.insert globalSymbolTable symbolId (typeList, value)
             putState st { globalSymbolTable = globalSymbolTable }
         (top : rest) -> do
-            let (table, b) = top
-            liftIO $ H.insert table symbolId typeList
-            putState st { symbolTableStack = (table, b):rest}
-
-updateMemory :: MemoryType -> StateType ()
-updateMemory (symbolId, value) = do
-    InterpreterState{..} <- getState
-    result <- update (symbolId, value) memoryTableStack
-    unless result $ do
-        maybeValue <- liftIO $ H.lookup globalMemoryTable symbolId
-        case maybeValue of
-            Nothing -> fail $ "<updateMemory> symbolId: " ++ symbolId
-            Just _ -> liftIO $ H.insert globalMemoryTable symbolId (Just value)
-  where
-    update :: MemoryType -> MemoryTableStackType -> StateType Bool
-    update (_, _) [] = return False
-    update (n, v) (top:rest) = do
-        let (table, _) = top
-        found <- liftIO $ H.lookup table n
-        case found of
-            Just _ -> do
-                liftIO $ H.insert table n (Just v)
+            let (table, b, scopeId) = top
+            liftIO $ H.insert table symbolId (typeList, value)
+            putState st { symbolTableStack = (table, b, scopeId):rest}
+    where 
+        searchUpdate :: SymbolTableStackType -> StateType Bool
+        searchUpdate ((table, canAccessParent, _):rest) = do
+            lookupResult <- liftIO $ H.lookup table symbolId
+            if isJust lookupResult then do
+                liftIO $ H.insert table symbolId (typeList, value)
                 return True
-            Nothing -> update (n, v) rest
+            else if canAccessParent then 
+                searchUpdate rest
+            else return False
+        searchUpdate _ = return False
 
-consultSymbolTable :: String -> StateType (Maybe [Type])
+
+searchUpdateSymbolTable :: (String, Int) -> ([Type], Maybe Value) -> StateType ()
+searchUpdateSymbolTable (symbolId, tableId) (typeList, value) = do
+    InterpreterState{..} <- getState
+    assertCorrectness typeList value
+    searchUpdate symbolTableStack
+    where 
+        searchUpdate :: SymbolTableStackType -> StateType ()
+        searchUpdate ((table, canAccessParent, currTableId):rest) = 
+            if currTableId == tableId then do
+                lookupResult <- liftIO $ H.lookup table symbolId
+                case lookupResult of
+                    Just ([_currTypeList], _) -> do
+                        -- TODO assert currTypeList is equivalent to typeList
+                        liftIO $ H.insert table symbolId (typeList, value)
+                        -- TODO do i need a putState ? 
+                    _ -> semanticError "trying to use a invalid reference"
+            else when canAccessParent $ searchUpdate rest
+        searchUpdate _ = semanticError "trying to use a invalid reference"
+
+
+consultSymbolTable :: String -> StateType (Maybe ([Type], Maybe Value))
 consultSymbolTable symbol = do
     InterpreterState{..} <- getState
     result <- liftIO $ search symbol symbolTableStack
@@ -219,9 +256,9 @@ consultSymbolTable symbol = do
         Nothing -> liftIO $ H.lookup globalSymbolTable symbol
         Just _ -> return result
   where
-    search :: String -> SymbolTableStackType -> IO (Maybe [Type])
+    search :: String -> SymbolTableStackType -> IO (Maybe ([Type], Maybe Value))
     search _ [] = return Nothing
-    search name ((table, canAccessParent):rest) = do
+    search name ((table, canAccessParent, _scopeId):rest) = do
         result <- H.lookup table name
         case result of
             Just ty -> return (Just ty)
@@ -229,25 +266,3 @@ consultSymbolTable symbol = do
                 if canAccessParent then
                     search name rest
                 else return Nothing
-
-consultMemory :: String -> StateType (Maybe Value)
-consultMemory symbol = do
-    InterpreterState{..} <- getState
-    result <- liftIO $ search symbol memoryTableStack
-    -- If not found on memory stack, search on global memory
-    case result of
-        Nothing -> do
-            v <- liftIO $ H.lookup globalMemoryTable symbol
-            case v of
-                Nothing -> return Nothing
-                Just v' -> return v'
-        Just _ -> return result
-  where
-    search :: String -> MemoryTableStackType -> IO (Maybe Value)
-    search _ [] = return Nothing
-    search name (top:rest) = do
-        let (table, _) = top
-        result <- H.lookup table name
-        case result of
-            Just ty -> return ty
-            Nothing -> search name rest
