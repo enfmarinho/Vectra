@@ -17,6 +17,7 @@ data InterpreterState = InterpreterState
   , globalSymbolTable :: SymbolTableType
   , imports :: H.BasicHashTable String Bool
   , nestedImportCounter :: Int
+  , nextScopeId :: Int
   }
 
 type StateType = ParsecT [Token] InterpreterState IO
