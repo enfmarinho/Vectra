@@ -447,6 +447,8 @@ castValueToType StringType (_, BoolValue b) _ = return (StringValue (show b))
 castValueToType StringType (srcT, ConstValue v) posn =
     castValueToType StringType (srcT, v) posn
 
+castValueToType (ArrayType _)(_, ArrayValue array) _ = return (ArrayValue array)
+
 -- TODO what about TemplateType ? 
 --- Unsupported cast ---
 castValueToType targetType (srcT, _) posn =
