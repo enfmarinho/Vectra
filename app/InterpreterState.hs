@@ -55,11 +55,11 @@ searchImport fileName = do
     InterpreterState{..} <- getState
     liftIO $ H.lookup imports fileName
 
-pushScope :: SymbolTableType -> StateType () 
-pushScope table = do
+pushScope :: SymbolTableType -> Bool -> StateType () 
+pushScope table canAccessParentTables = do
     st@InterpreterState{..} <- getState
     putState st {
-            symbolTableStack = (table, False, nextScopeId) : symbolTableStack,
+            symbolTableStack = (table, canAccessParentTables, nextScopeId) : symbolTableStack,
             nextScopeId = nextScopeId + 1
         }
 
@@ -121,33 +121,6 @@ setParserBlock pst = do
   st <- getState
   putState st { parserBlock = pst }
 
--- addImplMethods :: SymbolType -> StateType ()
--- addImplMethods (symbolId, NamespaceType st) = do
---     result <- consultSymbolTable symbolId
---     case result of
---         Nothing -> semanticError "TODO How did we get here ??????" 
---         Just typeList -> findUpdateNamespace typeList []
---     where 
---         findUpdateNamespace (ImplNamespaceType currSt:t) carry = do
---             liftIO $ mergeSymbolTables currSt st
---             updateSymbolTable symbolId $ carry ++ [NamespaceType currSt] ++ t
---         findUpdateNamespace (h:t) carry = findUpdateNamespace t (h:carry)
---         findUpdateNamespace [] _ = 
---             insertSymbol (symbolId, ImplNamespaceType st) True
--- addImplMethods (_, _) = fail "TODO write errmsg: should not get into this"
---
--- mergeSymbolTables :: SymbolTableType -> SymbolTableType -> IO ()
--- mergeSymbolTables dst src = do
---     pairs <- liftIO $ H.toList src
---     forM_ pairs $ \(k, (s, v)) -> do
---         existing <- liftIO $ H.lookup dst k
---         case existing of
---             Nothing -> liftIO $ H.insert dst k (s, v)
---             Just (existingList, value) -> do
---                 when (isJust value) $ -- 
---                     putStrLn $ "Unexpected non-Nothing value for key: " ++ k -- TODO should not be putStrLn
---                 liftIO $ H.insert dst k (existingList ++ s, Nothing)
---
 assertEmptyValue :: Maybe Value -> StateType ()
 assertEmptyValue m = do
     case m of

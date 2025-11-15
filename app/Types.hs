@@ -6,6 +6,7 @@ import qualified Data.Vector as V
 
 type SymbolType = (String, Type, Maybe Value)
 type SymbolTableType = H.BasicHashTable String ([Type], Maybe Value)
+type NamespaceSymbolTableType = H.BasicHashTable String ([Type], Maybe Value, AccessModifiers)
 type SymbolTableStackType = [(SymbolTableType, Bool, Int)]
 
 type LibMethodSignature = [Value] -> AlexPosn -> StateType (Maybe Value)
@@ -21,6 +22,11 @@ data InterpreterState = InterpreterState
   }
 
 type StateType = ParsecT [Token] InterpreterState IO
+
+data AccessModifiers = Static
+                     | Public
+                     | Private
+                     deriving (Eq)
 
 data ParserBlock = GlobalScope
                  | Method (Maybe Type) -- Target return type
@@ -43,19 +49,19 @@ data Type = IntType
           | StringType
           | TemplateType
           | RefType Type
-          | ConstType Type                                  -- (internal_type)
-          | ArrayType Type                                  -- (internal_type)                 
-          | EnumType [String]                               -- (valid_labels)
-          | ProcType [String] [(String, Type)] [Token]      -- (template_ids, param_types, method_body)
-          | FuncType [String] [(String, Type)] Type [Token] -- (template_ids, (param_ids, param_types), return_type, method_body)
-          | StructType [String] SymbolTableType             -- (template_ids, table_for_data)
-          | StructInstanceType String                       -- (struct_type_id)
-          | EnumInstanceType String                         -- (enum_type_id)
-          | FuncRefType [String] [Type] Type                -- (templates_ids, param_types, return_type)
-          | ProcRefType [String] [Type]                     -- (templates_ids, param_types)
-          | NamespaceType SymbolTableType                   -- (symbol_table)
-          | ImplNamespaceType SymbolTableType               -- (symbol_table)
-          | HaskellMethod [Type] (Maybe Type) LibMethodSignature         -- (param_types, return_type, internal_method)
+          | ConstType Type                                           -- (internal_type)
+          | ArrayType Type                                           -- (internal_type)                 
+          | EnumType [String]                                        -- (valid_labels)
+          | ProcType [String] [(String, Type)] [Token]               -- (template_ids, param_types, method_body)
+          | FuncType [String] [(String, Type)] Type [Token]          -- (template_ids, (param_ids, param_types), return_type, method_body)
+          | StructType [String] SymbolTableType SymbolTableType      -- (template_ids, table_public_data, table_private_methods)
+          | StructInstanceType String                                -- (struct_type_id)
+          | EnumInstanceType String                                  -- (enum_type_id)
+          | FuncRefType [String] [Type] Type                         -- (templates_ids, param_types, return_type)
+          | ProcRefType [String] [Type]                              -- (templates_ids, param_types)
+          | ImplType SymbolTableType SymbolTableType SymbolTableType -- (public_table, private_table, static_table)
+          | NamespaceType SymbolTableType SymbolTableType            -- (public_symbol_table, private_symbol_table)
+          | HaskellMethod [Type] (Maybe Type) LibMethodSignature     -- (param_types, return_type, internal_method)
 
 data Value = IntValue Int
            | FloatValue Float
@@ -65,7 +71,7 @@ data Value = IntValue Int
            | ConstValue Value
            | ArrayValue (V.Vector (Maybe Value))
            | EnumValue String
-           | RefValue Int String
+           | RefValue Int String -- (scope_id, referent_id)
            | FuncRefValue String
            | ProcRefValue String
            | StructValue SymbolTableType    -- (internal_symbol_table)
@@ -96,7 +102,7 @@ instance Show Type where
         "proc<" ++ show templates ++ ">" ++ "(" ++ showParams params ++ ")"
     show (FuncType templates params returnT _) =
         "func<" ++ show templates ++ ">" ++ "(" ++ showParams params ++ ")" ++ " -> " ++ show returnT
-    show (StructType templates _table) = "structDecl" ++ show templates ++ ">"
+    show (StructType templates _ _) = "structDecl" ++ show templates ++ ">"
     show (StructInstanceType structId) = "struct " ++ structId
     show (EnumInstanceType enumId) = "enum " ++ enumId
     show (FuncRefType templates params returnT) =
@@ -105,8 +111,8 @@ instance Show Type where
     show (ProcRefType templates params) =
         "procRef<" ++ show templates ++ ">" ++
         "(" ++ show params ++ ")"
-    show (NamespaceType _) = "namespace"
-    show (ImplNamespaceType _) = "impl"
+    show (NamespaceType _ _) = "namespace"
+    show (ImplType {}) = "namespace"
     show (HaskellMethod paramTypes _ _) =
         "internalMethod" ++ show paramTypes
 

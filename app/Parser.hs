@@ -5,14 +5,14 @@ module Parser
   ) where
 
 import InterpreterState
-import TerminalTokens as TT
+import qualified TerminalTokens as TT
+import qualified Data.HashTable.IO as H
 import Scanner
 import Text.Parsec
 import Types
 import Assert
 import Control.Monad
 import Data.Maybe
-import qualified Data.Vector as V
 import Control.Monad.IO.Class
 import VectraLib
 import Data.List (genericLength)
@@ -74,6 +74,7 @@ vectraLanguage = do
             <|> enumDecl
             <|> methodDecl
             <|> varDecl
+            <|> namespaceDecl
 
 templateDecl :: StateType ([Token], [String])
 templateDecl = do
@@ -131,33 +132,170 @@ structDecl = do
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
-    c <- concat <$> many1 varDecl -- TODO handle private and public kws
+
+    publicTable <- liftIO H.new 
+    privateTable <- liftIO H.new 
+    _ <- many1 (do
+                    accessModifier <- option Public (do
+                                            _ <- TT.kwPublic
+                                            return Public
+                                        <|> do
+                                            _ <- TT.kwPrivate
+                                            return Private
+                                        )
+                    openScope False
+                    _ <- varDecl
+                    currScope <- topScope
+                    closeScope
+
+                    case accessModifier of
+                        Public -> liftIO $ mergeTablesInPlace currScope publicTable
+                        Private -> liftIO $ mergeTablesInPlace currScope privateTable
+                        _ -> fail "<structDecl>" -- Cannot reach this, just to avoid warnings
+                    )
+    _ <- TT.newLine
     _ <- TT.unindent
-    structScope <- topScope
     closeScope
-    insertSymbol (symbolId, StructType templateIds structScope, Nothing) False
-    return $ a ++ [b] ++ c
+    insertSymbol (symbolId, StructType templateIds publicTable privateTable, Nothing) False
+    return $ a ++ [b]
 
 implDecl :: StateType [Token]
 implDecl = do
     openScope False
     _ <- TT.kwImpl
     a <- TT.id
-    -- TODO Get existing impl scope for id if there is, and push it to top of the stack
-
-    let ID posn symbolId = a
-    consultTypeList symbolId posn >>= assertStructType symbolId posn
+    let ID _posn symbolId = a
+    result <- consultSymbolTable symbolId
+    (publicMethodTable, privateMethodTable, staticMethodTable) <- case result of
+                                    Nothing -> semanticError $ "using a impl for a non declared symbol: " ++ symbolId
+                                    Just (t, _) -> do helperF t symbolId
 
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
-    _ <- concat <$> many1 methodDecl -- TODO handle private and public kws
+    _ <- concat <$> many1 (do
+                            f <- option Public (do 
+                                                _ <- TT.kwStatic
+                                                return Static
+                                            <|> do
+                                                _ <- TT.kwPrivate
+                                                return Private
+                                            <|> do
+                                                _ <- TT.kwPublic
+                                                return Public
+                                            )
+
+                            -- TODO this is bugged, because a static method should be able to see other static methods,
+                            --      at the moment it doesn't 
+                            let canAccessStructData = f /= Static
+                            openScope canAccessStructData -- open temporary scope 
+                            g <- varDecl 
+                                <|> methodDecl
+                                <|> enumDecl
+                                <|> structDecl
+                                <|> implDecl
+                                <|> namespaceDecl
+                            currScope <- topScope 
+                            closeScope -- close temporary scope 
+
+                            case f of
+                                Public -> liftIO $ mergeTablesInPlace currScope publicMethodTable
+                                Private -> liftIO $ mergeTablesInPlace currScope privateMethodTable
+                                Static -> liftIO $ mergeTablesInPlace currScope staticMethodTable
+                            return g
+                        )
+    _ <- TT.newLine
     _ <- TT.unindent
-    -- implScope <- topScope
-    closeScope
-    -- TODO
+
+    closeScope -- closing scope for static methods
+    closeScope -- closing scope for private methods
+    closeScope -- closing scope for public methods
+    closeScope -- closing scope for private data 
+    closeScope -- closing scope for public data
+
+    when (isNothing result) $
+        insertSymbol (symbolId, ImplType publicMethodTable privateMethodTable staticMethodTable, Nothing) True 
+
     return []
-    return []
+    where 
+        helperF :: [Type] -> String -> StateType (SymbolTableType, SymbolTableType, SymbolTableType )
+        helperF [StructType templateList publicDataTable privateDataTable] symbolId = do
+            emptyTable <- liftIO H.new 
+            helperF [StructType templateList publicDataTable privateDataTable, 
+                     ImplType emptyTable emptyTable emptyTable] symbolId
+        helperF [ImplType publicMethodTable privateMethodTable staticMethodTable, 
+                 StructType templateList publicDataTable privateDataTable] symbolId = do
+            helperF [StructType templateList publicDataTable privateDataTable,
+                     ImplType publicMethodTable privateMethodTable staticMethodTable] symbolId
+        helperF [StructType templateList publicDataTable privateDataTable, 
+                 ImplType publicMethodTable privateMethodTable staticMethodTable] _symbolId = do
+            pushScope publicDataTable True
+            insertTemplates templateList
+            pushScope privateDataTable True
+            pushScope publicMethodTable True
+            pushScope privateMethodTable True
+            pushScope staticMethodTable True
+            return (publicMethodTable, privateMethodTable, staticMethodTable)
+        helperF _ symbolId = semanticError $ "using a impl for a non-struct type " ++ symbolId
+            
+        insertTemplates :: [String] -> StateType ()
+        insertTemplates [] = return ()
+        insertTemplates (h:t) = do
+            insertSymbol (h, TemplateType, Nothing) False
+            insertTemplates t
+
+namespaceDecl :: StateType [Token]
+namespaceDecl = do
+    a <- TT.kwNamespace
+    b <- TT.id
+    let ID _posn symbolId = b
+    result <- consultSymbolTable symbolId
+    (publicTable, privateTable) <- case result of
+            Nothing -> do
+                openScope False
+                openScope False
+                emptyTable <- liftIO H.new 
+                return (emptyTable, emptyTable)
+            Just (t, _) -> case t of
+                                [NamespaceType publicTable privateTable] -> do
+                                    pushScope publicTable True
+                                    pushScope privateTable True
+                                    return (publicTable, privateTable)
+                                _ -> semanticError $ "ambiguos declaration, " ++ symbolId ++ " is already declared as another type"
+    c <- TT.kwColumn
+    d <- TT.newLine
+    e <- TT.indent
+    f <- concat <$> many1 (do
+                            f <- option Public (do 
+                                                _ <- TT.kwPrivate
+                                                return Private
+                                            <|> do
+                                                _ <- TT.kwPublic
+                                                return Public
+                                            )
+
+                            openScope True -- open temporary scope 
+                            g <- varDecl 
+                                <|> methodDecl
+                                <|> enumDecl
+                                <|> structDecl
+                                <|> implDecl
+                                <|> namespaceDecl
+                            currScope <- topScope 
+                            closeScope -- close temporary scope 
+
+                            case f of
+                                Public -> liftIO $ mergeTablesInPlace currScope publicTable
+                                Private -> liftIO $ mergeTablesInPlace currScope privateTable
+                                _ -> fail "<namespaceDecl>" -- will never reach this, just to avoid warnings
+                            return g
+                        )
+    _ <- TT.unindent
+    _ <- TT.newLine
+    closeScope -- close scope for past private declarations
+    closeScope -- close scope for past public declarations
+    updateSymbolTable symbolId ([NamespaceType publicTable privateTable], Nothing)
+    return ([a] ++  [b] ++ [c] ++ [d] ++ [e] ++ f)
 
 enumDecl :: StateType [Token]
 enumDecl = do

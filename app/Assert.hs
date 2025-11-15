@@ -4,10 +4,12 @@ module Assert where
 import Scanner
 import InterpreterState
 import Types
+import qualified Data.HashTable.IO as H
 import Control.Monad (when, unless)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Data.List (genericLength)
 import Data.Maybe
+import Data.Foldable 
 
 warningMsg :: String -> StateType ()
 warningMsg msg = liftIO $ putStrLn $ "Warning: " ++ msg
@@ -36,7 +38,7 @@ getEnumOrStructTypes :: [Type] -> StateType (Maybe Type)
 getEnumOrStructTypes (h:t) = do
     case h of
         EnumType list -> return $ Just $ EnumType list
-        StructType templateList dataList -> return $ Just $ StructType templateList dataList
+        StructType templateList dataTable methodTable -> return $ Just $ StructType templateList dataTable methodTable
         _ -> getEnumOrStructTypes t
 getEnumOrStructTypes [] = return Nothing
 
@@ -121,7 +123,7 @@ assertStructType :: String -> AlexPosn -> [Type]  -> StateType ()
 assertStructType symbolId posn (h:t) = do
     case h of
         StructType {} -> assertStructType symbolId posn t
-        ImplNamespaceType {} -> assertStructType symbolId posn t
+        ImplType {} -> assertStructType symbolId posn t
         _ -> semanticError $ symbolId ++ " must be a struct " ++ showPos posn
 assertStructType _ _ [] = return ()
 
@@ -129,7 +131,7 @@ assertNamespaceType :: String -> Type -> AlexPosn -> StateType ()
 assertNamespaceType symbolId t posn = do
     case t of
         NamespaceType {} -> return ()
-        ImplNamespaceType {} -> return ()
+        ImplType {} -> return ()
         _ -> semanticError $ symbolId ++ " must be a namespace " ++ showPos posn
 
 assertBooleanCompatible :: Type -> AlexPosn -> StateType ()
@@ -535,3 +537,14 @@ typeFromValue (ProcRefValue symbolId) posn = do
         _ -> semanticError $ "Invalid procedure reference type for symbol " ++ symbolId
 
 typeFromValue (StructValue _symbolTable) _ = return (StructInstanceType "")
+
+-- This don't check for ambiguities, it should have already been done
+mergeTablesInPlace :: SymbolTableType -> SymbolTableType -> IO ()
+mergeTablesInPlace destiny source = do
+    pairs <- liftIO $ H.toList source
+    forM_ pairs $ \(k, (s, v)) -> do
+        existing <- liftIO $ H.lookup destiny k
+        case existing of
+            Nothing -> liftIO $ H.insert destiny k (s, v)
+            Just (existingList, _) -> do
+                liftIO $ H.insert destiny k (existingList ++ s, Nothing)
