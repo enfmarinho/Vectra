@@ -619,6 +619,17 @@ literal = do
     <|> do
         a <- TT.kwFalse
         return ([a], BoolType, Just $ BoolValue False)
+    <|> do
+        a <- TT.openBracket
+        let OPEN_BRACKET posn = a
+        (bTokens, bt, bv) <- literal
+        c <- many $ do
+            d <- TT.kwComma
+            (cTokens, ct, cv) <- literal
+            assertTypesEq bt ct posn
+            return (cTokens ++ [d], cv)
+        d <- TT.closeBracket
+        return ([a] ++ bTokens ++ concatMap fst c ++ [d], ArrayType bt, Just $ ArrayValue $ V.fromList (bv : map snd c))
 
 expStmtList :: StateType [([Token], Type, Maybe Value)]
 expStmtList = do
