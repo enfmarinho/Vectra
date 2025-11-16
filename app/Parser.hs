@@ -87,8 +87,8 @@ templateDecl = do
         return (c:[d], dParam)
     d <- TT.opGreater
 
-    let cTokens = b : concatMap fst c
-    let cIds = bId : map snd c
+    let cTokens = concatMap fst c
+    let cIds = map snd c
 
     return ([a] ++ [b] ++ cTokens ++ [d], bId : cIds)
   where
