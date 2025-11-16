@@ -34,13 +34,14 @@ assertNonAmbiguous symbolId posn = do
         Just _ -> semanticError $ "Ambiguous declaration for symbol " ++ symbolId ++ " " ++ showPos posn
 
 
-getEnumOrStructTypes :: [Type] -> StateType (Maybe Type)
-getEnumOrStructTypes (h:t) = do
+getCustomType :: [Type] -> StateType (Maybe Type)
+getCustomType (h:t) = do
     case h of
         EnumType list -> return $ Just $ EnumType list
         StructType templateList dataTable methodTable -> return $ Just $ StructType templateList dataTable methodTable
-        _ -> getEnumOrStructTypes t
-getEnumOrStructTypes [] = return Nothing
+        TemplateType -> return $ Just TemplateType
+        _ -> getCustomType t
+getCustomType [] = return Nothing
 
 
 consultType :: String -> AlexPosn -> StateType Type

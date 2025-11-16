@@ -1134,7 +1134,7 @@ typeStmt = do
             <|> do -- customType
                 b <- TT.id
                 let ID posn s = b
-                maybeT <- consultTypeList s posn >>= getEnumOrStructTypes
+                maybeT <- consultTypeList s posn >>= getCustomType
                 case maybeT of
                     Nothing -> semanticError $ s ++ " is not a type " ++ showPos posn
                     Just t -> return ([b], t)
