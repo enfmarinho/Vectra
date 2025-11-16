@@ -524,7 +524,7 @@ callStmt symbolId symbolTypeList = do
     let templateLen = genericLength templateTypeList
     maybeSymbolType <- searchTypeList symbolTypeList templateLen typeList
     symbolType <- case maybeSymbolType of 
-        Nothing -> semanticError $ "no mathing function to call \"" ++ symbolId ++ "\""
+        Nothing -> semanticError $ "no matching function to call \"" ++ symbolId ++ "\"" ++ showPos posn
         Just t -> return t
     (maybeReturnT, maybeReturnV) <- case symbolType of
                             FuncType templateIds paramList returnT funcBody -> do
