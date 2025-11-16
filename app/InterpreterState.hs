@@ -84,6 +84,17 @@ closeScope = do
       { symbolTableStack = newSymbolStack
       }
 
+changeTopScopeVisibility :: Bool -> StateType ()
+changeTopScopeVisibility newAccessModifier = do
+    st@InterpreterState{..} <- getState
+    case symbolTableStack of
+        [] -> return ()
+        (top : rest) -> do
+            let (table, _, tableId) = top
+            putState st
+              { symbolTableStack = (table, newAccessModifier, tableId) : rest
+              }
+
 topScope :: StateType SymbolTableType
 topScope = do
     InterpreterState{..} <- getState
