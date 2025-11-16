@@ -101,16 +101,16 @@ templateDecl = do
 
 templateInstantiation :: StateType ([Token], [Type])
 templateInstantiation = do
-    _ <- TT.opSmaller
-    (a, aType) <- typeStmt
+    a <- TT.opSmaller
+    (b, bType) <- typeStmt
     rest <- many $ do
-        b <- TT.kwComma
-        (c, cType) <- typeStmt
-        return (b:c, cType)
-    let tokenList = a ++ concatMap fst rest
-        typeList = aType : map snd rest
-    _ <- TT.opGreater
-    return (tokenList, typeList)
+        c <- TT.kwComma
+        (d, dType) <- typeStmt
+        return (c:d, dType)
+    let tokenList = b ++ concatMap fst rest
+        typeList = bType : map snd rest
+    c <- TT.opGreater
+    return ([a] ++ tokenList ++ [c], typeList)
 
 insertTemplateInstantiation :: [Type] -> [String] -> StateType ()
 insertTemplateInstantiation [] [] = return ()
