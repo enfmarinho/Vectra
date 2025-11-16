@@ -47,7 +47,7 @@ data Type = IntType
           | CharType
           | BoolType
           | StringType
-          | TemplateType
+          | TemplateType (Maybe String) -- (template_symbol)
           | RefType Type
           | ConstType Type                                           -- (internal_type)
           | ArrayType Type                                           -- (internal_type)                 
@@ -93,7 +93,8 @@ instance Show Type where
     show CharType = "char"
     show BoolType = "bool"
     show StringType = "string"
-    show TemplateType = "template"
+    show (TemplateType Nothing) = "template"
+    show (TemplateType (Just name)) = "template<" ++ name ++ ">"
     show (RefType t) = "ref(" ++ show t ++ ")"
     show (ConstType t) = "const(" ++ show t ++ ")"
     show (ArrayType t) = show t ++ "[]"
@@ -125,7 +126,7 @@ instance Eq Type where
     CharType == CharType = True
     BoolType == BoolType = True
     StringType == StringType = True
-    TemplateType == TemplateType = True
+    TemplateType _ == TemplateType _ = True
     RefType t1 == RefType t2 = t1 == t2
     ConstType t1 == ConstType t2 = t1 == t2
     ArrayType t1 == ArrayType t2 = t1 == t2

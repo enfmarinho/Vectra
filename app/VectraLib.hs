@@ -14,8 +14,8 @@ import Control.Monad
 importSpecialMethod :: String -> AlexPosn -> StateType ()
 importSpecialMethod symbolId posn = do
     case symbolId of
-        "print" -> insertSymbol ("print", HaskellMethod [TemplateType] Nothing vectraPrint, Nothing) True
-        "println" -> insertSymbol ("println", HaskellMethod [TemplateType] Nothing vectraPrintln, Nothing) True
+        "print" -> insertSymbol ("print", HaskellMethod [TemplateType Nothing] Nothing vectraPrint, Nothing) True
+        "println" -> insertSymbol ("println", HaskellMethod [TemplateType Nothing] Nothing vectraPrintln, Nothing) True
         "read_int" -> insertSymbol ("read_int", HaskellMethod [] (Just IntType) vectraReadInt, Nothing) True
         "read_float" -> insertSymbol ("read_float", HaskellMethod [] (Just FloatType) vectraReadFloat, Nothing) True
         "read_bool" -> insertSymbol ("read_bool", HaskellMethod [] (Just BoolType) vectraReadBool, Nothing) True

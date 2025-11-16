@@ -39,7 +39,7 @@ getCustomType (h:t) = do
     case h of
         EnumType list -> return $ Just $ EnumType list
         StructType templateList dataTable methodTable -> return $ Just $ StructType templateList dataTable methodTable
-        TemplateType -> return $ Just TemplateType
+        TemplateType s -> return $ Just $ TemplateType s
         _ -> getCustomType t
 getCustomType [] = return Nothing
 
@@ -519,7 +519,7 @@ typeFromValue (ConstValue v) posn = do
     t <- typeFromValue v posn
     return (ConstType t)
 
-typeFromValue (ArrayValue _) _ = return $ ArrayType TemplateType
+typeFromValue (ArrayValue _) _ = return $ ArrayType $ TemplateType Nothing
 
 typeFromValue (EnumValue _) _ = return (EnumInstanceType "")
 typeFromValue (RefValue symbolId _) posn = do

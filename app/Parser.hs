@@ -96,7 +96,7 @@ templateDecl = do
     idSymbol = do
         a <- TT.id
         let ID _posn symbolId = a
-        insertSymbol (symbolId, TemplateType, Nothing) False
+        insertSymbol (symbolId, TemplateType $ Just symbolId, Nothing) False
         return (a, symbolId)
 
 templateInstantiation :: StateType ([Token], [Type])
@@ -242,7 +242,7 @@ implDecl = do
         insertTemplates :: [String] -> StateType ()
         insertTemplates [] = return ()
         insertTemplates (h:t) = do
-            insertSymbol (h, TemplateType, Nothing) False
+            insertSymbol (h, TemplateType $ Just h, Nothing) False
             insertTemplates t
 
 namespaceDecl :: StateType [Token]
@@ -515,9 +515,9 @@ callStmt symbolId symbolTypeList = do
     let OPEN_PAREN posn = c
     let runMethod templateIds paramList funcBody = do
             let (idList, expectedParamTypes) = unzip paramList
-            assertValidParamList expectedParamTypes typeList posn -- todo should use castType not eq
+            assertValidParamList expectedParamTypes typeList posn -- TODO check this for correctness
             insertTemplateInstantiation templateTypeList templateIds
-            newinstatiateArgs idList expectedParamTypes (typeList, maybeValueList) posn
+            instatiateArgs idList expectedParamTypes (typeList, maybeValueList) posn
             changeTopScopeVisibility False
             runFuncBody funcBody
     let templateLen = genericLength templateTypeList
@@ -566,24 +566,36 @@ callStmt symbolId symbolTypeList = do
                     return (v:rest)
 
 
-        newinstatiateArgs :: [String] -> [Type] -> ([Type], [Maybe Value]) -> AlexPosn -> StateType ()
-        newinstatiateArgs (currId:idsTail) (expectedType:expectedTypesTail) (currType:typesTail, currValue:valuesTail) posn = do
+        instatiateArgs :: [String] -> [Type] -> ([Type], [Maybe Value]) -> AlexPosn -> StateType ()
+        instatiateArgs (currId:idsTail) (expectedType:expectedTypesTail) (currType:typesTail, currValue:valuesTail) posn = do
             isRunning' <- isRunning
             finalV <- if isRunning' 
                         then do 
                             case currValue of
                                 Nothing -> runtimeError $ "calling subprogram with unitialized var " ++ currId ++ showPos posn
                                 Just v -> do
-                                    finalV <- castValueToType expectedType (currType, v) posn
+                                    expectedType' <- case expectedType of
+                                                        TemplateType s -> do
+                                                            (t, _) <- case s of
+                                                                        Nothing -> semanticError "TODO1"
+                                                                        Just s' -> do
+                                                                            result <- consultSymbolTable s' 
+                                                                            case result of
+                                                                                Nothing -> semanticError "TODO2"
+                                                                                Just t -> return t
+                                                            getTypeFromTypeList t
+                                                        _ -> return expectedType
+
+                                    finalV <- castValueToType expectedType' (currType, v) posn
                                     return $ Just finalV
                         else return Nothing
             insertSymbol (currId, expectedType, finalV) False
-            newinstatiateArgs idsTail expectedTypesTail (typesTail, valuesTail) posn
-        newinstatiateArgs [] [] ([], []) _ = return ()
-        newinstatiateArgs [] _ (_, _) _ = fail "<callStmt>"
-        newinstatiateArgs _ [] (_, _) _ = fail "<callStmt>"
-        newinstatiateArgs _ _ ([], _) _ = fail "<callStmt>"
-        newinstatiateArgs _ _ (_, []) _ = fail "<callStmt>"
+            instatiateArgs idsTail expectedTypesTail (typesTail, valuesTail) posn
+        instatiateArgs [] [] ([], []) _ = return ()
+        instatiateArgs [] _ (_, _) _ = fail "<callStmt>"
+        instatiateArgs _ [] (_, _) _ = fail "<callStmt>"
+        instatiateArgs _ _ ([], _) _ = fail "<callStmt>"
+        instatiateArgs _ _ (_, []) _ = fail "<callStmt>"
             
         runFuncBody :: [Token] -> StateType (Maybe (Type, Value))
         runFuncBody funcBody = do
