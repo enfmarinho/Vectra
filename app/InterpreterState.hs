@@ -21,7 +21,7 @@ initInterpreterState = do
     globalSymbolTable <- liftIO H.new
     importTable <- liftIO H.new
 
-    return InterpreterState 
+    return InterpreterState
         { globalSymbolTable = globalSymbolTable
         , symbolTableStack = []
         , programState = Starting
@@ -30,7 +30,7 @@ initInterpreterState = do
         , nestedImportCounter = 0
         , nextScopeId = 0
         }
-    
+
 
 isRunning :: StateType Bool
 isRunning = do
@@ -55,7 +55,7 @@ searchImport fileName = do
     InterpreterState{..} <- getState
     liftIO $ H.lookup imports fileName
 
-pushScope :: SymbolTableType -> Bool -> StateType () 
+pushScope :: SymbolTableType -> Bool -> StateType ()
 pushScope table canAccessParentTables = do
     st@InterpreterState{..} <- getState
     putState st {
@@ -63,10 +63,10 @@ pushScope table canAccessParentTables = do
             nextScopeId = nextScopeId + 1
         }
 
-openScope :: Bool -> StateType () 
+openScope :: Bool -> StateType ()
 openScope canAccessParentTables = do
     st@InterpreterState{..} <- getState
-    newTable <- liftIO H.new 
+    newTable <- liftIO H.new
     putState st {
             symbolTableStack = (newTable, canAccessParentTables, nextScopeId) : symbolTableStack,
             nextScopeId = nextScopeId + 1
@@ -95,7 +95,7 @@ topScope = do
 
 getExpectedReturnT :: StateType (Maybe Type)
 getExpectedReturnT = do
-    st <- getParserBlock 
+    st <- getParserBlock
     case st of
         Method t -> return t
         Conditional t -> return t
@@ -140,7 +140,7 @@ insertSymbol (symbolId, symbolType, maybeValue) canBeDuplicate = do
                 assertEmptyValue maybeValue
 
                 liftIO $ H.insert globalSymbolTable symbolId  (existingSymbolTypeList ++ [symbolType], Nothing)
-            else 
+            else
                 liftIO $ H.insert globalSymbolTable symbolId ([symbolType], maybeValue)
 
             putState st { globalSymbolTable = globalSymbolTable }
@@ -153,7 +153,7 @@ insertSymbol (symbolId, symbolType, maybeValue) canBeDuplicate = do
                 assertEmptyValue maybeValue
 
                 liftIO $ H.insert table symbolId (existingSymbolTypeList ++ [symbolType], Nothing)
-            else 
+            else
                 liftIO $ H.insert table symbolId ([symbolType], maybeValue)
 
             putState st { symbolTableStack = (table, b, scopeId):rest}
@@ -167,7 +167,7 @@ assertCorrectness types maybeValue =
         (_:_:_, Just _) -> liftIO $ putStrLn "<updateSymbolTable>"
         _               -> return ()
 
-            
+
 updateSymbolTable :: String -> ([Type], Maybe Value) -> StateType ()
 updateSymbolTable symbolId (typeList, value) = do
     st@InterpreterState{..} <- getState
@@ -187,14 +187,14 @@ updateSymbolTable symbolId (typeList, value) = do
             let (table, b, scopeId) = top
             liftIO $ H.insert table symbolId (typeList, value)
             putState st { symbolTableStack = (table, b, scopeId):rest}
-    where 
+    where
         searchUpdate :: SymbolTableStackType -> StateType Bool
         searchUpdate ((table, canAccessParent, _):rest) = do
             lookupResult <- liftIO $ H.lookup table symbolId
             if isJust lookupResult then do
                 liftIO $ H.insert table symbolId (typeList, value)
                 return True
-            else if canAccessParent then 
+            else if canAccessParent then
                 searchUpdate rest
             else return False
         searchUpdate _ = return False
@@ -205,9 +205,9 @@ searchUpdateSymbolTable (symbolId, tableId) (typeList, value) = do
     InterpreterState{..} <- getState
     assertCorrectness typeList value
     searchUpdate symbolTableStack
-    where 
+    where
         searchUpdate :: SymbolTableStackType -> StateType ()
-        searchUpdate ((table, canAccessParent, currTableId):rest) = 
+        searchUpdate ((table, canAccessParent, currTableId):rest) =
             if currTableId == tableId then do
                 lookupResult <- liftIO $ H.lookup table symbolId
                 case lookupResult of
@@ -239,3 +239,19 @@ consultSymbolTable symbol = do
                 if canAccessParent then
                     search name rest
                 else return Nothing
+
+consultSymbolTableById :: (String, Int) -> StateType (Maybe ([Type], Maybe Value))
+consultSymbolTableById (symbolId, tableId) = do
+    InterpreterState{..} <- getState
+    searchUpdate symbolTableStack
+    where
+        searchUpdate :: SymbolTableStackType -> StateType (Maybe ([Type], Maybe Value))
+        searchUpdate ((table, canAccessParent, currTableId) : rest)
+          | currTableId == tableId = do
+                lookupResult <- liftIO $ H.lookup table symbolId
+                case lookupResult of
+                    Just r -> return $ Just r
+                    _ -> semanticError "trying to use a invalid reference"
+          | canAccessParent = searchUpdate rest
+          | otherwise = semanticError "tyring to use a invalid reference"
+        searchUpdate _ = semanticError "trying to use a invalid reference"
