@@ -505,21 +505,20 @@ var = do
 
 callStmt :: String -> [Type] -> StateType ([Token], Maybe Type, Maybe Value)
 callStmt symbolId symbolTypeList = do
+    openScope True -- True because it needs access to the param values, it will be changed to false latter on
     previousProgramState <- getProgramState
     (b, templateTypeList) <- option ([], []) templateInstantiation
     c <- TT.openParen
     (d, typeList, maybeValueList) <- unzip3 <$> option [] expStmtList
     e <- TT.closeParen
 
-    openScope True -- TODO this cannot be True
-
     let OPEN_PAREN posn = c
     let runMethod templateIds paramList funcBody = do
             let (idList, expectedParamTypes) = unzip paramList
-            assertValidParamList expectedParamTypes typeList posn
-            valueList <- valueListFromMaybeValue maybeValueList posn
-            instatiateArgs idList typeList valueList
+            assertValidParamList expectedParamTypes typeList posn -- todo should use castType not eq
             insertTemplateInstantiation templateTypeList templateIds
+            newinstatiateArgs idList expectedParamTypes (typeList, maybeValueList) posn
+            changeTopScopeVisibility False
             runFuncBody funcBody
     let templateLen = genericLength templateTypeList
     maybeSymbolType <- searchTypeList symbolTypeList templateLen typeList
@@ -567,16 +566,25 @@ callStmt symbolId symbolTypeList = do
                     return (v:rest)
 
 
-        instatiateArgs :: [String] -> [Type] -> [Value] -> StateType ()
-        instatiateArgs (idListHead:isListTail) (typeListHead:typeListTail) (valueListHead:valueListTail) = do
-            insertSymbol (idListHead, typeListHead, Just valueListHead) False
-            instatiateArgs isListTail typeListTail valueListTail
-        instatiateArgs [] [] [] = return ()
-        instatiateArgs [] _ _ = fail "<callStmt>"
-        instatiateArgs _ [] _ = fail "<callStmt>"
-        instatiateArgs _ _ [] = fail "<callStmt>"
-
-
+        newinstatiateArgs :: [String] -> [Type] -> ([Type], [Maybe Value]) -> AlexPosn -> StateType ()
+        newinstatiateArgs (currId:idsTail) (expectedType:expectedTypesTail) (currType:typesTail, currValue:valuesTail) posn = do
+            isRunning' <- isRunning
+            finalV <- if isRunning' 
+                        then do 
+                            case currValue of
+                                Nothing -> runtimeError $ "calling subprogram with unitialized var " ++ currId ++ showPos posn
+                                Just v -> do
+                                    finalV <- castValueToType expectedType (currType, v) posn
+                                    return $ Just finalV
+                        else return Nothing
+            insertSymbol (currId, expectedType, finalV) False
+            newinstatiateArgs idsTail expectedTypesTail (typesTail, valuesTail) posn
+        newinstatiateArgs [] [] ([], []) _ = return ()
+        newinstatiateArgs [] _ (_, _) _ = fail "<callStmt>"
+        newinstatiateArgs _ [] (_, _) _ = fail "<callStmt>"
+        newinstatiateArgs _ _ ([], _) _ = fail "<callStmt>"
+        newinstatiateArgs _ _ (_, []) _ = fail "<callStmt>"
+            
         runFuncBody :: [Token] -> StateType (Maybe (Type, Value))
         runFuncBody funcBody = do
             previousProgramState <- getProgramState
