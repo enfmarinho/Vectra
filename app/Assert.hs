@@ -521,7 +521,7 @@ typeFromValue (ConstValue v) posn = do
 typeFromValue (ArrayValue _) _ = return $ ArrayType TemplateType
 
 typeFromValue (EnumValue _) _ = return (EnumInstanceType "")
-typeFromValue (RefValue _ symbolId) posn = do
+typeFromValue (RefValue symbolId _) posn = do
     symbolType <- consultType symbolId posn
     return (RefType symbolType)
 

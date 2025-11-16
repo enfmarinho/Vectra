@@ -71,7 +71,7 @@ data Value = IntValue Int
            | ConstValue Value
            | ArrayValue (V.Vector (Maybe Value))
            | EnumValue String
-           | RefValue Int String -- (scope_id, referent_id)
+           | RefValue String Int -- (referent_id, scope_id)
            | FuncRefValue String
            | ProcRefValue String
            | StructValue SymbolTableType    -- (internal_symbol_table)
