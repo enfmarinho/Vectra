@@ -7,6 +7,7 @@ module Parser
 import InterpreterState
 import qualified TerminalTokens as TT
 import qualified Data.HashTable.IO as H
+import qualified Data.Vector as V
 import Scanner
 import Text.Parsec
 import Types
@@ -662,29 +663,54 @@ baseExp = do
                                 (b, expType, expValue) <- expStmt
                                 c <- TT.closeParen
                                 return ([a] ++ b ++ [c], expType, expValue)
-                            -- <|> do
-                            --     a <- TT.kwCast
-                            --     b <- TT.opSmaller
-                            --     (c, t) <- typeStmt
-                            --     d <- TT.opGreater
-                            --     e <- TT.openParen
-                            --     f <- var
-                            --     g <- TT.closeParen
-                                -- return ([a] ++ [b] ++ c ++ [d], t, Maybe)
-                            -- <|> do -- TODO derefVar
-                            --     a <- TT.kwDeref
-                            --     b <- TT.openParen
-                            --     (c, varType, _varValue) <- var
-                            --     let OPEN_PAREN posn = b
-                            --     derefType <- case varType of
-                            --                     RefType derefType -> return derefType
-                            --                     _ -> semanticError $ "Trying to deref a non reference type " ++ showPos posn
-                            --     d <- TT.closeParen
-                            --
-                                -- derefValue <- case varValue of
-                                --                 RefValue key refId -> return 
-                                --                 _ -> semanticError $ "Trying to deref a non reference type " ++ showPos posn
-                                -- return ([a] ++ [b] ++ c ++ [d], derefType, IntValue 1)
+                            <|> do
+                                a <- TT.kwCast
+                                b <- TT.opSmaller
+                                (c, t) <- typeStmt
+                                d <- TT.opGreater
+                                e <- TT.openParen
+                                (f, varId, varT, varV) <- var
+                                g <- TT.closeParen
+                                let OPEN_PAREN posn = e
+                                varT' <- getTypeFromTypeList varT
+                                finalT <- castType t varT' posn
+                                isRunning' <- isRunning
+                                finalV <- if isRunning' 
+                                            then do
+                                                case varV of
+                                                    Nothing -> runtimeError $ "Using unitialized var \"" ++ varId ++ "\""
+                                                    Just v -> do
+                                                        finalV <- castValueToType finalT (varT', v) posn
+                                                        return $ Just finalV
+                                            else return Nothing
+                                return ([a] ++ [b] ++ c ++ [d] ++ [e] ++ f ++ [g], t, finalV)
+                            <|> do
+                                a <- TT.kwDeref
+                                b <- TT.openParen
+                                (c, varId, varType, varValue) <- var
+                                let OPEN_PAREN posn = b
+                                varType' <- getTypeFromTypeList varType
+                                derefType <- case varType' of
+                                                RefType derefType -> return derefType
+                                                _ -> semanticError $ "Trying to deref a non reference type \"" ++ varId ++ "\"" ++ showPos posn
+                                d <- TT.closeParen
+
+                                isRunning' <- isRunning
+                                searchRefResult <- if isRunning' 
+                                            then do
+                                                case varValue of
+                                                    Just refValue -> do
+                                                        case refValue of
+                                                            RefValue refSymbol scopeId -> consultSymbolTableById (refSymbol, scopeId)
+                                                            _ -> runtimeError "trying to deref a non reference value" -- TODO will not reach this
+                                                    Nothing -> runtimeError $ "using unitialized var \"" ++ varId ++ "\""
+                                            else return Nothing
+
+                                finalV <- case searchRefResult of
+                                    Nothing -> return Nothing
+                                    Just (_refT, refV) -> return refV
+
+                                return ([a] ++ [b] ++ c ++ [d], derefType, finalV)
 
     case optionUnary of
         Nothing -> return (base, baseT, baseV)
