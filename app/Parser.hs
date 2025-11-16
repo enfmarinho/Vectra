@@ -503,8 +503,8 @@ var = do
 
     return ([a], symbolId, t, value)
 
-callStmt :: [Type] -> StateType ([Token], Maybe Type, Maybe Value)
-callStmt symbolTypeList = do
+callStmt :: String -> [Type] -> StateType ([Token], Maybe Type, Maybe Value)
+callStmt symbolId symbolTypeList = do
     previousProgramState <- getProgramState
     (b, templateTypeList) <- option ([], []) templateInstantiation
     c <- TT.openParen
@@ -524,7 +524,7 @@ callStmt symbolTypeList = do
     let templateLen = genericLength templateTypeList
     maybeSymbolType <- searchTypeList symbolTypeList templateLen typeList
     symbolType <- case maybeSymbolType of 
-        Nothing -> semanticError "no mathing function for call" -- TODO add symbolId to err msg
+        Nothing -> semanticError $ "no mathing function to call \"" ++ symbolId ++ "\""
         Just t -> return t
     (maybeReturnT, maybeReturnV) <- case symbolType of
                             FuncType templateIds paramList returnT funcBody -> do
@@ -649,7 +649,7 @@ baseExp = do
                             <|> (do
                                     (a, symbolId, typeList, varValue) <- var
                                     (do
-                                        (b, maybeType, maybeValue) <- try $ callStmt typeList -- TODO remove this try
+                                        (b, maybeType, maybeValue) <- try $ callStmt symbolId typeList -- TODO remove this try
                                         expType <- case maybeType of
                                                         Nothing -> semanticError $ "called the procedure " ++ symbolId ++ " expecting a value"
                                                         Just t -> return t
@@ -878,7 +878,7 @@ stmt = do
         (a, symbolId, typeList, _varV) <- var
         b <- assignStmt symbolId typeList 
             <|> (do
-                    (b, _, _) <- callStmt typeList
+                    (b, _, _) <- callStmt symbolId typeList
                     return b
                 )
         return $ a ++ b)
@@ -1241,7 +1241,7 @@ forStmt = do
                                 (f, symbolId, typeList, _varV) <- var 
                                 g <- assignStmt symbolId typeList 
                                     <|> (do 
-                                            (g, _, _) <- callStmt typeList
+                                            (g, _, _) <- callStmt symbolId typeList
                                             return g
                                         )
                                     <?> "loop increment should be either an assignStmt or a method call"
