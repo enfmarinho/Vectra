@@ -38,6 +38,14 @@ getCustomType (h:t) = do
 getCustomType [] = return Nothing
 
 
+getStructType :: [Type] -> StateType (Maybe Type)
+getStructType (h:t) = do
+    case h of
+        StructType templateList dataTable methodTable -> return $ Just $ StructType templateList dataTable methodTable
+        _ -> getStructType t
+getStructType [] = return Nothing
+
+
 consultType :: String -> AlexPosn -> StateType Type
 consultType symbolId posn = do
     consultResult <- consultSymbolTable symbolId
@@ -413,3 +421,28 @@ mergeTablesInPlace destiny source = do
             Nothing -> liftIO $ H.insert destiny k (s, v)
             Just (existingList, _) -> do
                 liftIO $ H.insert destiny k (existingList ++ s, Nothing)
+
+searchTypeOnTable :: SymbolTableType -> String -> StateType (Maybe Type)
+searchTypeOnTable table symbolId = do
+    result <- liftIO $ H.lookup table symbolId
+    case result of
+        Nothing -> return Nothing
+        Just (tList, _) -> do
+            t <- getTypeFromTypeList tList
+            return $ Just t
+
+
+searchTypeOnStruct :: SymbolTableType -> SymbolTableType -> [String] -> StateType (Maybe Type)
+searchTypeOnStruct publicTable privateTable [symbolListH] = do
+    result <- searchTypeOnTable publicTable symbolListH
+    case result of 
+        Nothing -> searchTypeOnTable privateTable symbolListH
+        Just t -> return $ Just t
+searchTypeOnStruct publicTable privateTable (symbolListH:symbolListT) = do
+    a <- searchTypeOnStruct publicTable privateTable [symbolListH]
+    case a of 
+        Nothing -> semanticError $ "member " ++ "\"" ++ symbolListH ++ "\"" ++ " doesn't exist on this context"
+        Just t -> case t of
+                    StructType _ p1 p2 -> searchTypeOnStruct p1 p2 symbolListT
+                    _ -> semanticError $ "member " ++ "\"" ++ symbolListH ++ "\"" ++ " is not a struct type"
+searchTypeOnStruct _ _ [] = return Nothing
