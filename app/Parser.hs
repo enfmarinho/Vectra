@@ -303,26 +303,28 @@ namespaceDecl = do
 enumDecl :: StateType ()
 enumDecl = do
     _ <- TT.kwEnum
-    a <- TT.id
+    (ID posn enumId) <- TT.id
 
-    let ID posn symbolId = a
-    assertNonAmbiguous symbolId posn
+    openScope False
+    assertNonAmbiguous enumId posn
 
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
-    b <- idList
+    _ <- idList enumId
+    _ <- TT.unindent
 
-    let ID _posn enumId = a
-    insertSymbol (enumId, EnumType b, Nothing) False
+    topScope' <- topScope
+    closeScope
+    insertSymbol (enumId, EnumType enumId topScope', Nothing) False
     where
-        idList :: StateType [String]
-        idList = do
-            concat <$> (ids `sepEndBy1` TT.newLine)
-            where ids = do
-                    a <- TT.id
-                    let ID _posn symbolId = a
-                    return [symbolId]
+        idList :: String -> StateType ()
+        idList enumId = do
+            _ <- many1 $ do
+                (ID _posn labelId) <- TT.id
+                _ <- TT.newLine
+                insertSymbol (labelId, EnumLabelType enumId, Nothing) False
+            return ()
 
 optUnnamedParamDeclList :: StateType ([Token], [Type])
 optUnnamedParamDeclList = do

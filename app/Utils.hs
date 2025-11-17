@@ -31,7 +31,7 @@ getBooleanValue (Just value) posn = do
 getCustomType :: [Type] -> StateType (Maybe Type)
 getCustomType (h:t) = do
     case h of
-        EnumType list -> return $ Just $ EnumType list
+        EnumType name list -> return $ Just $ EnumType name list
         StructType templateList dataTable methodTable -> return $ Just $ StructType templateList dataTable methodTable
         TemplateType s -> return $ Just $ TemplateType s
         _ -> getCustomType t
@@ -267,8 +267,8 @@ castType (ArrayType t1) (ArrayType t2) posn = do
     return (ArrayType finalT)
 
 -- EnumType target
-castType (EnumType names1) (EnumType names2) posn
-    | names1 == names2 = return (EnumType names1)
+castType (EnumType name1 labels1) (EnumType name2 labels2) posn
+    | EnumType name1 labels1 == EnumType name2 labels2 = return (EnumType name1 labels1)
     | otherwise =
         semanticError $ "Incompatible enum types at " ++ showPos posn
 
@@ -391,7 +391,7 @@ typeFromValue (ConstValue v) posn = do
 
 typeFromValue (ArrayValue _) _ = return $ ArrayType $ TemplateType Nothing
 
-typeFromValue (EnumValue _) _ = return (EnumInstanceType "")
+typeFromValue (EnumValue _) _ = return (EnumLabelType "")
 typeFromValue (RefValue symbolId _) posn = do
     symbolType <- consultType symbolId posn
     return (RefType symbolType)

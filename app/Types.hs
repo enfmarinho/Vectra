@@ -50,12 +50,12 @@ data Type = IntType
           | RefType Type
           | ConstType Type                                           -- (internal_type)
           | ArrayType Type                                           -- (internal_type)                 
-          | EnumType [String]                                        -- (valid_labels)
+          | EnumType String SymbolTableType                          -- (enum_id, valid_labels)
+          | EnumLabelType String                                     -- (enum_type_id)
           | ProcType [String] [(String, Type)] [Token]               -- (template_ids, param_types, method_body)
           | FuncType [String] [(String, Type)] Type [Token]          -- (template_ids, (param_ids, param_types), return_type, method_body)
           | StructType [String] SymbolTableType SymbolTableType      -- (template_ids, table_public_data, table_private_methods)
           | StructInstanceType String                                -- (struct_type_id)
-          | EnumInstanceType String                                  -- (enum_type_id)
           | FuncRefType [String] [Type] Type                         -- (templates_ids, param_types, return_type)
           | ProcRefType [String] [Type]                              -- (templates_ids, param_types)
           | ImplType SymbolTableType SymbolTableType SymbolTableType -- (public_table, private_table, static_table)
@@ -97,14 +97,14 @@ instance Show Type where
     show (RefType t) = "ref(" ++ show t ++ ")"
     show (ConstType t) = "const(" ++ show t ++ ")"
     show (ArrayType t) = show t ++ "[]"
-    show (EnumType _labelsId) = "enumDecl"
+    show (EnumType name _labelsId) = "enum " ++ name
     show (ProcType templates params _body) =
         "proc<" ++ show templates ++ ">" ++ "(" ++ showParams params ++ ")"
     show (FuncType templates params returnT _) =
         "func<" ++ show templates ++ ">" ++ "(" ++ showParams params ++ ")" ++ " -> " ++ show returnT
     show (StructType templates _ _) = "structDecl" ++ show templates ++ ">"
     show (StructInstanceType structId) = "struct " ++ structId
-    show (EnumInstanceType enumId) = "enum " ++ enumId
+    show (EnumLabelType enumId) = "enum " ++ enumId
     show (FuncRefType templates params returnT) =
         "funcRef<" ++ show templates ++ ">" ++
         "(" ++ show params ++ ") -> " ++ show returnT
@@ -129,14 +129,14 @@ instance Eq Type where
     RefType t1 == RefType t2 = t1 == t2
     ConstType t1 == ConstType t2 = t1 == t2
     ArrayType t1 == ArrayType t2 = t1 == t2
-    EnumType _ == EnumType _ = False
+    EnumType n1 _ == EnumType n2 _ = n1 == n2
     ProcType templates1 params1 _ == ProcType templates2 params2 _ =
         templates1 == templates2 && params1 == params2
     FuncType templates1 params1 r1 _ == FuncType templates2 params2 r2 _ =
         templates1 == templates2 && params1 == params2 && r1 == r2
     StructType {} == StructType {} = False
     StructInstanceType s1 == StructInstanceType s2 = s1 == s2
-    EnumInstanceType e1 == EnumInstanceType e2 = e1 == e2
+    EnumLabelType e1 == EnumLabelType e2 = e1 == e2
     FuncRefType templates1 params1 r1 == FuncRefType templates2 params2 r2 =
         templates1 == templates2 && params1 == params2 && r1 == r2
     ProcRefType templates1 params1 == ProcRefType templates2 params2 =
