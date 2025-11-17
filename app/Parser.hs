@@ -319,6 +319,21 @@ enumDecl = do
                     let ID _posn symbolId = a
                     return [symbolId]
 
+optUnnamedParamDeclList :: StateType ([Token], [Type])
+optUnnamedParamDeclList = do
+    option ([], []) unnamedParamDeclList
+    where 
+        unnamedParamDeclList :: StateType ([Token], [Type])
+        unnamedParamDeclList = do
+            (a, aT) <- typeStmt
+            rest <- many $ do
+                b <- TT.kwComma
+                (c, cT) <- typeStmt
+                return (b:c, cT)
+            let tokenList = a ++ concatMap fst rest
+                paramList = aT : map snd rest
+            return (tokenList, paramList)
+
 optParamDeclList :: StateType ([Token], [(String, Type)])
 optParamDeclList = option ([], []) paramDeclList
 
@@ -1160,17 +1175,17 @@ typeStmt = do
                 case maybeT of
                     Nothing -> semanticError $ s ++ " is not a type " ++ showPos posn
                     Just t -> return ([b], t)
-            <|> do -- reference for method
+            <|> do -- reference for subprogram
                 b <- TT.openParen
                 (c, templateIds) <- option ([], []) templateDecl
                 d <- TT.openParen
-                (e, paramList) <- optParamDeclList
+                (e, paramList) <- optUnnamedParamDeclList
                 f <- TT.closeParen
                 optionG <- optionMaybe returnDecl
 
                 let (gTokens, t) = case optionG of
-                        Nothing -> ([], ProcRefType templateIds (map snd paramList))
-                        Just (returnTokens, returnType) -> (returnTokens, FuncRefType templateIds (map snd paramList) returnType)
+                        Nothing -> ([], ProcRefType templateIds paramList)
+                        Just (returnTokens, returnType) -> (returnTokens, FuncRefType templateIds paramList returnType)
 
                 return ([b] ++ c ++ [d] ++ e ++ [f] ++ gTokens, t)
     maybeC <- optionMaybe arrayDecl
