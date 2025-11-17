@@ -7,6 +7,8 @@ module Parser
 import InterpreterState
 import qualified TerminalTokens as TT
 import Utils
+import Text.Parsec.Error (newErrorMessage, Message(..))
+import Text.Parsec.Pos   (initialPos)
 import qualified Data.HashTable.IO as H
 import qualified Data.Vector as V
 import Scanner
@@ -20,6 +22,7 @@ import VectraLib
 import Data.List (genericLength)
 
 -- TODO remove uses of 'try'
+-- TODO add file name to messages
 
 importFile :: String -> AlexPosn -> StateType ()
 importFile filePath _posn = do
@@ -589,11 +592,11 @@ callStmt symbolId symbolTypeList = do
                                     expectedType' <- case expectedType of
                                                         TemplateType s -> do
                                                             (t, _) <- case s of
-                                                                        Nothing -> semanticError "TODO1"
+                                                                        Nothing -> semanticError $ "missing template instatiation " ++ showPos posn -- cannot reach this
                                                                         Just s' -> do
                                                                             result <- consultSymbolTable s' 
                                                                             case result of
-                                                                                Nothing -> semanticError "TODO2"
+                                                                                Nothing -> semanticError $ "cannot find template instatiation " ++ showPos posn -- cannot reach this
                                                                                 Just t -> return t
                                                             getTypeFromTypeList t
                                                         _ -> return expectedType
@@ -1329,5 +1332,5 @@ parser tokenList = do
             case finalProgramState of
                 Finished -> return Nothing
                 _ -> do
-                    putStrLn "Error: no main method"
-                    return Nothing -- TODO should be Just 
+                    let err = newErrorMessage (Message "Error: no main method") (initialPos "")
+                    return (Just err)

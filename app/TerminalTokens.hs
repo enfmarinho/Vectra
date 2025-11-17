@@ -320,5 +320,5 @@ kwTil = tokenPrim show updatePos getToken where
   getToken _       = Nothing
 
 updatePos :: SourcePos -> Token -> [Token] -> SourcePos
-updatePos pos _ (_:_) = incSourceColumn pos 1 -- TODO does this really work ?
+updatePos pos _ (_:_) = incSourceColumn pos 1
 updatePos pos _ []    = pos

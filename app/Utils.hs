@@ -17,7 +17,7 @@ showPos (AlexPn _ line col) =
     "(Line " ++ show line ++ ", Column " ++ show col ++ ")"
 
 getBooleanValue :: Maybe Value -> AlexPosn -> StateType Bool
-getBooleanValue Nothing posn = semanticError $ "TODO " ++ showPos posn
+getBooleanValue Nothing posn = semanticError $ "using uninitialized var " ++ showPos posn
 getBooleanValue (Just value) posn = do
     case value of
         BoolValue v -> return v
@@ -347,7 +347,7 @@ resultOpType BoolType FloatType _ = return FloatType
 resultOpType (ConstType lhs) rhs posn = resultOpType lhs rhs posn
 resultOpType lhs (ConstType rhs) posn = resultOpType lhs rhs posn
 
-resultOpType _ _ posn = semanticError $ "TODO resultOpType " ++ showPos posn
+resultOpType _ _ posn = semanticError $ "<resultOpType> " ++ showPos posn
 
 searchTypeList :: [Type] -> Int -> [Type] -> StateType (Maybe Type)
 searchTypeList [] _ _ = return Nothing
@@ -360,7 +360,7 @@ searchTypeList (typesH:typesT) templateLen typeList = do
             let (_, expectedTypeList) = unzip expectedParamList
             return (templateList, expectedTypeList)
         HaskellMethod expectedTypeList _ _ -> return ([], expectedTypeList)
-        _ -> fail "what????" -- TODO
+        _ -> fail "<searchTypeList>" -- should not reach this
 
     let expectedTemplateLen = genericLength templateList
     if expectedTemplateLen == templateLen && typeListMatch expectedTypeList typeList 

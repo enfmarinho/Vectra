@@ -21,7 +21,6 @@ importSpecialMethod symbolId posn = do
         "read_bool" -> insertSymbol ("read_bool", HaskellMethod [] (Just BoolType) vectraReadBool, Nothing) True
         "read_string" -> insertSymbol ("read_string", HaskellMethod [] (Just StringType) vectraReadString, Nothing) True
         "read_line" -> insertSymbol ("read_line", HaskellMethod [] (Just StringType) vectraReadLine, Nothing) True
-        -- TODO add more methods to stdlib
         _ -> semanticError $ "Invalid import: " ++ symbolId ++ " doesn't exist " ++ showPos posn
     return ()
 

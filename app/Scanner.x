@@ -141,7 +141,7 @@ popIndentationLevel = do
   ust <- alexGetUserState
   case indentationLevelStack ust of
     (_:rest) -> alexSetUserState ust { indentationLevelStack = rest }
-    []       -> alexError "TODO write this error message"
+    []       -> alexError "<popIndentationLevel>" -- should not reach this
 
 alexEOF :: Alex (Maybe Token)
 alexEOF = do
