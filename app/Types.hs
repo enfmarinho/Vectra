@@ -31,7 +31,6 @@ data AccessModifiers = Static
 data ParserBlock = GlobalScope
                  | Method (Maybe Type) -- Target return type
                  | Loop (Maybe Type) -- Target return type
-                 | Conditional (Maybe Type) -- Target return type
                  deriving (Eq, Show)
 
 data ProgramState = Starting

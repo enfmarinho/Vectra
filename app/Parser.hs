@@ -1022,9 +1022,6 @@ ifElseStmt = do
     previousProgramState <- getProgramState
     previousParserBlock <- getParserBlock
 
-    expectedReturnT <- getExpectedReturnT 
-    setParserBlock $ Conditional expectedReturnT
-
     (a, ifExecuted) <- ifStmt
     if ifExecuted then
         setProgramState Skip

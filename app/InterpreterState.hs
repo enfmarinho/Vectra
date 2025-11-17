@@ -109,7 +109,6 @@ getExpectedReturnT = do
     st <- getParserBlock
     case st of
         Method t -> return t
-        Conditional t -> return t
         Loop t -> return t
         _ -> return Nothing
 

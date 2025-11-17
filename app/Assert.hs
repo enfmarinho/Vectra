@@ -50,7 +50,6 @@ assertBreakable posn = do
     currProgramState <- getParserBlock
     case currProgramState of
         Loop _ -> return ()
-        Conditional _ -> return ()
         _ -> semanticError $ "Trying to use break outside a loop " ++ showPos posn
 
 
@@ -67,7 +66,6 @@ assertReturnType maybeReturnT posn = do
     s <- getParserBlock
     expectedMaybeT <- case s of
                 Method maybeT -> return maybeT 
-                Conditional maybeT -> return maybeT
                 Loop maybeT -> return maybeT
                 _ -> semanticError $ "return statement outside a method " ++ showPos posn
 
