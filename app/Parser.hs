@@ -646,6 +646,13 @@ literal = do
             return (cTokens ++ [d], cv)
         d <- TT.closeBracket
         return ([a] ++ bTokens ++ concatMap fst c ++ [d], ArrayType bt, Just $ ArrayValue $ V.fromList (bv : map snd c))
+    <|> do 
+        (a, at) <- typeStmt
+        b <- TT.openBracket
+        c <- TT.intLiteral
+        d <- TT.closeBracket
+        let INT_LITERAL _ size = c
+        return (a ++ [b] ++ [c] ++ [d], ArrayType at, Just $ ArrayValue $ V.replicate size Nothing)
 
 expStmtList :: StateType [([Token], Type, Maybe Value)]
 expStmtList = do
@@ -660,7 +667,7 @@ expStmtList = do
 baseExp :: StateType ([Token], Type, Maybe Value)
 baseExp = do
     optionUnary <- optionMaybe (TT.opSub <|> TT.opNot)
-    (base, baseT, baseV) <- literal
+    (base, baseT, baseV) <- try literal
                             <|> (do
                                     (a, symbolId, typeList, varValue) <- var
                                     (do
