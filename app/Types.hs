@@ -142,4 +142,7 @@ instance Eq Type where
     ProcRefType templates1 params1 == ProcRefType templates2 params2 =
         templates1 == templates2 && params1 == params2
 
+    TemplateType _ == _ = True
+    _ == TemplateType _  = True
+
     _ == _ = False
