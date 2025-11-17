@@ -19,6 +19,8 @@ import Control.Monad.IO.Class
 import VectraLib
 import Data.List (genericLength)
 
+-- TODO remove uses of 'try'
+
 importFile :: String -> AlexPosn -> StateType ()
 importFile filePath _posn = do
     result <- searchImport filePath
@@ -353,7 +355,7 @@ paramDeclList = do
             (a, varType) <- typeStmt
             b <- TT.id
             let ID _posn symbolId = b
-            insertSymbol (symbolId, varType, Nothing) False -- TODO insert correct value in case running
+            insertSymbol (symbolId, varType, Nothing) False
             return (a ++ [b], (symbolId, varType))
 
 methodDecl :: StateType ()
@@ -550,8 +552,8 @@ callStmt symbolId symbolTypeList = do
                                 when (isJust returnedV) $ semanticError
                                     ("procedure returned a value, but it shouldn't. Consider declaring as a func instead " ++ showPos posn)
                                 return (Nothing, Nothing)
-                            HaskellMethod _expectedTypeList returnT libMethod -> do
-                                -- TODO assert expectedTypeList is equivalent to typeList
+                            HaskellMethod expectedTypeList returnT libMethod -> do
+                                assertValidParamList expectedTypeList typeList posn
                                 isRunning' <- isRunning
                                 returnV <- if isRunning'
                                                 then do
