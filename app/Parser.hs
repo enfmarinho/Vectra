@@ -72,7 +72,7 @@ vectraLanguage = do
             structDecl
             <|> implDecl
             <|> enumDecl
-            <|> methodDecl
+            <|> subprogramDecl
             <|> do 
                 _ <- varDecl
                 return ()
@@ -193,7 +193,7 @@ implDecl = do
                             _ <- do
                                     _ <- varDecl 
                                     return ()
-                                <|> methodDecl
+                                <|> subprogramDecl
                                 <|> enumDecl
                                 <|> structDecl
                                 <|> implDecl
@@ -280,7 +280,7 @@ namespaceDecl = do
                             _ <- do
                                     _ <- varDecl 
                                     return ()
-                                <|> methodDecl
+                                <|> subprogramDecl
                                 <|> enumDecl
                                 <|> structDecl
                                 <|> implDecl
@@ -361,8 +361,8 @@ paramDeclList = do
             insertSymbol (symbolId, varType, Nothing) False
             return (a ++ [b], (symbolId, varType))
 
-methodDecl :: StateType ()
-methodDecl = do
+subprogramDecl :: StateType ()
+subprogramDecl = do
     previousParserBlock <- getParserBlock
     openScope False
     a <- TT.kwProc
