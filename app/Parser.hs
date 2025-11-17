@@ -6,6 +6,7 @@ module Parser
 
 import InterpreterState
 import qualified TerminalTokens as TT
+import Utils
 import qualified Data.HashTable.IO as H
 import qualified Data.Vector as V
 import Scanner

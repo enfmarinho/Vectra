@@ -3,7 +3,7 @@ module VectraLib where
 import InterpreterState
 import Types
 import Control.Monad.IO.Class
-import Assert
+import Utils
 import qualified System.IO as IO
 import Data.Char (isSpace, toLower)
 import Text.Read (readMaybe)
