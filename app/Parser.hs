@@ -19,8 +19,6 @@ import Control.Monad.IO.Class
 import VectraLib
 import Data.List (genericLength)
 
--- TODO some functions shouldn't return [Token], but yet do. Fix this...
-
 importFile :: String -> AlexPosn -> StateType ()
 importFile filePath _posn = do
     result <- searchImport filePath
@@ -39,43 +37,40 @@ importFile filePath _posn = do
     parserResult <- liftIO $ runParserT vectraLanguage currState "<import>" importTokens
     case parserResult of
         Left _ -> fail $ "semantic failure on file " ++ filePath
-        Right (_, finalState) -> do
-
+        Right finalState -> do
             putState finalState
             finishImport filePath
 
-vectraLanguage :: StateType ([Token], InterpreterState)
+vectraLanguage :: StateType InterpreterState
 vectraLanguage = do
-    a <- concat <$> (importCommand `sepEndBy` TT.newLine)
-    b <- concat <$> (globalDecl `sepEndBy` TT.newLine)
-
-    currState <- getState
-    return (a ++ b, currState)
+    _ <- importCommand `sepEndBy` TT.newLine
+    _ <- globalDecl `sepEndBy` TT.newLine
+    getState
 
     where
-        importCommand :: StateType [Token]
+        importCommand :: StateType ()
         importCommand = do
-            a <- TT.kwImport
-            b <- importList `sepEndBy1` TT.kwComma
-            return $ a:b
+            _ <- TT.kwImport
+            _ <- importList `sepEndBy1` TT.kwComma
+            return ()
             where importList = do
                     a <- TT.id
                     let ID posn symbolId = a
                     importSpecialMethod symbolId posn
-                    return a
                     <|> do
                         a <- TT.stringLiteral
                         let STRING_LITERAL posn filePath = a
                         importFile filePath posn
-                        return a
 
-        globalDecl :: StateType [Token]
+        globalDecl :: StateType ()
         globalDecl = do
             structDecl
             <|> implDecl
             <|> enumDecl
             <|> methodDecl
-            <|> varDecl
+            <|> do 
+                _ <- varDecl
+                return ()
             <|> namespaceDecl
 
 templateDecl :: StateType ([Token], [String])
@@ -121,11 +116,11 @@ insertTemplateInstantiation (t:typeRest) (s:symbolRest) = do
     insertSymbol (s, t, Nothing) False
     insertTemplateInstantiation typeRest symbolRest
 
-structDecl :: StateType [Token]
+structDecl :: StateType ()
 structDecl = do
     openScope False
     _ <- TT.kwStruct
-    (a, templateIds) <- option ([], []) templateDecl
+    (_, templateIds) <- option ([], []) templateDecl
     b <- TT.id
 
     let ID posn symbolId = b
@@ -159,9 +154,8 @@ structDecl = do
     _ <- TT.unindent
     closeScope
     insertSymbol (symbolId, StructType templateIds publicTable privateTable, Nothing) False
-    return $ a ++ [b]
 
-implDecl :: StateType [Token]
+implDecl :: StateType ()
 implDecl = do
     openScope False
     _ <- TT.kwImpl
@@ -191,7 +185,9 @@ implDecl = do
                             --      at the moment it doesn't 
                             let canAccessStructData = f /= Static
                             openScope canAccessStructData -- open temporary scope 
-                            g <- varDecl 
+                            _ <- do
+                                    _ <- varDecl 
+                                    return ()
                                 <|> methodDecl
                                 <|> enumDecl
                                 <|> structDecl
@@ -204,7 +200,7 @@ implDecl = do
                                 Public -> liftIO $ mergeTablesInPlace currScope publicMethodTable
                                 Private -> liftIO $ mergeTablesInPlace currScope privateMethodTable
                                 Static -> liftIO $ mergeTablesInPlace currScope staticMethodTable
-                            return g
+                            return []
                         )
     _ <- TT.newLine
     _ <- TT.unindent
@@ -218,7 +214,6 @@ implDecl = do
     when (isNothing result) $
         insertSymbol (symbolId, ImplType publicMethodTable privateMethodTable staticMethodTable, Nothing) True 
 
-    return []
     where 
         helperF :: [Type] -> String -> StateType (SymbolTableType, SymbolTableType, SymbolTableType )
         helperF [StructType templateList publicDataTable privateDataTable] symbolId = do
@@ -246,9 +241,9 @@ implDecl = do
             insertSymbol (h, TemplateType $ Just h, Nothing) False
             insertTemplates t
 
-namespaceDecl :: StateType [Token]
+namespaceDecl :: StateType ()
 namespaceDecl = do
-    a <- TT.kwNamespace
+    _ <- TT.kwNamespace
     b <- TT.id
     let ID _posn symbolId = b
     result <- consultSymbolTable symbolId
@@ -264,10 +259,10 @@ namespaceDecl = do
                                     pushScope privateTable True
                                     return (publicTable, privateTable)
                                 _ -> semanticError $ "ambiguos declaration, " ++ symbolId ++ " is already declared as another type"
-    c <- TT.kwColumn
-    d <- TT.newLine
-    e <- TT.indent
-    f <- concat <$> many1 (do
+    _ <- TT.kwColumn
+    _ <- TT.newLine
+    _ <- TT.indent
+    _ <- concat <$> many1 (do
                             f <- option Public (do 
                                                 _ <- TT.kwPrivate
                                                 return Private
@@ -277,7 +272,9 @@ namespaceDecl = do
                                             )
 
                             openScope True -- open temporary scope 
-                            g <- varDecl 
+                            _ <- do
+                                    _ <- varDecl 
+                                    return ()
                                 <|> methodDecl
                                 <|> enumDecl
                                 <|> structDecl
@@ -290,16 +287,15 @@ namespaceDecl = do
                                 Public -> liftIO $ mergeTablesInPlace currScope publicTable
                                 Private -> liftIO $ mergeTablesInPlace currScope privateTable
                                 _ -> fail "<namespaceDecl>" -- will never reach this, just to avoid warnings
-                            return g
+                            return []
                         )
     _ <- TT.unindent
     _ <- TT.newLine
     closeScope -- close scope for past private declarations
     closeScope -- close scope for past public declarations
     updateSymbolTable symbolId ([NamespaceType publicTable privateTable], Nothing)
-    return ([a] ++  [b] ++ [c] ++ [d] ++ [e] ++ f)
 
-enumDecl :: StateType [Token]
+enumDecl :: StateType ()
 enumDecl = do
     _ <- TT.kwEnum
     a <- TT.id
@@ -314,7 +310,6 @@ enumDecl = do
 
     let ID _posn enumId = a
     insertSymbol (enumId, EnumType b, Nothing) False
-    return [a]
     where
         idList :: StateType [String]
         idList = do
@@ -346,18 +341,18 @@ paramDeclList = do
             insertSymbol (symbolId, varType, Nothing) False -- TODO insert correct value in case running
             return (a ++ [b], (symbolId, varType))
 
-methodDecl :: StateType [Token]
+methodDecl :: StateType ()
 methodDecl = do
     previousParserBlock <- getParserBlock
     openScope False
     a <- TT.kwProc
         <|> TT.kwFunc
-    (bTokens, bIds) <- option ([], []) templateDecl
+    (_, bIds) <- option ([], []) templateDecl
     c <- TT.id
 
     _ <- TT.openParen
-    (dTokens, dParams) <- optParamDeclList
-    e <- TT.closeParen
+    (_, dParams) <- optParamDeclList
+    _ <- TT.closeParen
     optionF <- optionMaybe returnDecl
 
     case optionF of
@@ -415,7 +410,6 @@ methodDecl = do
             _ -> return ()
         setProgramState Finished
     setParserBlock previousParserBlock
-    return ([a] ++ bTokens ++ [c] ++ dTokens ++ [e] ++ maybe [] fst optionF ++ g)
 
 arrayDecl :: StateType [Token]
 arrayDecl = do
@@ -1300,16 +1294,16 @@ foreachStmt = do
     setParserBlock previousParserBlock
     return $ [a] ++ [b] ++ [c] ++ [d] ++ [e] ++ [f] ++ [g] ++ h ++ [i]
 
-parser :: [Token] -> IO (Either ParseError [Token])
+parser :: [Token] -> IO (Maybe ParseError)
 parser tokenList = do
     interpreterState <- initInterpreterState
     parserResult <- runParserT vectraLanguage interpreterState "Error message" tokenList
     case parserResult of
-        Left a -> return $ Left a
-        Right (t, finalState) -> do
+        Left a -> return $ Just a
+        Right finalState -> do
             let finalProgramState = programState finalState
             case finalProgramState of
-                Finished -> return $ Right t
+                Finished -> return Nothing
                 _ -> do
                     putStrLn "Error: no main method"
-                    return $ Right [] -- TODO should be Left
+                    return Nothing -- TODO should be Just 
