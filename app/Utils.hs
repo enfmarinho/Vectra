@@ -320,6 +320,11 @@ castValueToType StringType (srcT, ConstValue v) posn =
 
 castValueToType (ArrayType _)(_, ArrayValue array) _ = return (ArrayValue array)
 
+--- Enum Target ---
+castValueToType (EnumLabelType id1)(EnumLabelType id2, EnumValue label) posn = do
+    when (id1 /= id2) $ semanticError $ "incompatible enum types " ++ showPos posn
+    return (EnumValue label)
+
 -- TODO what about TemplateType ? 
 --- Unsupported cast ---
 castValueToType targetType (srcT, _) posn =
