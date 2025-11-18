@@ -31,7 +31,7 @@ getBooleanValue (Just value) posn = do
 getCustomType :: [Type] -> StateType (Maybe Type)
 getCustomType (h:t) = do
     case h of
-        EnumType name list -> return $ Just $ EnumType name list
+        EnumDeclType name _list -> return $ Just $ EnumLabelType name
         StructType templateList dataTable methodTable -> return $ Just $ StructType templateList dataTable methodTable
         TemplateType s -> return $ Just $ TemplateType s
         _ -> getCustomType t
