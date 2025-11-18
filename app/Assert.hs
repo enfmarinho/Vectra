@@ -77,6 +77,18 @@ assertReturnType maybeReturnT posn = do
                 Just expectedT -> assertTypesEq returnT expectedT posn
 
 
+assertCustomType :: Type -> AlexPosn -> StateType ()
+assertCustomType t posn = do
+    case t of
+        StructType {} -> return ()
+        EnumDeclType {} -> return ()
+        EnumLabelType {} -> return ()
+        _ -> semanticError $ "invalid type " ++ show t ++ " " ++ showPos posn
+
+
+assertComparableTypes :: Type -> Type -> AlexPosn -> StateType ()
+assertComparableTypes _t1 _t2 _posn = return () -- TODO
+
 assertIterableType :: String -> Type -> AlexPosn -> StateType ()
 assertIterableType symbolId t posn = do
     case t of
