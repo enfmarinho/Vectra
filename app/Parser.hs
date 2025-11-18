@@ -842,8 +842,8 @@ compareExpStmt = do
                 (resultT, resultV) <- handleComparison av v b posn
                 return (a ++ [b] ++ c, resultT, Just resultV)
             else do
-                resultT <- resultOpType at t posn
-                return (a ++ [b] ++ c, resultT, Nothing)
+                assertComparableTypes at t posn
+                return (a ++ [b] ++ c, BoolType, Nothing)
         )
 
 
