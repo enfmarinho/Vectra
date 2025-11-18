@@ -128,6 +128,11 @@ handleComparison (Just (StringValue lhs)) (Just (StringValue rhs)) compOp _ =
         OP_EQ _     -> return (BoolType, BoolValue $ lhs == rhs)
         OP_NOT_EQ _ -> return (BoolType, BoolValue $ lhs /= rhs)
         _ -> semanticError "Invalid operator for strings"
+handleComparison (Just (EnumValue lhs)) (Just (EnumValue rhs)) compOp _ =
+    case compOp of
+        OP_EQ _     -> return (BoolType, BoolValue $ lhs == rhs)
+        OP_NOT_EQ _ -> return (BoolType, BoolValue $ lhs /= rhs)
+        _ -> semanticError "Invalid operator for strings"
 handleComparison (Just lhsV) (Just rhsV) compOp posn = do
     lhsT <- typeFromValue lhsV posn
     lhsV' <- castValueToType FloatType (lhsT, lhsV) posn
