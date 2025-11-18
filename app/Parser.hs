@@ -316,7 +316,7 @@ enumDecl = do
 
     topScope' <- topScope
     closeScope
-    insertSymbol (enumId, EnumType enumId topScope', Nothing) False
+    insertSymbol (enumId, EnumDeclType enumId topScope', Nothing) False
     where
         idList :: String -> StateType ()
         idList enumId = do
