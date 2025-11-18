@@ -249,8 +249,7 @@ implDecl = do
 namespaceDecl :: StateType ()
 namespaceDecl = do
     _ <- TT.kwNamespace
-    b <- TT.id
-    let ID _posn symbolId = b
+    (ID _posn symbolId) <- TT.id
     result <- consultSymbolTable symbolId
     (publicTable, privateTable) <- case result of
             Nothing -> do
@@ -285,6 +284,7 @@ namespaceDecl = do
                                 <|> structDecl
                                 <|> implDecl
                                 <|> namespaceDecl
+                            _ <- optionMaybe TT.newLine
                             currScope <- topScope 
                             closeScope -- close temporary scope 
 
@@ -295,10 +295,9 @@ namespaceDecl = do
                             return []
                         )
     _ <- TT.unindent
-    _ <- TT.newLine
     closeScope -- close scope for past private declarations
     closeScope -- close scope for past public declarations
-    updateSymbolTable symbolId ([NamespaceType publicTable privateTable], Nothing)
+    insertSymbol (symbolId, NamespaceType publicTable privateTable, Nothing) False
 
 enumDecl :: StateType ()
 enumDecl = do
