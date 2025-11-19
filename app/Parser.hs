@@ -259,13 +259,14 @@ namespaceDecl = do
                 return (emptyTable, emptyTable)
             Just (t, _) -> case t of
                                 [NamespaceType publicTable privateTable] -> do
-                                    pushScope publicTable True
+                                    pushScope publicTable False
                                     pushScope privateTable True
                                     return (publicTable, privateTable)
                                 _ -> semanticError $ "ambiguos declaration, " ++ symbolId ++ " is already declared as another type"
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
+    openScope True
     _ <- concat <$> many1 (do
                             f <- option Public (do 
                                                 _ <- TT.kwPrivate
@@ -288,13 +289,15 @@ namespaceDecl = do
                             currScope <- topScope 
                             closeScope -- close temporary scope 
 
+                            mergeTableToScope currScope
                             case f of
-                                Public -> liftIO $ mergeTablesInPlace currScope publicTable
-                                Private -> liftIO $ mergeTablesInPlace currScope privateTable
+                                Public -> liftIO $ mergeTablesInPlace publicTable currScope
+                                Private -> liftIO $ mergeTablesInPlace privateTable currScope
                                 _ -> fail "<namespaceDecl>" -- will never reach this, just to avoid warnings
                             return []
                         )
     _ <- TT.unindent
+    closeScope
     closeScope -- close scope for past private declarations
     closeScope -- close scope for past public declarations
     insertSymbol (symbolId, NamespaceType publicTable privateTable, Nothing) False
@@ -322,7 +325,7 @@ enumDecl = do
             _ <- many1 $ do
                 (ID _posn labelId) <- TT.id
                 _ <- TT.newLine
-                insertSymbol (labelId, EnumLabelType enumId, Nothing) False
+                insertSymbol (labelId, EnumLabelType enumId, Just $ EnumValue labelId) False
             return ()
 
 optUnnamedParamDeclList :: StateType ([Token], [Type])
@@ -365,11 +368,11 @@ paramDeclList = do
 subprogramDecl :: StateType ()
 subprogramDecl = do
     previousParserBlock <- getParserBlock
-    openScope False
+    openScope True
     a <- TT.kwProc
         <|> TT.kwFunc
     (_, bIds) <- option ([], []) templateDecl
-    c <- TT.id
+    (ID posn symbolId) <- TT.id
 
     _ <- TT.openParen
     (_, dParams) <- optParamDeclList
@@ -380,7 +383,6 @@ subprogramDecl = do
         Nothing -> setParserBlock (Method Nothing)
         Just (_, t) -> setParserBlock (Method $ Just t)
 
-    let ID posn symbolId = c
     when (symbolId == "main") $ do
         programState <- getProgramState
         when (programState == Finished) $ semanticError $ "A second main method is declared here, it must exist only one " ++ showPos posn
@@ -522,6 +524,7 @@ var = do
 callStmt :: String -> [Type] -> StateType ([Token], Maybe Type, Maybe Value)
 callStmt symbolId symbolTypeList = do
     openScope True -- True because it needs access to the param values, it will be changed to false latter on
+    -- TODO read a optional dot followed by var, to allow method calls
     previousProgramState <- getProgramState
     (b, templateTypeList) <- option ([], []) templateInstantiation
     c <- TT.openParen
