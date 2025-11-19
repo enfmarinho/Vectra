@@ -8,6 +8,8 @@ import qualified Data.HashTable.IO as H
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Data.List (genericLength) -- TODO there are better ways
 import Data.Foldable 
+import GHC.OldList (intercalate)
+import GHC.Base (when)
 
 warningMsg :: String -> StateType ()
 warningMsg msg = liftIO $ putStrLn $ "Warning: " ++ msg
@@ -272,8 +274,8 @@ castType (ArrayType t1) (ArrayType t2) posn = do
     return (ArrayType finalT)
 
 -- EnumType target
-castType (EnumType name1 labels1) (EnumType name2 labels2) posn
-    | EnumType name1 labels1 == EnumType name2 labels2 = return (EnumType name1 labels1)
+castType (EnumDeclType name1 labels1) (EnumDeclType name2 labels2) posn
+    | EnumDeclType name1 labels1 == EnumDeclType name2 labels2 = return (EnumDeclType name1 labels1)
     | otherwise =
         semanticError $ "Incompatible enum types at " ++ showPos posn
 
@@ -326,6 +328,8 @@ castValueToType StringType (srcT, ConstValue v) posn =
 castValueToType (ArrayType _)(_, ArrayValue array) _ = return (ArrayValue array)
 
 --- Enum Target ---
+castValueToType (EnumDeclType id1 _)(EnumLabelType id2, EnumValue label) posn = 
+    castValueToType (EnumLabelType id1) (EnumLabelType id2, EnumValue label) posn
 castValueToType (EnumLabelType id1)(EnumLabelType id2, EnumValue label) posn = do
     when (id1 /= id2) $ semanticError $ "incompatible enum types " ++ showPos posn
     return (EnumValue label)
@@ -357,7 +361,12 @@ resultOpType BoolType FloatType _ = return FloatType
 resultOpType (ConstType lhs) rhs posn = resultOpType lhs rhs posn
 resultOpType lhs (ConstType rhs) posn = resultOpType lhs rhs posn
 
-resultOpType _ _ posn = semanticError $ "<resultOpType> " ++ showPos posn
+-- Enum
+resultOpType (EnumLabelType label1) (EnumLabelType label2) posn = do
+    when (label1 /= label2) $ semanticError $ "operation between incompatible enums " ++ showPos posn
+    return $ EnumLabelType label1
+
+resultOpType t1 t2 posn = semanticError $ "<resultOpType> " ++ show t1 ++ " " ++ show t2 ++ showPos posn
 
 searchTypeList :: [Type] -> Int -> [Type] -> StateType (Maybe Type)
 searchTypeList [] _ _ = return Nothing
@@ -401,7 +410,7 @@ typeFromValue (ConstValue v) posn = do
 
 typeFromValue (ArrayValue _) _ = return $ ArrayType $ TemplateType Nothing
 
-typeFromValue (EnumValue _) _ = return (EnumLabelType "")
+typeFromValue (EnumValue _enumId) _ = return (EnumLabelType "")
 typeFromValue (RefValue symbolId _) posn = do
     symbolType <- consultType symbolId posn
     return (RefType symbolType)

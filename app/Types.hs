@@ -50,7 +50,7 @@ data Type = IntType
           | RefType Type
           | ConstType Type                                           -- (internal_type)
           | ArrayType Type                                           -- (internal_type)                 
-          | EnumType String SymbolTableType                          -- (enum_id, valid_labels)
+          | EnumDeclType String SymbolTableType                          -- (enum_id, valid_labels)
           | EnumLabelType String                                     -- (enum_type_id)
           | ProcType [String] [(String, Type)] [Token]               -- (template_ids, param_types, method_body)
           | FuncType [String] [(String, Type)] Type [Token]          -- (template_ids, (param_ids, param_types), return_type, method_body)
@@ -74,6 +74,7 @@ data Value = IntValue Int
            | FuncRefValue String
            | ProcRefValue String
            | StructValue SymbolTableType    -- (internal_symbol_table)
+           deriving (Show)
 
 instance Eq ProgramState where
     Starting == Starting = True
@@ -97,7 +98,7 @@ instance Show Type where
     show (RefType t) = "ref(" ++ show t ++ ")"
     show (ConstType t) = "const(" ++ show t ++ ")"
     show (ArrayType t) = show t ++ "[]"
-    show (EnumType name _labelsId) = "enum " ++ name
+    show (EnumDeclType name _labelsId) = "enum " ++ name
     show (ProcType templates params _body) =
         "proc<" ++ show templates ++ ">" ++ "(" ++ showParams params ++ ")"
     show (FuncType templates params returnT _) =
@@ -129,7 +130,7 @@ instance Eq Type where
     RefType t1 == RefType t2 = t1 == t2
     ConstType t1 == ConstType t2 = t1 == t2
     ArrayType t1 == ArrayType t2 = t1 == t2
-    EnumType n1 _ == EnumType n2 _ = n1 == n2
+    EnumDeclType n1 _ == EnumDeclType n2 _ = n1 == n2
     ProcType templates1 params1 _ == ProcType templates2 params2 _ =
         templates1 == templates2 && params1 == params2
     FuncType templates1 params1 r1 _ == FuncType templates2 params2 r2 _ =
