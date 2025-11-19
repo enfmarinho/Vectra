@@ -638,6 +638,27 @@ callStmt symbolId symbolTypeList = do
                     setProgramState previousProgramState
                     return maybeReturn
 
+namespaceAccess :: StateType ([Token], [String])
+namespaceAccess = do
+    segments <- many $ do
+        access <- TT.kwDoubleColumn
+        name@(ID _ nameId) <- TT.id
+        return (access : [name], nameId)
+
+    let (tokenList, idList) = unzip segments
+
+    return (concat tokenList, idList)
+
+-- memberAccess :: StateType ([Token], [String])
+-- memberAccess = do
+--     segments <- many $ do
+--         dot <- TT.kwDot
+--         c@(ID _ cid) <- TT.id
+--         return ([dot, c], cid)
+--
+--     let (tokenList, idList) = unzip segments
+--
+--     return (concat tokenList, idList)
 
 literal :: StateType ([Token], Type, Maybe Value)
 literal = do
