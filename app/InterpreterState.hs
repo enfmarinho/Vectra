@@ -137,6 +137,18 @@ assertEmptyValue m = do
         Nothing -> return ()
         Just _ -> semanticError "TODO 3"
 
+mergeTableToScope :: SymbolTableType -> StateType ()
+mergeTableToScope table = do
+    InterpreterState{} <- getState
+    destiny <- topScope
+    pairs <- liftIO $ H.toList table
+    forM_ pairs $ \(k, (s, v)) -> do
+        existing <- liftIO $ H.lookup destiny k
+        case existing of
+            Nothing -> liftIO $ H.insert destiny k (s, v)
+            Just (existingList, _) -> do
+                liftIO $ H.insert destiny k (existingList ++ s, Nothing)
+
 insertSymbol :: SymbolType -> Bool -> StateType ()
 insertSymbol (symbolId, symbolType, maybeValue) canBeDuplicate = do
     st@InterpreterState{..} <- getState
