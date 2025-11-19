@@ -505,21 +505,13 @@ varDecl = do
 -- TODO var is incomplete, this is just a STUB
 var :: StateType ([Token], String, [Type], Maybe Value)
 var = do
-    a <- TT.id
+    -- TODO Calling namespaced subprograms is problematic
+    a@(ID posn symbolId) <- TT.id
+    (b, namespacePath) <- namespaceAccess
     -- (b, symbolList) <- option ([], []) memberAccess
 
-    let ID posn symbolId = a
-    t <- consultTypeList symbolId posn
-    isRunning' <- isRunning
-    maybeTV <- if isRunning'
-                then consultSymbolTable symbolId
-                else return Nothing
-
-    value <- case maybeTV of
-                Nothing -> return Nothing
-                Just (_, v) -> return v
-
-    return ([a], symbolId, t, value)
+    (varTypeList, varValue) <- accessNamespace (symbolId : namespacePath) posn
+    return (a:b, symbolId, varTypeList, varValue)
 
 callStmt :: String -> [Type] -> StateType ([Token], Maybe Type, Maybe Value)
 callStmt symbolId symbolTypeList = do
@@ -680,7 +672,7 @@ literal = do
     <|> do
         a <- TT.kwFalse
         return ([a], BoolType, Just $ BoolValue False)
-    <|> do
+    <|> try (do
         a <- TT.openBracket
         let OPEN_BRACKET posn = a
         (bTokens, bt, bv) <- literal
@@ -690,14 +682,24 @@ literal = do
             assertTypesEq bt ct posn
             return (cTokens ++ [d], cv)
         d <- TT.closeBracket
-        return ([a] ++ bTokens ++ concatMap fst c ++ [d], ArrayType bt, Just $ ArrayValue $ V.fromList (bv : map snd c))
-    <|> do 
+        return ([a] ++ bTokens ++ concatMap fst c ++ [d], ArrayType bt, Just $ ArrayValue $ V.fromList (bv : map snd c)))
+    <|> try (do 
         (a, at) <- typeStmt
         b <- TT.openBracket
         c <- TT.intLiteral
         d <- TT.closeBracket
         let INT_LITERAL _ size = c
-        return (a ++ [b] ++ [c] ++ [d], ArrayType at, Just $ ArrayValue $ V.replicate size Nothing)
+        return (a ++ [b] ++ [c] ++ [d], ArrayType at, Just $ ArrayValue $ V.replicate size Nothing))
+    <|> try (do -- enum labels
+        a@(ID posn symbolId) <- TT.id
+        (b, bPath) <- namespaceAccess
+        (tList, v) <- accessNamespace (symbolId : bPath) posn
+        t <- getTypeFromTypeList tList 
+        case t of
+            EnumLabelType _ -> return ()
+            _ -> semanticError $ "should be a enum label " ++ showPos posn
+        return (a : b, t, v)
+        )
 
 expStmtList :: StateType [([Token], Type, Maybe Value)]
 expStmtList = do
@@ -1196,12 +1198,12 @@ typeStmt = do
                 e <- TT.closeParen
                 return ([b] ++ [c] ++ d ++ [e], RefType t)
             <|> do -- customType
-                b <- TT.id
-                let ID posn s = b
-                maybeT <- consultTypeList s posn >>= getCustomType
-                case maybeT of
-                    Nothing -> semanticError $ s ++ " is not a type " ++ showPos posn
-                    Just t -> return ([b], t)
+                b@(ID posn symbolId) <- TT.id
+                (c, namespacePath) <- namespaceAccess
+                (tList, _) <- accessNamespace (symbolId : namespacePath) posn
+                t <- getTypeFromTypeList tList
+                assertCustomType t posn
+                return (b:c, t)
             <|> do -- reference for subprogram
                 b <- TT.openParen
                 (c, templateIds) <- option ([], []) templateDecl
