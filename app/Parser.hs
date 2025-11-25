@@ -1062,6 +1062,7 @@ ifElseStmt = do
         -- The Bool indicates whether the conditional was executed
         ifStmt :: StateType ([Token], Bool)
         ifStmt = do
+            previousProgramState <- getProgramState
             openScope True
             a <- TT.kwIf
             (b, expType, expValue) <- expStmt
@@ -1081,6 +1082,7 @@ ifElseStmt = do
             (f, _) <- stmtList
             g <- TT.unindent
 
+            setProgramState previousProgramState
             closeScope
             return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g], condition)
 
