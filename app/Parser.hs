@@ -876,34 +876,65 @@ compareExpStmt = do
 
 addSubExpStmt :: StateType ([Token], Type, Maybe Value)
 addSubExpStmt = do
-    (a, at, av) <- multDivExpStmt
-    option (a, at, av) (do
-            (b, posn, isAdd) <- do
+    -- 1. Analisa o primeiro termo (Lado Esquerdo inicial)
+    initial <- multDivExpStmt
+    -- 2. Entra num loop para consumir o resto da cadeia (ex: + b - c + d)
+    chainLoop initial
+
+    where
+        chainLoop :: ([Token], Type, Maybe Value) -> StateType ([Token], Type, Maybe Value)
+        chainLoop (accTokens, accType, accValue) = 
+            option (accTokens, accType, accValue) (do
+                -- Tenta ler um operador (+ ou -)
+                -- Se falhar, retorna o acumulador atual (resultado final)
+                (opToken, posn, isAdd) <- do
                             b <- TT.opAdd
                             let OP_ADD posn = b
                             return (b, posn, True)
                         <|> do
                             b <- TT.opSub
+                                -- Pattern Matching (Desconstrução). Como sabemos que b é um token de subtração, nós o abrimos para pegar a variável posn que está guardada dentro dele.
                             let OP_SUB posn = b
                             return (b, posn, False)
-            (c, t, v) <- addSubExpStmt
+                
+                -- IMPORTANTE: Aqui chamamos o nível de precedência INFERIOR (multDivExpStmt)
+                -- e NÃO o próprio addSubExpStmt, para evitar loops infinitos ou precedência errada.
+                (rhsTokens, rhsType, rhsValue) <- multDivExpStmt
 
             isRunning' <- isRunning
-            if isRunning' then do
-                (resultT, resultV) <- if isAdd
-                                        then handleAdd av v posn
-                                        else handleSub av v posn
-                return (a ++ [b] ++ c, resultT, Just resultV)
+                
+                -- Calcula o novo resultado (Acumulador Operador LadoDireito)
+                (resultT, resultV) <- if isRunning' then do
+                    if isAdd
+                        then do
+                            (t, v) <- handleAdd accValue rhsValue posn
+                            return (t, Just v)
             else do
-                resultT <- resultOpType at t posn
-                return (a ++ [b] ++ c, resultT, Nothing)
+                            (t, v) <- handleSub accValue rhsValue posn
+                            return (t, Just v)
+                else do
+                    t <- resultOpType accType rhsType posn
+                    return (t, Nothing)
+
+                -- 3. Chama o loop recursivamente, passando o NOVO resultado como o acumulador (Esquerda)
+                -- Isso garante a associatividade à esquerda: ((a + b) - c)
+                chainLoop (accTokens ++ [opToken] ++ rhsTokens, resultT, resultV)
         )
 
 multDivExpStmt :: StateType ([Token], Type, Maybe Value)
 multDivExpStmt = do
-    (a, at, av) <- baseExp
-    option (a, at, av) (do
-            (b, posn, isMult) <- do
+    -- 1. Analisa o primeiro termo (Lado Esquerdo inicial)
+    initial <- baseExp
+    -- 2. Entra num loop para consumir o resto da cadeia (ex: + b - c + d)
+    chainLoop initial
+
+    where
+        chainLoop :: ([Token], Type, Maybe Value) -> StateType ([Token], Type, Maybe Value)
+        chainLoop (accTokens, accType, accValue) = 
+            option (accTokens, accType, accValue) (do
+                -- Tenta ler um operador (* ou /)
+                -- Se falhar, retorna o acumulador atual (resultado final)
+                (opToken, posn, isMult) <- do
                             b <- TT.opMult
                             let OP_MULT posn = b
                             return (b, posn, True)
@@ -911,19 +942,30 @@ multDivExpStmt = do
                             b <- TT.opDiv
                             let OP_DIV posn = b
                             return (b, posn, False)
-            (c, t, v) <- multDivExpStmt
+                
+                -- IMPORTANTE: Aqui chamamos o nível de precedência INFERIOR (baseExp)
+                -- e NÃO o próprio multDivExpStmt, para evitar loops infinitos ou precedência errada.
+                (rhsTokens, rhsType, rhsValue) <- baseExp
 
             isRunning' <- isRunning
-            if isRunning' then do
-                (resultT, resultV) <- if isMult
-                                        then handleMult av v posn
-                                        else handleDiv av v posn
-                return (a ++ [b] ++ c, resultT, Just resultV)
+                
+                -- Calcula o novo resultado (Acumulador Operador LadoDireito)
+                (resultT, resultV) <- if isRunning' then do
+                    if isMult
+                        then do
+                            (t, v) <- handleMult accValue rhsValue posn
+                            return (t, Just v)
             else do
-                resultT <- resultOpType at t posn
-                return (a ++ [b] ++ c, resultT, Nothing)
-        )
+                            (t, v) <- handleDiv accValue rhsValue posn
+                            return (t, Just v)
+                else do
+                    t <- resultOpType accType rhsType posn
+                    return (t, Nothing)
 
+                -- 3. Chama o loop recursivamente, passando o NOVO resultado como o acumulador (Esquerda)
+                -- Isso garante a associatividade à esquerda: ((a * b) / c)
+                chainLoop (accTokens ++ [opToken] ++ rhsTokens, resultT, resultV)
+        )
 
 expStmt :: StateType ([Token], Type, Maybe Value)
 expStmt = do
