@@ -46,6 +46,7 @@ importFile filePath _posn = do
             putState finalState
             finishImport filePath
 
+-- define o que é um programa Vectra (imports + global decls, que são structs, impls, enums, subprograms e vars)
 vectraLanguage :: StateType InterpreterState
 vectraLanguage = do
     _ <- importCommand `sepEndBy` TT.newLine
@@ -397,7 +398,7 @@ subprogramDecl = do
             Just t | t `elem` [IntType, BoolType] -> return ()
                    | otherwise -> semanticError "main method must either return an int, a bool, or be a procedure"
 
-        setProgramState Running
+        setProgramState Running -- Aqui é que o programa começa a rodar de fato
 
     _ <- TT.kwColumn
     _ <- TT.newLine

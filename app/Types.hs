@@ -4,6 +4,9 @@ import Text.Parsec
 import Scanner
 import qualified Data.Vector as V
 
+-- type cria apenas um sinônimo
+-- data cria uma estrutura totalmente nova (parecido com um class ou struct), são os TADs
+
 type SymbolType = (String, Type, Maybe Value)
 type SymbolTableType = H.BasicHashTable String ([Type], Maybe Value)
 type NamespaceSymbolTableType = H.BasicHashTable String ([Type], Maybe Value, AccessModifiers)
@@ -11,10 +14,11 @@ type SymbolTableStackType = [(SymbolTableType, Bool, Int)]
 
 type LibMethodSignature = [Value] -> AlexPosn -> StateType (Maybe Value)
 
+-- registro (como uma struct em C), "coração" da memória do programa em execução
 data InterpreterState = InterpreterState
-  { parserBlock :: ParserBlock
-  , programState :: ProgramState
-  , symbolTableStack :: SymbolTableStackType
+  { parserBlock :: ParserBlock                  -- "onde estou no código?"
+  , programState :: ProgramState                -- "o que devo fazer agora? break? return?"
+  , symbolTableStack :: SymbolTableStackType    -- Pilha de tabelas de símbolo. Escopo Estático e Aninhado definido aqui
   , globalSymbolTable :: SymbolTableType
   , imports :: H.BasicHashTable String Bool
   , nestedImportCounter :: Int
@@ -26,13 +30,14 @@ type StateType = ParsecT [Token] InterpreterState IO
 data AccessModifiers = Static
                      | Public
                      | Private
-                     deriving (Eq)
+                     deriving (Eq) -- Faz igualdade padrão (só é igual se for igual). Sem isso, precisaria do boilerplate, igual tem no fim com instance Eq Type
 
 data ParserBlock = GlobalScope
                  | Method (Maybe Type) -- Target return type
                  | Loop (Maybe Type) -- Target return type
                  deriving (Eq, Show)
 
+-- "sequenciadores"
 data ProgramState = Starting
                   | Running
                   | Skip
@@ -41,19 +46,20 @@ data ProgramState = Starting
                   | Return (Maybe (Type, Value)) -- Return value
                   | Finished
 
+-- definimos os tipos que existem em tempo de compilação
 data Type = IntType
           | FloatType
           | CharType
           | BoolType
           | StringType
-          | TemplateType (Maybe String) -- (template_symbol)
+          | TemplateType (Maybe String) -- (template_symbol) para subprogramas genéricos
           | RefType Type
           | ConstType Type                                           -- (internal_type)
-          | ArrayType Type                                           -- (internal_type)                 
-          | EnumDeclType String SymbolTableType                          -- (enum_id, valid_labels)
+          | ArrayType Type                                           -- (internal_type)  Tipo recursivo: array de quê?               
+          | EnumDeclType String SymbolTableType                      -- (enum_id, valid_labels)
           | EnumLabelType String                                     -- (enum_type_id)
-          | ProcType [String] [(String, Type)] [Token]               -- (template_ids, param_types, method_body)
-          | FuncType [String] [(String, Type)] Type [Token]          -- (template_ids, (param_ids, param_types), return_type, method_body)
+          | ProcType [String] [(String, Type)] [Token]               -- (template_ids, param_types, method_body) Procedimentos (sem retorno)
+          | FuncType [String] [(String, Type)] Type [Token]          -- (template_ids, (param_ids, param_types), return_type, method_body) Funções (com retorno)
           | StructType [String] SymbolTableType SymbolTableType      -- (template_ids, table_public_data, table_private_methods)
           | StructInstanceType String                                -- (struct_type_id)
           | FuncRefType [String] [Type] Type                         -- (templates_ids, param_types, return_type)
@@ -62,6 +68,8 @@ data Type = IntType
           | NamespaceType SymbolTableType SymbolTableType            -- (public_symbol_table, private_symbol_table)
           | HaskellMethod [Type] (Maybe Type) LibMethodSignature     -- (param_types, return_type, internal_method)
 
+-- Aqui definimos o que existe na memória em tempo de execução.
+-- Haskell é fortemente tipado. Para contornar isso e permitir que interpretador guarde qualquer coisa, criamos esse tipo "Wrapper" (tudo é um Value)
 data Value = IntValue Int
            | FloatValue Float
            | CharValue Char
@@ -76,6 +84,7 @@ data Value = IntValue Int
            | StructValue SymbolTableType    -- (internal_symbol_table)
            deriving (Show)
 
+-- ensinando o operador == a comparar dois estados
 instance Eq ProgramState where
     Starting == Starting = True
     Running == Running = True
@@ -87,6 +96,7 @@ instance Eq ProgramState where
 
     _ == _ = False
 
+-- ensinando a função show (converter para String) a imprimir nossos tipos (vital para msg de erro)
 instance Show Type where
     show IntType = "int"
     show FloatType = "float"
@@ -143,6 +153,9 @@ instance Eq Type where
     ProcRefType templates1 params1 == ProcRefType templates2 params2 =
         templates1 == templates2 && params1 == params2
 
+-- Imagine a função swap<T>(T a, T b). O interpretador espera receber T. O usuário passa int. 
+-- O interpretador pergunta: IntType == TemplateType? 
+-- Graças a essa regra (T é igual a qualquer coisa), a resposta é SIM. O interpretador aceita a chamada sem precisar de uma lógica complexa de inferência de tipos.
     TemplateType _ == _ = True
     _ == TemplateType _  = True
 
