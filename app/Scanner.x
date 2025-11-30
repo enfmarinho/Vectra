@@ -61,7 +61,6 @@ tokens :-
     cast         { \aInp _ -> do t <- handleIndentation (KW_CAST (alexPos aInp)); return $ Just t }
     impl         { \aInp _ -> do t <- handleIndentation (KW_IMPL (alexPos aInp)); return $ Just t }
     static       { \aInp _ -> do t <- handleIndentation (KW_STATIC (alexPos aInp)); return $ Just t }
-    local        { \aInp _ -> do t <- handleIndentation (KW_LOCAL (alexPos aInp)); return $ Just t }
     int          { \aInp _ -> do t <- handleIndentation (KW_INT (alexPos aInp)); return $ Just t }
     float        { \aInp _ -> do t <- handleIndentation (KW_FLOAT (alexPos aInp)); return $ Just t }
     string       { \aInp _ -> do t <- handleIndentation (KW_STRING (alexPos aInp)); return $ Just t }
@@ -253,7 +252,6 @@ data Token =
   KW_CONST AlexPosn |
   KW_IMPL AlexPosn |
   KW_STATIC AlexPosn |
-  KW_LOCAL AlexPosn |
   KW_TRUE AlexPosn |
   KW_FALSE AlexPosn |
   KW_RETURN AlexPosn |
