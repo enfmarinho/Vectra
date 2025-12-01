@@ -4,6 +4,24 @@ import Scanner
 import Text.Parsec
 import Types
 
+-- tokenPrim: É a função Parsec para criar um parser primitivo que aceita um token se ele passar no teste. Ela aceita 3 argumentos:
+-- Argumento 1 (show): "Como eu imprimo esse token se der erro?" (Usa a função show).
+-- Argumento 2 (updatePos): "Como eu atualizo a linha/coluna atual do arquivo?" (Usa a função definida lá embaixo).
+-- Argumento 3 (getToken): "Qual é o teste para aceitar esse token?".
+
+
+-- getToken é uma função local (where). Ela usa Pattern Matching.
+-- getToken (INT_LITERAL pos x) = Just ...: Se o token que chegou for do tipo INT_LITERAL, ACEITE (retorne Just).
+-- getToken _ = Nothing: Se for qualquer outra coisa (o _ significa "qualquer coisa"), REJEITE (retorne Nothing).
+
+-- StateType Token significa: um parser que lê algo e retorna um Token (ex: INT_LITERAL 10, em vez de só 10)
+-- tokenPrim é token primitivo
+
+-- getToken (KW_PUBLIC pos):
+-- Pergunta: "O token que chegou é exatamente um KW_PUBLIC?" (Note que pos é uma variável que captura a posição vinda junto com o token).
+-- Resposta: Se sim, retorne Just (KW_PUBLIC pos).
+-- O que é Just? Em Haskell, funções que podem falhar não retornam null. Elas retornam um tipo Maybe. Just significa "Sucesso, aqui está o valor".
+
 id :: StateType Token
 id = tokenPrim show updatePos getToken where
   getToken (ID pos s) = Just (ID pos s)
@@ -154,6 +172,7 @@ closeCurly = tokenPrim show updatePos getToken where
   getToken (CLOSE_CURLY pos) = Just (CLOSE_CURLY pos)
   getToken _       = Nothing
 
+-- Indentação Significativa
 indent :: StateType Token
 indent = tokenPrim show updatePos getToken where
   getToken (INDENT posn) = Just (INDENT posn)
@@ -233,6 +252,8 @@ kwDeref :: StateType Token
 kwDeref = tokenPrim show updatePos getToken where
   getToken (KW_DEREF pos) = Just (KW_DEREF pos)
   getToken _       = Nothing
+
+-- Distinção entre procedimento e função
 
 kwFunc :: StateType Token
 kwFunc = tokenPrim show updatePos getToken where
