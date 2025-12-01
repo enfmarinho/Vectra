@@ -901,7 +901,7 @@ addSubExpStmt = do
                 -- e NÃO o próprio addSubExpStmt, para evitar loops infinitos ou precedência errada.
                 (rhsTokens, rhsType, rhsValue) <- multDivExpStmt
 
-            isRunning' <- isRunning
+                isRunning' <- isRunning
                 
                 -- Calcula o novo resultado (Acumulador Operador LadoDireito)
                 (resultT, resultV) <- if isRunning' then do
@@ -909,17 +909,17 @@ addSubExpStmt = do
                         then do
                             (t, v) <- handleAdd accValue rhsValue posn
                             return (t, Just v)
-            else do
+                    else do
                             (t, v) <- handleSub accValue rhsValue posn
                             return (t, Just v)
-                else do
-                    t <- resultOpType accType rhsType posn
-                    return (t, Nothing)
+                    else do
+                        t <- resultOpType accType rhsType posn
+                        return (t, Nothing)
 
                 -- 3. Chama o loop recursivamente, passando o NOVO resultado como o acumulador (Esquerda)
                 -- Isso garante a associatividade à esquerda: ((a + b) - c)
                 chainLoop (accTokens ++ [opToken] ++ rhsTokens, resultT, resultV)
-        )
+            )
 
 multDivExpStmt :: StateType ([Token], Type, Maybe Value)
 multDivExpStmt = do
@@ -947,7 +947,7 @@ multDivExpStmt = do
                 -- e NÃO o próprio multDivExpStmt, para evitar loops infinitos ou precedência errada.
                 (rhsTokens, rhsType, rhsValue) <- baseExp
 
-            isRunning' <- isRunning
+                isRunning' <- isRunning
                 
                 -- Calcula o novo resultado (Acumulador Operador LadoDireito)
                 (resultT, resultV) <- if isRunning' then do
@@ -955,17 +955,17 @@ multDivExpStmt = do
                         then do
                             (t, v) <- handleMult accValue rhsValue posn
                             return (t, Just v)
-            else do
+                    else do
                             (t, v) <- handleDiv accValue rhsValue posn
                             return (t, Just v)
-                else do
-                    t <- resultOpType accType rhsType posn
-                    return (t, Nothing)
+                    else do
+                        t <- resultOpType accType rhsType posn
+                        return (t, Nothing)
 
                 -- 3. Chama o loop recursivamente, passando o NOVO resultado como o acumulador (Esquerda)
                 -- Isso garante a associatividade à esquerda: ((a * b) / c)
                 chainLoop (accTokens ++ [opToken] ++ rhsTokens, resultT, resultV)
-        )
+            )
 
 expStmt :: StateType ([Token], Type, Maybe Value)
 expStmt = do
