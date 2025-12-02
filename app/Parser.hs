@@ -19,7 +19,7 @@ import Control.Monad
 import Data.Maybe
 import Control.Monad.IO.Class
 import VectraLib
-import Data.List (genericLength)
+import Data.List (intercalate, genericLength)
 
 -- TODO remove uses of 'try'
 -- TODO add file name to messages
@@ -73,7 +73,7 @@ vectraLanguage = do
             <|> implDecl
             <|> enumDecl
             <|> subprogramDecl
-            <|> do 
+            <|> do
                 _ <- varDecl
                 return ()
             <|> namespaceDecl
@@ -95,9 +95,8 @@ templateDecl = do
   where
     idSymbol :: StateType (Token, String)
     idSymbol = do
-        a <- TT.id
-        let ID _posn symbolId = a
-        insertSymbol (symbolId, TemplateType $ Just symbolId, Nothing) False
+        a@(ID posn symbolId) <- TT.id
+        insertSymbol (symbolId, TemplateType $ Just symbolId, Nothing) posn
         return (a, symbolId)
 
 templateInstantiation :: StateType ([Token], [Type])
@@ -113,30 +112,30 @@ templateInstantiation = do
     c <- TT.opGreater
     return ([a] ++ tokenList ++ [c], typeList)
 
-insertTemplateInstantiation :: [Type] -> [String] -> StateType ()
-insertTemplateInstantiation [] [] = return ()
-insertTemplateInstantiation (_:_) [] = semanticError "Template instantiation: missing symbols"
-insertTemplateInstantiation [] (_:_) = semanticError "Template instantiation: missing types"
-insertTemplateInstantiation (t:typeRest) (s:symbolRest) = do
-    insertSymbol (s, t, Nothing) False
-    insertTemplateInstantiation typeRest symbolRest
+insertTemplateInstantiation :: [Type] -> [String] -> AlexPosn -> StateType ()
+insertTemplateInstantiation [] [] _= return ()
+insertTemplateInstantiation (_:_) [] posn = semanticError $ "Template instantiation: missing symbols at " ++ showPos posn
+insertTemplateInstantiation [] (_:_) posn = semanticError $ "Template instantiation: missing types" ++ showPos posn
+insertTemplateInstantiation (t:typeRest) (s:symbolRest) posn = do
+    insertSymbol (s, t, Nothing) posn
+    insertTemplateInstantiation typeRest symbolRest posn
 
 structDecl :: StateType ()
 structDecl = do
-    openScope False
+    openScope True
     _ <- TT.kwStruct
     (_, templateIds) <- option ([], []) templateDecl
-    b <- TT.id
+    (ID posn symbolId) <- TT.id
 
-    let ID posn symbolId = b
     assertNonAmbiguous symbolId posn
 
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
 
-    publicTable <- liftIO H.new 
-    privateTable <- liftIO H.new 
+    emptyTable <- liftIO H.new
+    let publicTable = emptyTable
+        privateTable = emptyTable
     _ <- many1 (do
                     accessModifier <- option Public (do
                                             _ <- TT.kwPublic
@@ -153,29 +152,45 @@ structDecl = do
                     case accessModifier of
                         Public -> liftIO $ mergeTablesInPlace currScope publicTable
                         Private -> liftIO $ mergeTablesInPlace currScope privateTable
-                        _ -> fail "<structDecl>" -- Cannot reach this, just to avoid warnings
+                        Static -> return () -- Cannot reach this, since we don't allow static data, just to avoid warnings
                     )
     _ <- TT.newLine
     _ <- TT.unindent
     closeScope
-    insertSymbol (symbolId, StructType templateIds publicTable privateTable, Nothing) False
+    insertSymbol (symbolId, StructType symbolId templateIds publicTable privateTable, Nothing) posn
 
 implDecl :: StateType ()
 implDecl = do
-    openScope False
+    openScope True
     _ <- TT.kwImpl
-    a <- TT.id
-    let ID _posn symbolId = a
-    result <- consultSymbolTable symbolId
-    (publicMethodTable, privateMethodTable, staticMethodTable) <- case result of
-                                    Nothing -> semanticError $ "using a impl for a non declared symbol: " ++ symbolId
-                                    Just (t, _) -> do helperF t symbolId
+    (ID posn symbolId) <- TT.id
+    (typeList, _) <- consultSymbolTable symbolId posn
+    structT <- getTypeFromTypeList typeList
+    case structT of
+        StructType _name templeteList publicTable privateTable -> do
+            pushScope publicTable True
+            pushScope privateTable True
+            insertTemplates templeteList posn
+        _ -> semanticError $ "using impl for a non-struct type \"" ++ symbolId ++ "\" " ++ showPos posn
 
+    implMaybe <- consultSymbolTableMaybe ("impl::" ++ symbolId) 
+    (publicMethodTable, privateMethodTable) <- case implMaybe of
+                                                    Nothing -> do
+                                                        emptyTable <- liftIO H.new
+                                                        return (emptyTable, emptyTable)
+                                                    Just (implT, _) -> case implT of
+                                                                            [ImplType pub priv] -> return (pub, priv)
+                                                                            _ -> semanticError "<implDecl>"
+
+
+    pushScope publicMethodTable True
+    pushScope privateMethodTable True
+    
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
     _ <- concat <$> many1 (do
-                            f <- option Public (do 
+                            f <- option Public (do
                                                 _ <- TT.kwStatic
                                                 return Static
                                             <|> do
@@ -186,99 +201,52 @@ implDecl = do
                                                 return Public
                                             )
 
-                            -- TODO this is bugged, because a static method should be able to see other static methods,
-                            --      at the moment it doesn't 
-                            let canAccessStructData = f /= Static
-                            openScope canAccessStructData -- open temporary scope 
-                            _ <- do
-                                    _ <- varDecl 
-                                    return ()
-                                <|> subprogramDecl
-                                <|> enumDecl
-                                <|> structDecl
-                                <|> implDecl
-                                <|> namespaceDecl
-                            currScope <- topScope 
+                            let isStatic = f /= Static
+                            when (f == Static) $ do
+                                pushNamespacePrefix symbolId
+                            openScope isStatic -- open temporary scope 
+                            _ <- subprogramDecl
+                            _ <- optionMaybe TT.newLine
+                            currScope <- topScope
                             closeScope -- close temporary scope 
+                            when (f == Static) $ do
+                                popNamespacePrefix
 
                             case f of
                                 Public -> liftIO $ mergeTablesInPlace currScope publicMethodTable
                                 Private -> liftIO $ mergeTablesInPlace currScope privateMethodTable
-                                Static -> liftIO $ mergeTablesInPlace currScope staticMethodTable
+                                Static -> mergeTableToGlobal currScope
                             return []
                         )
-    _ <- TT.newLine
     _ <- TT.unindent
 
-    closeScope -- closing scope for static methods
     closeScope -- closing scope for private methods
     closeScope -- closing scope for public methods
     closeScope -- closing scope for private data 
     closeScope -- closing scope for public data
 
-    when (isNothing result) $
-        insertSymbol (symbolId, ImplType publicMethodTable privateMethodTable staticMethodTable, Nothing) True 
+    when (isNothing implMaybe) $
+        insertSymbol ("impl" ++ symbolId, ImplType publicMethodTable privateMethodTable, Nothing) posn
 
-    where 
-        helperF :: [Type] -> String -> StateType (SymbolTableType, SymbolTableType, SymbolTableType )
-        helperF [StructType templateList publicDataTable privateDataTable] symbolId = do
-            emptyTable <- liftIO H.new 
-            helperF [StructType templateList publicDataTable privateDataTable, 
-                     ImplType emptyTable emptyTable emptyTable] symbolId
-        helperF [ImplType publicMethodTable privateMethodTable staticMethodTable, 
-                 StructType templateList publicDataTable privateDataTable] symbolId = do
-            helperF [StructType templateList publicDataTable privateDataTable,
-                     ImplType publicMethodTable privateMethodTable staticMethodTable] symbolId
-        helperF [StructType templateList publicDataTable privateDataTable, 
-                 ImplType publicMethodTable privateMethodTable staticMethodTable] _symbolId = do
-            pushScope publicDataTable True
-            insertTemplates templateList
-            pushScope privateDataTable True
-            pushScope publicMethodTable True
-            pushScope privateMethodTable True
-            pushScope staticMethodTable True
-            return (publicMethodTable, privateMethodTable, staticMethodTable)
-        helperF _ symbolId = semanticError $ "using a impl for a non-struct type " ++ symbolId
-            
-        insertTemplates :: [String] -> StateType ()
-        insertTemplates [] = return ()
-        insertTemplates (h:t) = do
-            insertSymbol (h, TemplateType $ Just h, Nothing) False
-            insertTemplates t
+    where
+        insertTemplates :: [String] -> AlexPosn -> StateType ()
+        insertTemplates [] _ = return ()
+        insertTemplates (h:t) posn = do
+            insertSymbol (h, TemplateType $ Just h, Nothing) posn
+            insertTemplates t posn
 
 namespaceDecl :: StateType ()
 namespaceDecl = do
     _ <- TT.kwNamespace
-    (ID _posn symbolId) <- TT.id
-    result <- consultSymbolTable symbolId
-    (publicTable, privateTable) <- case result of
-            Nothing -> do
-                openScope False
-                openScope False
-                emptyTable <- liftIO H.new 
-                return (emptyTable, emptyTable)
-            Just (t, _) -> case t of
-                                [NamespaceType publicTable privateTable] -> do
-                                    pushScope publicTable False
-                                    pushScope privateTable True
-                                    return (publicTable, privateTable)
-                                _ -> semanticError $ "ambiguos declaration, " ++ symbolId ++ " is already declared as another type"
+    (ID posn symbolId) <- TT.id
+    assertNonAmbiguous symbolId posn 
+    pushNamespacePrefix symbolId
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
-    openScope True
     _ <- concat <$> many1 (do
-                            f <- option Public (do 
-                                                _ <- TT.kwPrivate
-                                                return Private
-                                            <|> do
-                                                _ <- TT.kwPublic
-                                                return Public
-                                            )
-
-                            openScope True -- open temporary scope 
                             _ <- do
-                                    _ <- varDecl 
+                                    _ <- varDecl
                                     return ()
                                 <|> subprogramDecl
                                 <|> enumDecl
@@ -286,52 +254,44 @@ namespaceDecl = do
                                 <|> implDecl
                                 <|> namespaceDecl
                             _ <- optionMaybe TT.newLine
-                            currScope <- topScope 
-                            closeScope -- close temporary scope 
-
-                            mergeTableToScope currScope
-                            case f of
-                                Public -> liftIO $ mergeTablesInPlace publicTable currScope
-                                Private -> liftIO $ mergeTablesInPlace privateTable currScope
-                                _ -> fail "<namespaceDecl>" -- will never reach this, just to avoid warnings
                             return []
                         )
     _ <- TT.unindent
-    closeScope
-    closeScope -- close scope for past private declarations
-    closeScope -- close scope for past public declarations
-    insertSymbol (symbolId, NamespaceType publicTable privateTable, Nothing) False
+    popNamespacePrefix
 
 enumDecl :: StateType ()
 enumDecl = do
     _ <- TT.kwEnum
     (ID posn enumId) <- TT.id
-
-    openScope False
     assertNonAmbiguous enumId posn
+
+    pushNamespacePrefix enumId
+    openScope False
 
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
-    _ <- idList enumId
+    _ <- idList enumId posn
     _ <- TT.unindent
 
-    topScope' <- topScope
+    currScope <- topScope
     closeScope
-    insertSymbol (enumId, EnumDeclType enumId topScope', Nothing) False
+    popNamespacePrefix
+    mergeTableToScope currScope
+    insertSymbol (enumId, EnumDeclType enumId currScope, Nothing) posn
     where
-        idList :: String -> StateType ()
-        idList enumId = do
+        idList :: String -> AlexPosn -> StateType ()
+        idList enumId posn = do
             _ <- many1 $ do
                 (ID _posn labelId) <- TT.id
                 _ <- TT.newLine
-                insertSymbol (labelId, EnumLabelType enumId, Just $ EnumValue labelId) False
+                insertSymbol (labelId, EnumLabelType enumId, Just $ EnumValue labelId) posn
             return ()
 
 optUnnamedParamDeclList :: StateType ([Token], [Type])
 optUnnamedParamDeclList = do
     option ([], []) unnamedParamDeclList
-    where 
+    where
         unnamedParamDeclList :: StateType ([Token], [Type])
         unnamedParamDeclList = do
             (a, aT) <- typeStmt
@@ -360,9 +320,8 @@ paramDeclList = do
         paramDecl :: StateType ([Token], (String, Type))
         paramDecl = do
             (a, varType) <- typeStmt
-            b <- TT.id
-            let ID _posn symbolId = b
-            insertSymbol (symbolId, varType, Nothing) False
+            b@(ID posn symbolId) <- TT.id
+            insertSymbol (symbolId, varType, Nothing) posn
             return (a ++ [b], (symbolId, varType))
 
 subprogramDecl :: StateType ()
@@ -413,11 +372,11 @@ subprogramDecl = do
                 "A procedure cannot return a value, only functions can. Considerer declaring " ++ symbolId ++
                 " as a functions instead " ++ showPos posn
 
-            insertSymbol (symbolId, ProcType bIds dParams g, Nothing) True
+            insertSymbol (symbolId, ProcType bIds dParams g, Nothing) posn
         KW_FUNC _ -> case optionF of
                         Nothing -> semanticError $ "A function must return something. Consider declaring "
                                                     ++ symbolId ++ " as a procedure instead " ++ showPos posn
-                        Just (_, returnType) -> insertSymbol (symbolId, FuncType bIds dParams returnType g, Nothing) True
+                        Just (_, returnType) -> insertSymbol (symbolId, FuncType bIds dParams returnType g, Nothing) posn
         _ ->  fail "<methodDecl>" -- Impossible to get here, this is just to avoid warnings  
 
     when (symbolId == "main") $ do
@@ -426,7 +385,7 @@ subprogramDecl = do
             Return maybeTV -> do
                 case maybeTV of
                     Nothing -> return ()
-                    Just (_returnT, returnV) -> case returnV of 
+                    Just (_returnT, returnV) -> case returnV of
                                                     IntValue v -> when (v /= 0) $ warningMsg "main returned a non-zero int"
                                                     BoolValue v -> unless v $ warningMsg "main return false"
                                                     _ -> return ()
@@ -468,7 +427,6 @@ returnDecl = do
 -- TODO make arrayDecl recursive to allow multiple dimension arrays
 varDecl :: StateType [Token]
 varDecl = do
-    a <- optionMaybe TT.kwLocal
     (b, bType) <- typeStmt
     c <- TT.id
     optionD <- optionMaybe arrayDecl
@@ -476,8 +434,7 @@ varDecl = do
                         Nothing -> return ([], bType)
                         Just d -> return (d, ArrayType bType)
     let ID posn symbolId = c
-    when (isNothing a) $ checkShadowing symbolId posn
-    insertSymbol (symbolId, varType, Nothing) False
+    insertSymbol (symbolId, varType, Nothing) posn
     e <- do
             e <- TT.kwAssingment
             (f, expType, maybeExpValue) <- expStmt
@@ -505,13 +462,11 @@ varDecl = do
 -- TODO var is incomplete, this is just a STUB
 var :: StateType ([Token], String, [Type], Maybe Value)
 var = do
-    -- TODO Calling namespaced subprograms is problematic
-    a@(ID posn symbolId) <- TT.id
-    (b, namespacePath) <- namespaceAccess
+    (b, symbolId, posn) <- namespaceAccess
     -- (b, symbolList) <- option ([], []) memberAccess
 
-    (varTypeList, varValue) <- accessNamespace (symbolId : namespacePath) posn
-    return (a:b, symbolId, varTypeList, varValue)
+    (varTypeList, varValue) <- consultSymbolTable symbolId posn
+    return (b, symbolId, varTypeList, varValue)
 
 callStmt :: String -> [Type] -> StateType ([Token], Maybe Type, Maybe Value)
 callStmt symbolId symbolTypeList = do
@@ -527,13 +482,13 @@ callStmt symbolId symbolTypeList = do
     let runMethod templateIds paramList funcBody = do
             let (idList, expectedParamTypes) = unzip paramList
             assertValidParamList expectedParamTypes typeList posn -- TODO check this for correctness
-            insertTemplateInstantiation templateTypeList templateIds
+            insertTemplateInstantiation templateTypeList templateIds posn
             instatiateArgs idList expectedParamTypes (typeList, maybeValueList) posn
             changeTopScopeVisibility False
             runFuncBody funcBody
     let templateLen = genericLength templateTypeList
     maybeSymbolType <- searchTypeList symbolTypeList templateLen typeList
-    symbolType <- case maybeSymbolType of 
+    symbolType <- case maybeSymbolType of
         Nothing -> semanticError $ "no matching function to call \"" ++ symbolId ++ "\"" ++ showPos posn
         Just t -> return t
     (maybeReturnT, maybeReturnV) <- case symbolType of
@@ -580,8 +535,8 @@ callStmt symbolId symbolTypeList = do
         instatiateArgs :: [String] -> [Type] -> ([Type], [Maybe Value]) -> AlexPosn -> StateType ()
         instatiateArgs (currId:idsTail) (expectedType:expectedTypesTail) (currType:typesTail, currValue:valuesTail) posn = do
             isRunning' <- isRunning
-            finalV <- if isRunning' 
-                        then do 
+            finalV <- if isRunning'
+                        then do
                             case currValue of
                                 Nothing -> runtimeError $ "calling subprogram with unitialized var " ++ currId ++ showPos posn
                                 Just v -> do
@@ -590,7 +545,7 @@ callStmt symbolId symbolTypeList = do
                                                             (t, _) <- case s of
                                                                         Nothing -> semanticError $ "missing template instatiation " ++ showPos posn -- cannot reach this
                                                                         Just s' -> do
-                                                                            result <- consultSymbolTable s' 
+                                                                            result <- consultSymbolTableMaybe s'
                                                                             case result of
                                                                                 Nothing -> semanticError $ "cannot find template instatiation " ++ showPos posn -- cannot reach this
                                                                                 Just t -> return t
@@ -600,14 +555,14 @@ callStmt symbolId symbolTypeList = do
                                     finalV <- castValueToType expectedType' (currType, v) posn
                                     return $ Just finalV
                         else return Nothing
-            insertSymbol (currId, expectedType, finalV) False
+            insertSymbol (currId, expectedType, finalV) posn
             instatiateArgs idsTail expectedTypesTail (typesTail, valuesTail) posn
         instatiateArgs [] [] ([], []) _ = return ()
         instatiateArgs [] _ (_, _) _ = fail "<callStmt>"
         instatiateArgs _ [] (_, _) _ = fail "<callStmt>"
         instatiateArgs _ _ ([], _) _ = fail "<callStmt>"
         instatiateArgs _ _ (_, []) _ = fail "<callStmt>"
-            
+
         runFuncBody :: [Token] -> StateType (Maybe (Type, Value))
         runFuncBody funcBody = do
             previousProgramState <- getProgramState
@@ -630,8 +585,9 @@ callStmt symbolId symbolTypeList = do
                     setProgramState previousProgramState
                     return maybeReturn
 
-namespaceAccess :: StateType ([Token], [String])
+namespaceAccess :: StateType ([Token], String, AlexPosn)
 namespaceAccess = do
+    (ID posn symbolId) <- TT.id
     segments <- many $ do
         access <- TT.kwDoubleColumn
         name@(ID _ nameId) <- TT.id
@@ -639,7 +595,7 @@ namespaceAccess = do
 
     let (tokenList, idList) = unzip segments
 
-    return (concat tokenList, idList)
+    return (concat tokenList, intercalate "::" (symbolId : idList) , posn)
 
 -- memberAccess :: StateType ([Token], [String])
 -- memberAccess = do
@@ -683,7 +639,7 @@ literal = do
             return (cTokens ++ [d], cv)
         d <- TT.closeBracket
         return ([a] ++ bTokens ++ concatMap fst c ++ [d], ArrayType bt, Just $ ArrayValue $ V.fromList (bv : map snd c)))
-    <|> try (do 
+    <|> try (do
         (a, at) <- typeStmt
         b <- TT.openBracket
         c <- TT.intLiteral
@@ -691,14 +647,13 @@ literal = do
         let INT_LITERAL _ size = c
         return (a ++ [b] ++ [c] ++ [d], ArrayType at, Just $ ArrayValue $ V.replicate size Nothing))
     <|> try (do -- enum labels
-        a@(ID posn symbolId) <- TT.id
-        (b, bPath) <- namespaceAccess
-        (tList, v) <- accessNamespace (symbolId : bPath) posn
-        t <- getTypeFromTypeList tList 
+        (b, symbolId, posn) <- namespaceAccess
+        (tList, v) <- consultSymbolTable symbolId posn
+        t <- getTypeFromTypeList tList
         case t of
             EnumLabelType _ -> return ()
             _ -> semanticError $ "should be a enum label " ++ showPos posn
-        return (a : b, t, v)
+        return (b, t, v)
         )
 
 expStmtList :: StateType [([Token], Type, Maybe Value)]
@@ -722,7 +677,7 @@ baseExp = do
                                         expType <- case maybeType of
                                                         Nothing -> semanticError $ "called the procedure " ++ symbolId ++ " expecting a value"
                                                         Just t -> return t
-                                        return (a ++ b, expType, maybeValue)) 
+                                        return (a ++ b, expType, maybeValue))
                                      <|> (do
                                             t <- getTypeFromTypeList typeList
                                             return (a, t, varValue))
@@ -744,7 +699,7 @@ baseExp = do
                                 varT' <- getTypeFromTypeList varT
                                 finalT <- castType t varT' posn
                                 isRunning' <- isRunning
-                                finalV <- if isRunning' 
+                                finalV <- if isRunning'
                                             then do
                                                 case varV of
                                                     Nothing -> runtimeError $ "Using unitialized var \"" ++ varId ++ "\""
@@ -765,12 +720,12 @@ baseExp = do
                                 d <- TT.closeParen
 
                                 isRunning' <- isRunning
-                                searchRefResult <- if isRunning' 
+                                searchRefResult <- if isRunning'
                                             then do
                                                 case varValue of
                                                     Just refValue -> do
                                                         case refValue of
-                                                            RefValue refSymbol scopeId -> consultSymbolTableById (refSymbol, scopeId)
+                                                            RefValue refSymbol scopeId -> consultSymbolTableByIdMaybe (refSymbol, scopeId)
                                                             _ -> runtimeError "trying to deref a non reference value" -- TODO will not reach this
                                                     Nothing -> runtimeError $ "using unitialized var \"" ++ varId ++ "\""
                                             else return Nothing
@@ -945,7 +900,7 @@ stmt = do
     try varDecl -- TODO remove this try to improve errs
     <|> (do
         (a, symbolId, typeList, _varV) <- var
-        b <- assignStmt symbolId typeList 
+        b <- assignStmt symbolId typeList
             <|> (do
                     (b, _, _) <- callStmt symbolId typeList
                     return b
@@ -983,7 +938,7 @@ stmt = do
                     let KW_RETURN posn = a
                     assertReturnType (Just expType) posn
                     isRunning' <- isRunning
-                    when isRunning' $ do 
+                    when isRunning' $ do
                         case expValue of
                             Nothing -> do
                                  -- Should not reach this, since this would be handled beforehand
@@ -1024,7 +979,7 @@ assignStmt symbolId typeList = do
                 return []
             Just op -> do
                 when isRunning' $ do
-                    maybeTV <- consultSymbolTable symbolId
+                    maybeTV <- consultSymbolTableMaybe symbolId
                     maybeValue <- case maybeTV of
                                 Nothing -> return Nothing
                                 Just (_, v) -> return v
@@ -1133,7 +1088,7 @@ whileStmt = do
     openScope True
 
     a <- TT.kwWhile
-    expectedReturnT <- getExpectedReturnT 
+    expectedReturnT <- getExpectedReturnT
     setParserBlock $ Loop expectedReturnT
     (b, expType, expValue) <- expStmt
 
@@ -1198,12 +1153,11 @@ typeStmt = do
                 e <- TT.closeParen
                 return ([b] ++ [c] ++ d ++ [e], RefType t)
             <|> do -- customType
-                b@(ID posn symbolId) <- TT.id
-                (c, namespacePath) <- namespaceAccess
-                (tList, _) <- accessNamespace (symbolId : namespacePath) posn
+                (c, symbolId, posn) <- namespaceAccess
+                (tList, _) <- consultSymbolTable symbolId posn
                 t <- getTypeFromTypeList tList
                 assertCustomType t posn
-                return (b:c, t)
+                return (c, t)
             <|> do -- reference for subprogram
                 b <- TT.openParen
                 (c, templateIds) <- option ([], []) templateDecl
@@ -1235,7 +1189,7 @@ forStmt = do
     previousProgramState <- getProgramState
     openScope True
     a <- TT.kwFor
-    expectedReturnT <- getExpectedReturnT 
+    expectedReturnT <- getExpectedReturnT
     setParserBlock $ Loop expectedReturnT
     b <- option [] varDecl
     c <- TT.kwSemicolumn
@@ -1301,12 +1255,12 @@ forStmt = do
     closeScope
 
     return ([a] ++ b  ++ [c] ++ d ++ [e] ++ f ++ [g] ++ [h] ++ [i] ++ j ++ [k])
-    where 
+    where
         loopIncrementStmt :: StateType ([Token], InterpreterState)
         loopIncrementStmt = do
-                                (f, symbolId, typeList, _varV) <- var 
-                                g <- assignStmt symbolId typeList 
-                                    <|> (do 
+                                (f, symbolId, typeList, _varV) <- var
+                                g <- assignStmt symbolId typeList
+                                    <|> (do
                                             (g, _, _) <- callStmt symbolId typeList
                                             return g
                                         )
@@ -1314,14 +1268,14 @@ forStmt = do
                                 finalState <- getState
                                 return (f ++ g, finalState)
 
-        
+
 
 foreachStmt :: StateType [Token]
 foreachStmt = do
     previousParserBlock <- getParserBlock
     openScope True
     a <- TT.kwForeach
-    expectedReturnT <- getExpectedReturnT 
+    expectedReturnT <- getExpectedReturnT
     setParserBlock $ Loop expectedReturnT
     b <- TT.id
     c <- TT.kwIn
@@ -1333,7 +1287,7 @@ foreachStmt = do
 
     let ArrayType underlyingType = dType
     let ID _ bSymbol = b
-    insertSymbol (bSymbol, underlyingType, Nothing) False
+    insertSymbol (bSymbol, underlyingType, Nothing) posn
 
     e <- TT.kwColumn
     f <- TT.newLine

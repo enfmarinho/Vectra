@@ -5,6 +5,7 @@ import Scanner
 import qualified Data.Vector as V
 
 type SymbolType = (String, Type, Maybe Value)
+type SymbolTableEntry = ([Type], Maybe Value)
 type SymbolTableType = H.BasicHashTable String ([Type], Maybe Value)
 type NamespaceSymbolTableType = H.BasicHashTable String ([Type], Maybe Value, AccessModifiers)
 type SymbolTableStackType = [(SymbolTableType, Bool, Int)]
@@ -19,6 +20,7 @@ data InterpreterState = InterpreterState
   , imports :: H.BasicHashTable String Bool
   , nestedImportCounter :: Int
   , nextScopeId :: Int
+  , namespaceStack :: [String]
   }
 
 type StateType = ParsecT [Token] InterpreterState IO
@@ -50,16 +52,15 @@ data Type = IntType
           | RefType Type
           | ConstType Type                                           -- (internal_type)
           | ArrayType Type                                           -- (internal_type)                 
-          | EnumDeclType String SymbolTableType                          -- (enum_id, valid_labels)
+          | EnumDeclType String SymbolTableType                      -- (enum_id, valid_labels)
           | EnumLabelType String                                     -- (enum_type_id)
           | ProcType [String] [(String, Type)] [Token]               -- (template_ids, param_types, method_body)
           | FuncType [String] [(String, Type)] Type [Token]          -- (template_ids, (param_ids, param_types), return_type, method_body)
-          | StructType [String] SymbolTableType SymbolTableType      -- (template_ids, table_public_data, table_private_methods)
+          | StructType String [String] SymbolTableType SymbolTableType -- (struct_id, template_ids, public_data, private_data)
           | StructInstanceType String                                -- (struct_type_id)
           | FuncRefType [String] [Type] Type                         -- (templates_ids, param_types, return_type)
           | ProcRefType [String] [Type]                              -- (templates_ids, param_types)
-          | ImplType SymbolTableType SymbolTableType SymbolTableType -- (public_table, private_table, static_table)
-          | NamespaceType SymbolTableType SymbolTableType            -- (public_symbol_table, private_symbol_table)
+          | ImplType SymbolTableType SymbolTableType -- (public_table, private_table)
           | HaskellMethod [Type] (Maybe Type) LibMethodSignature     -- (param_types, return_type, internal_method)
 
 data Value = IntValue Int
@@ -103,7 +104,8 @@ instance Show Type where
         "proc<" ++ show templates ++ ">" ++ "(" ++ showParams params ++ ")"
     show (FuncType templates params returnT _) =
         "func<" ++ show templates ++ ">" ++ "(" ++ showParams params ++ ")" ++ " -> " ++ show returnT
-    show (StructType templates _ _) = "structDecl" ++ show templates ++ ">"
+    show (StructType structId templates _ _) = "struct " ++ structId ++ " <" ++ show templates ++ ">"
+    show (ImplType _ _) = "impl"
     show (StructInstanceType structId) = "struct " ++ structId
     show (EnumLabelType enumId) = "enum " ++ enumId
     show (FuncRefType templates params returnT) =
@@ -112,8 +114,6 @@ instance Show Type where
     show (ProcRefType templates params) =
         "procRef<" ++ show templates ++ ">" ++
         "(" ++ show params ++ ")"
-    show (NamespaceType _ _) = "namespace"
-    show (ImplType {}) = "namespace"
     show (HaskellMethod paramTypes _ _) =
         "internalMethod" ++ show paramTypes
 

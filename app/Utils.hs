@@ -8,15 +8,12 @@ import qualified Data.HashTable.IO as H
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Data.List (genericLength) -- TODO there are better ways
 import Data.Foldable 
-import GHC.OldList (intercalate)
+-- import GHC.OldList (intercalate)
 import GHC.Base (when)
 
 warningMsg :: String -> StateType ()
 warningMsg msg = liftIO $ putStrLn $ "Warning: " ++ msg
 
-showPos :: AlexPosn -> String
-showPos (AlexPn _ line col) =
-    "(Line " ++ show line ++ ", Column " ++ show col ++ ")"
 
 getBooleanValue :: Maybe Value -> AlexPosn -> StateType Bool
 getBooleanValue Nothing posn = semanticError $ "using uninitialized var " ++ showPos posn
@@ -34,7 +31,8 @@ getCustomType :: [Type] -> StateType (Maybe Type)
 getCustomType (h:t) = do
     case h of
         EnumDeclType name _list -> return $ Just $ EnumLabelType name
-        StructType templateList dataTable methodTable -> return $ Just $ StructType templateList dataTable methodTable
+        StructType structId templateList publicData privateData  -> 
+            return $ Just $ StructType structId templateList publicData privateData
         TemplateType s -> return $ Just $ TemplateType s
         _ -> getCustomType t
 getCustomType [] = return Nothing
@@ -43,36 +41,26 @@ getCustomType [] = return Nothing
 getStructType :: [Type] -> StateType (Maybe Type)
 getStructType (h:t) = do
     case h of
-        StructType templateList dataTable methodTable -> return $ Just $ StructType templateList dataTable methodTable
+        StructType structId templateList publicData privateData -> 
+            return $ Just $ StructType structId templateList publicData privateData
         _ -> getStructType t
 getStructType [] = return Nothing
 
 
 consultType :: String -> AlexPosn -> StateType Type
 consultType symbolId posn = do
-    consultResult <- consultSymbolTable symbolId
+    consultResult <- consultSymbolTable symbolId posn
     case consultResult of
-        Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
         -- improve error message
-        Just ([], _) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
-        Just ([h], _) -> return h
-        Just (_:_, _) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
+        ([], _) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
+        ([h], _) -> return h
+        (_:_, _) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
 
 
 consultTypeList :: String -> AlexPosn -> StateType [Type]
 consultTypeList symbolId posn = do
-    consultResult <- consultSymbolTable symbolId
-    case consultResult of
-        Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
-        Just (t, _) -> return t
-
-
-checkShadowing :: String -> AlexPosn -> StateType ()
-checkShadowing symbolId posn = do
-    consultResult <- consultSymbolTable symbolId
-    case consultResult of
-        Nothing -> return ()
-        Just _ -> warningMsg $ "Declaring " ++ symbolId ++ " shadows and exists symbol " ++ showPos posn
+    (t, _) <- consultSymbolTable symbolId posn
+    return t
 
 
 toBoolValue :: Value -> Value
@@ -451,74 +439,76 @@ searchTypeOnTable table symbolId = do
             return $ Just t
 
 
-searchTypeOnStruct :: SymbolTableType -> SymbolTableType -> [String] -> StateType (Maybe Type)
-searchTypeOnStruct publicTable privateTable [symbolListH] = do
-    result <- searchTypeOnTable publicTable symbolListH
-    case result of 
-        Nothing -> searchTypeOnTable privateTable symbolListH
-        Just t -> return $ Just t
-searchTypeOnStruct publicTable privateTable (symbolListH:symbolListT) = do
-    a <- searchTypeOnStruct publicTable privateTable [symbolListH]
-    case a of 
-        Nothing -> semanticError $ "member " ++ "\"" ++ symbolListH ++ "\"" ++ " doesn't exist on this context"
-        Just t -> case t of
-                    StructType _ p1 p2 -> searchTypeOnStruct p1 p2 symbolListT
-                    _ -> semanticError $ "member " ++ "\"" ++ symbolListH ++ "\"" ++ " is not a struct type"
-searchTypeOnStruct _ _ [] = return Nothing
+-- searchTypeOnStruct :: SymbolTableType -> SymbolTableType -> [String] -> StateType (Maybe Type)
+-- searchTypeOnStruct publicTable privateTable [symbolListH] = do
+--     result <- searchTypeOnTable publicTable symbolListH
+--     case result of 
+--         Nothing -> searchTypeOnTable privateTable symbolListH
+--         Just t -> return $ Just t
+-- searchTypeOnStruct publicTable privateTable (symbolListH:symbolListT) = do
+--     a <- searchTypeOnStruct publicTable privateTable [symbolListH]
+--     case a of 
+--         Nothing -> semanticError $ "member " ++ "\"" ++ symbolListH ++ "\"" ++ " doesn't exist on this context"
+--         Just t -> case t of
+--                     StructType _ p1 p2 -> searchTypeOnStruct p1 p2 symbolListT
+--                     StructType templateList dataTable methodTable -> return $ Just $ StructType templateList dataTable methodTable
+--                     _ -> semanticError $ "member " ++ "\"" ++ symbolListH ++ "\"" ++ " is not a struct type"
+-- searchTypeOnStruct _ _ [] = return Nothing
 
-accessNamespacebaseCase :: Maybe ([Type], Maybe Value) -> String -> [String] -> AlexPosn -> StateType ([Type], Maybe Value)
-accessNamespacebaseCase result finalSymbol pastNamespace posn = do
-    case result of
-        Nothing -> do
-            semanticError $ "unknown symbol \"" ++ showNamespace pastNamespace ++ finalSymbol ++ "\"" ++ showPos posn
-        Just (t, v) -> case t of
-                        [EnumDeclType enumId _] -> return ([EnumLabelType enumId], v)
-                        [StructType {}] -> return ([StructInstanceType finalSymbol], v)
-                        _ -> return (t, v)
 
-accessNamespace :: [String] -> AlexPosn -> StateType ([Type], Maybe Value)
-accessNamespace [] posn = semanticError $ "<accessNamespace> " ++ showPos posn
-accessNamespace [finalSymbol] posn = do
-    result <- consultSymbolTable finalSymbol
-    accessNamespacebaseCase result finalSymbol [] posn
-accessNamespace (h:rest) posn = do
-    result <- consultSymbolTable h
-    case result of
-            Nothing -> do
-                semanticError $ "no existing symbol \"" ++ h ++ "\" on this context" ++ showPos posn
-            Just (tList, _value) -> do
-                t <- getTypeFromTypeList tList
-                case t of
-                    NamespaceType publicTable _privateTable ->do
-                        search rest [h] publicTable
-                    EnumDeclType _enumId labelTable -> search rest [h] labelTable
-                    ImplType _ _ staticMethodTable -> search rest [h] staticMethodTable
-                    _ -> do
-                        semanticError $ "Not a valid namespace symbol " ++ showPos posn
-    where 
-        search :: [String] -> [String] -> SymbolTableType -> StateType ([Type], Maybe Value)
-        search [finalSymbol] pastNamespace table = do
-            r <- liftIO $ H.lookup table finalSymbol
-            accessNamespacebaseCase r finalSymbol pastNamespace posn
-        search (namespaceSegment : rest') past namespaceTable = do
-            result <- liftIO $ H.lookup namespaceTable namespaceSegment
-            case result of
-                Nothing ->
-                    semanticError $
-                        "no existing symbol \"" ++ showNamespace past
-                        ++ namespaceSegment ++ "\" on this context" ++ showPos posn
-                Just (tList, _) -> do
-                    t <- getTypeFromTypeList tList 
-                    case t of
-                        NamespaceType publicTable _ ->
-                            -- Continue searching deeper
-                            search rest' (past ++ [namespaceSegment]) publicTable
-                        EnumDeclType _enumId table -> search rest' (past ++ [namespaceSegment]) table
-                        ImplType _publicTable _privateTabel staticTable -> search rest' (past ++ [namespaceSegment]) staticTable
-                        _ -> semanticError $
-                                "namespace access on a non-namespace type " ++ showPos posn
-        search _ _ _ = semanticError $ "invalid enum label " ++ showPos posn
-
-showNamespace :: [String] -> String
-showNamespace = intercalate "::"
+-- accessNamespacebaseCase :: Maybe ([Type], Maybe Value) -> String -> [String] -> AlexPosn -> StateType ([Type], Maybe Value)
+-- accessNamespacebaseCase result finalSymbol pastNamespace posn = do
+--     case result of
+--         Nothing -> do
+--             semanticError $ "unknown symbol \"" ++ showNamespace pastNamespace ++ finalSymbol ++ "\"" ++ showPos posn
+--         Just (t, v) -> case t of
+--                         [EnumDeclType enumId _] -> return ([EnumLabelType enumId], v)
+--                         [StructType {}] -> return ([StructInstanceType finalSymbol], v)
+--                         _ -> return (t, v)
+--
+-- accessNamespace :: [String] -> AlexPosn -> StateType ([Type], Maybe Value)
+-- accessNamespace [] posn = semanticError $ "<accessNamespace> " ++ showPos posn
+-- accessNamespace [finalSymbol] posn = do
+--     result <- consultSymbolTable finalSymbol
+--     accessNamespacebaseCase result finalSymbol [] posn
+-- accessNamespace (h:rest) posn = do
+--     result <- consultSymbolTable h
+--     case result of
+--             Nothing -> do
+--                 semanticError $ "no existing symbol \"" ++ h ++ "\" on this context" ++ showPos posn
+--             Just (tList, _value) -> do
+--                 t <- getTypeFromTypeList tList
+--                 case t of
+--                     NamespaceType publicTable _privateTable ->do
+--                         search rest [h] publicTable
+--                     EnumDeclType _enumId labelTable -> search rest [h] labelTable
+--                     ImplType _ _ staticMethodTable -> search rest [h] staticMethodTable
+--                     _ -> do
+--                         semanticError $ "Not a valid namespace symbol " ++ showPos posn
+--     where 
+--         search :: [String] -> [String] -> SymbolTableType -> StateType ([Type], Maybe Value)
+--         search [finalSymbol] pastNamespace table = do
+--             r <- liftIO $ H.lookup table finalSymbol
+--             accessNamespacebaseCase r finalSymbol pastNamespace posn
+--         search (namespaceSegment : rest') past namespaceTable = do
+--             result <- liftIO $ H.lookup namespaceTable namespaceSegment
+--             case result of
+--                 Nothing ->
+--                     semanticError $
+--                         "no existing symbol \"" ++ showNamespace past
+--                         ++ namespaceSegment ++ "\" on this context" ++ showPos posn
+--                 Just (tList, _) -> do
+--                     t <- getTypeFromTypeList tList 
+--                     case t of
+--                         NamespaceType publicTable _ ->
+--                             -- Continue searching deeper
+--                             search rest' (past ++ [namespaceSegment]) publicTable
+--                         EnumDeclType _enumId table -> search rest' (past ++ [namespaceSegment]) table
+--                         ImplType _publicTable _privateTabel staticTable -> search rest' (past ++ [namespaceSegment]) staticTable
+--                         _ -> semanticError $
+--                                 "namespace access on a non-namespace type " ++ showPos posn
+--         search _ _ _ = semanticError $ "invalid enum label " ++ showPos posn
+--
+-- showNamespace :: [String] -> String
+-- showNamespace = intercalate "::"
 
