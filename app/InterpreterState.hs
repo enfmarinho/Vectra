@@ -48,8 +48,8 @@ isRunning = do
 pushNamespacePrefix :: String -> StateType ()
 pushNamespacePrefix prefix = do
     st@InterpreterState{..} <- getState
-    top <- topNamespacePrefix
-    putState st{namespaceStack = (top ++ prefix) : namespaceStack}
+    finalNamespace <- getFinalSymbol prefix
+    putState st{namespaceStack = finalNamespace : namespaceStack}
 
 
 popNamespacePrefix :: StateType ()
@@ -72,6 +72,14 @@ getNamespaceStack :: StateType [String]
 getNamespaceStack = do
     InterpreterState{..} <- getState
     return namespaceStack
+
+getFinalSymbol :: String -> StateType String
+getFinalSymbol symbolId = do
+    top <- topNamespacePrefix
+    if top == "" 
+        then do
+            return symbolId
+        else return $ top ++ "::" ++ symbolId
 
 
 addImport :: String -> StateType ()
@@ -210,8 +218,7 @@ insertSymbol (symbolId, symbolType, maybeValue) posn = do
             :: SymbolTableType
             -> StateType ()
         insertInTable table = do
-            currPrefix <- topNamespacePrefix
-            let finalSymbolId = currPrefix ++ "::" ++ symbolId
+            finalSymbolId <- getFinalSymbol symbolId
             existing <- liftIO $ H.lookup table finalSymbolId
 
             case symbolType of
@@ -271,10 +278,10 @@ walkScopes
     -> StateType (Maybe ([Type], Maybe Value))
 walkScopes symbolId action = do
     InterpreterState{..} <- getState
-    a <- walkNamespaceStack namespaceStack symbolId (walkStack action)
+    a <- liftIO $ walkNamespaceStack namespaceStack symbolId symbolTableStack (walkStack action)
     case a of
-        Nothing -> liftIO $ action globalSymbolTable symbolId
-        Just e -> return $ Just  e
+        Nothing -> liftIO $ walkNamespaceStack namespaceStack symbolId [(globalSymbolTable, False, 0)] (walkStack action) 
+        Just e -> return $ Just e
 
 walkScopesById
     :: Int
@@ -284,23 +291,23 @@ walkScopesById
 walkScopesById refId symbolId action = do
     InterpreterState{..} <- getState
     if refId == 0 
-        then liftIO $ action globalSymbolTable symbolId
-        else walkNamespaceStack namespaceStack symbolId (walkStackById refId action)
+        then liftIO $ walkNamespaceStack namespaceStack symbolId [(globalSymbolTable, False, 0)] (walkStackById refId action)
+        else liftIO $ walkNamespaceStack namespaceStack symbolId symbolTableStack (walkStackById refId action)
 
 walkNamespaceStack
     :: [String]
     -> String
+    -> SymbolTableStackType
     -> (String -> SymbolTableStackType -> IO (Maybe ([Type], Maybe Value)))
-    -> StateType (Maybe ([Type], Maybe Value))
-walkNamespaceStack [] _ _ = return Nothing
-walkNamespaceStack (currNamespace : namespaceTail) symbolId action = do
-    InterpreterState{..} <- getState
-    let finalSymbolId = currNamespace ++ symbolId
-    stackResult <- liftIO $ action finalSymbolId symbolTableStack 
+    -> IO (Maybe ([Type], Maybe Value))
+walkNamespaceStack [] symbolId table action = action symbolId table 
+walkNamespaceStack (currNamespace : namespaceTail) symbolId table action = do
+    let finalSymbolId = currNamespace ++ "::" ++ symbolId
+    stackResult <- action finalSymbolId table 
 
     case stackResult of
         Just r -> return $ Just r
-        Nothing -> walkNamespaceStack namespaceTail symbolId action
+        Nothing -> walkNamespaceStack namespaceTail symbolId table action
 
 consultSymbolTableMaybe :: String -> StateType (Maybe ([Type], Maybe Value))
 consultSymbolTableMaybe symbolId = walkScopes symbolId H.lookup
