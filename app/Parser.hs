@@ -587,7 +587,7 @@ callStmt symbolId symbolTypeList = do
 
 namespaceAccess :: StateType ([Token], String, AlexPosn)
 namespaceAccess = do
-    (ID posn symbolId) <- TT.id
+    a@(ID posn symbolId) <- TT.id
     segments <- many $ do
         access <- TT.kwDoubleColumn
         name@(ID _ nameId) <- TT.id
@@ -595,7 +595,7 @@ namespaceAccess = do
 
     let (tokenList, idList) = unzip segments
 
-    return (concat tokenList, intercalate "::" (symbolId : idList) , posn)
+    return (a : concat tokenList, intercalate "::" (symbolId : idList) , posn)
 
 -- memberAccess :: StateType ([Token], [String])
 -- memberAccess = do
