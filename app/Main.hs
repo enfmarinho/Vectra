@@ -17,8 +17,6 @@ main = do
                     exitSuccess -- End execution early since a lexical error has been found
                 Right tokenList -> return tokenList
 
-            print tokenList
-
             sintaxResult <- parser tokenList
             forM_ sintaxResult print
 
