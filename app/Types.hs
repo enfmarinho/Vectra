@@ -42,6 +42,7 @@ data ProgramState = Starting
                   | Break
                   | Return (Maybe (Type, Value)) -- Return value
                   | Finished
+                  deriving (Show)
 
 data Type = IntType
           | FloatType
