@@ -1015,34 +1015,29 @@ assignStmt symbolId typeList = do
 
 ifElseStmt :: StateType [Token]
 ifElseStmt = do
-    previousProgramState <- getProgramState
-    previousParserBlock <- getParserBlock
-
-    (a, ifExecuted) <- ifStmt
-    if ifExecuted then
-        setProgramState Skip
-        else setProgramState previousProgramState
+    (a, _) <- ifStmt
     b <- option [] elseIfElseRecursion
 
-    setProgramState previousProgramState
-    setParserBlock previousParserBlock
+    currProgramState <- getProgramState
+    when (currProgramState == Skip) (setProgramState Running)
     return (a ++ b)
     where
         -- The Bool indicates whether the conditional was executed
         ifStmt :: StateType ([Token], Bool)
         ifStmt = do
+            previousProgramState <- getProgramState
             openScope True
-            a <- TT.kwIf
+            a@(KW_IF posn) <- TT.kwIf
             (b, expType, expValue) <- expStmt
 
-            let KW_IF posn = a
             assertBooleanCompatible expType posn
 
             isRunning' <- isRunning
-            condition <- if isRunning' then do
-                                getBooleanValue expValue posn
+            executed <- if isRunning' then do
+                                condition <- getBooleanValue expValue posn
+                                unless condition $ do setProgramState Skip
+                                return condition
                                 else return False
-            unless condition $ do setProgramState Skip
 
             c <- TT.kwColumn
             d <- TT.newLine
@@ -1051,7 +1046,11 @@ ifElseStmt = do
             g <- TT.unindent
 
             closeScope
-            return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g], condition)
+            currProgramState <- getProgramState
+            if executed && currProgramState == Running
+                then setProgramState Skip
+                else setProgramState previousProgramState
+            return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g], executed)
 
         elseIfElseRecursion :: StateType [Token]
         elseIfElseRecursion = do
@@ -1063,8 +1062,7 @@ ifElseStmt = do
             openScope True
             b <- TT.kwElse
             c <- do
-                (c, executed) <- ifStmt
-                when executed $ setProgramState Skip
+                (c, _) <- ifStmt
                 d <- option [] elseIfElseRecursion
                 return $ c ++ d
                 <|> (do
