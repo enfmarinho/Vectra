@@ -944,7 +944,7 @@ stmt = do
         let KW_CONTINUE posn = a
         assertContinuable posn
         isRunning' <- isRunning
-        when isRunning' $ setProgramState Skip
+        when isRunning' $ setProgramState Continue
         return [a]
     <|> do
         a <- TT.kwBreak
