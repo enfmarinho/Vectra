@@ -438,6 +438,7 @@ varDecl = do
     e <- do
             e <- TT.kwAssingment
             (f, expType, maybeExpValue) <- expStmt
+            assertTypesEq bType expType posn
             isRunning' <- isRunning
             when isRunning' $ do
                 case maybeExpValue of
