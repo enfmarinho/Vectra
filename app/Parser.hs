@@ -675,6 +675,66 @@ literal = do
             _ -> semanticError $ "should be a enum label " ++ showPos posn
         return (b, t, v)
         )
+    <|> try (do
+            (a, structSymbolId, posn) <- namespaceAccess
+            (b, templateTypeList) <- option ([], []) templateInstantiation
+            c <- TT.openCurly
+            d <- TT.newLine
+            e <- TT.indent
+
+            (structTList, _) <- consultSymbol structSymbolId posn
+            structT <- getTypeFromTypeList structTList
+            openScope True
+            (publicTable, privateTable) <- case structT of
+                    StructType _ templateList publicTable privateTable -> do
+                        insertTemplateInstantiation templateTypeList templateList posn
+                        cpub <- liftIO $ copyTable publicTable
+                        cpriv <- liftIO $ copyTable privateTable
+                        return (cpub, cpriv)
+                    _ -> semanticError $ "special initialization should be only used for struct types " ++ showPos posn
+
+            f <- many1 $ do
+                f@(ID posn' symbolId) <- TT.id
+                g <- TT.kwAssingment
+                (h, expT, expV) <- expStmt
+                i <- TT.newLine
+
+                publicSearch <- liftIO $ H.lookup publicTable symbolId
+                case publicSearch of
+                    Nothing -> do
+                        privateSearch <- liftIO $ H.lookup privateTable symbolId
+                        case privateSearch of 
+                            Nothing -> semanticError $ 
+                                "no symbol \"" ++ symbolId ++ "\" in struct \"" ++ structSymbolId ++ "\" " ++ showPos posn'
+                            Just (tList, _) -> do
+                                t <- getTypeFromTypeList tList
+                                liftIO $ H.delete privateTable symbolId
+                                assertTypesEq t expT posn
+                                insertSymbol (symbolId, t, expV) posn'
+                    Just (tList, _) -> do
+                            t <- getTypeFromTypeList tList
+                            liftIO $ H.delete publicTable symbolId
+                            assertTypesEq t expT posn
+                            insertSymbol (symbolId, t, expV) posn'
+                        
+
+                return ([f] ++ [g] ++ h ++ [i])
+
+            privateMissingInit <- liftIO $ H.toList privateTable
+            publicMissingInit <- liftIO $ H.toList publicTable
+            let missingSymbols = publicMissingInit ++ privateMissingInit
+            case missingSymbols of
+                [] -> return ()
+                _ -> semanticError $ "symbols missing initialization, such as: " ++ show missingSymbols ++ " at " ++ showPos posn
+            let unzipedF = concat f
+            g <- TT.unindent
+            h <- TT.newLine
+            i <- TT.closeCurly
+
+            currTable <- topScope
+            closeScope
+            return (a ++ b ++ [c] ++ [d] ++ [e] ++ unzipedF ++ [g] ++ [h] ++ [i], StructInstanceType structSymbolId, Just $ StructValue currTable)
+        )
 
 expStmtList :: StateType [([Token], Type, Maybe Value)]
 expStmtList = do
