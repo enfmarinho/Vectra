@@ -147,6 +147,7 @@ structDecl = do
                                         )
                     openScope False
                     _ <- varDecl
+                    _ <- TT.newLine
                     currScope <- topScope
                     closeScope
 
@@ -155,7 +156,6 @@ structDecl = do
                         Private -> liftIO $ mergeTablesInPlace currScope privateTable
                         Static -> return () -- Cannot reach this, since we don't allow static data, just to avoid warnings
                     )
-    _ <- TT.newLine
     _ <- TT.unindent
     closeScope
     insertSymbol (symbolId, StructType symbolId templateIds publicTable privateTable, Nothing) posn
