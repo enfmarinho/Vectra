@@ -6,6 +6,7 @@ import Types
 import Text.Parsec
 import Control.Monad.State.Lazy
 import Data.Maybe (fromMaybe, isJust)
+import Data.List.Split (splitOn)
 import Control.Monad
 import Scanner (AlexPosn (AlexPn))
 
@@ -51,6 +52,10 @@ pushNamespacePrefix prefix = do
     finalNamespace <- getFinalSymbol prefix
     putState st{namespaceStack = finalNamespace : namespaceStack}
 
+pushMultipleNamespacePrefix :: String -> StateType ()
+pushMultipleNamespacePrefix path = do
+    let namespaceList = splitOn "::" path
+    mapM_ pushNamespacePrefix namespaceList
 
 popNamespacePrefix :: StateType ()
 popNamespacePrefix = do
@@ -72,6 +77,11 @@ getNamespaceStack :: StateType [String]
 getNamespaceStack = do
     InterpreterState{..} <- getState
     return namespaceStack
+
+setNamespaceStack :: [String] -> StateType ()
+setNamespaceStack n = do
+  st <- getState
+  putState st { namespaceStack = n }
 
 getFinalSymbol :: String -> StateType String
 getFinalSymbol symbolId = do
