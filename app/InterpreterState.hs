@@ -319,6 +319,26 @@ walkNamespaceStack (currNamespace : namespaceTail) symbolId table action = do
         Just r -> return $ Just r
         Nothing -> walkNamespaceStack namespaceTail symbolId table action
 
+findSymbolTableId :: String -> AlexPosn -> StateType Int
+findSymbolTableId symbolId posn = do
+    namespaceStack <- getNamespaceStack
+    return search symbolId
+    where 
+        search :: StateType Int
+        search = do
+            return 1
+
+getSymbolRef :: String -> AlexPosn -> StateType (Type, Maybe Value)
+getSymbolRef symbolId posn = do
+    (symbolTypeList, _symbolV) <- consultSymbol symbolId posn
+    symbolT <- case symbolTypeList of
+                    [] -> semanticError $ "trying to get a reference from a non-typed symbol at " ++ showPos posn -- will never reach this
+                    (_:_:_) -> semanticError $ "trying to get a reference for a subprogram at " ++ showPos posn
+                    (h:_) -> return h
+    tableId <- findSymbolTableId symbolId posn
+    return (RefType symbolT, Just $ RefValue symbolId tableId) -- TODO check if this is correct
+
+
 consultSymbolMaybe :: String -> StateType (Maybe ([Type], Maybe Value))
 consultSymbolMaybe symbolId = walkScopes symbolId H.lookup
 
