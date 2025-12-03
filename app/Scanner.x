@@ -14,7 +14,7 @@ $NUMBER = 0-9
 $LETTER = [a-zA-Z]
 
 tokens :-
-    "//".*       { \_ _ -> return Nothing }
+    "//".*\n     { \_ _ -> return Nothing }
     [\ \t]+      { \_ len -> do setCurrIndentationLevel len; return Nothing }
     [\n]+        { \aInp _ -> do setBeginLine True; setCurrIndentationLevel 0; return $ Just (NEWLINE (alexPos aInp))}
 
