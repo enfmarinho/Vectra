@@ -29,6 +29,7 @@ executable Vectra
                       mtl,
                       parsec,
                       array,
-                      vector
+                      vector,
+                      split
     hs-source-dirs:   app
     default-language: GHC2021
