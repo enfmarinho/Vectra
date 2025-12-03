@@ -926,6 +926,7 @@ stmtList = do
 stmt :: StateType [Token]
 stmt = do
     try varDecl -- TODO remove this try to improve errs
+    <|> derefAssignStmt
     <|> (do
         (a, symbolId, typeList, _varV) <- var
         b <- assignStmt symbolId typeList
@@ -984,6 +985,60 @@ mathOpSymbol = do
     <|> TT.opAnd
     <|> TT.opOr
     <|> TT.opNot
+
+derefAssignStmt :: StateType [Token]
+derefAssignStmt = do
+    a <- TT.kwDeref
+    b@(OPEN_PAREN varPosn) <- TT.openParen
+    (c, symbolId, varT, varV) <- var -- TODO maybe <|> callStmt with "try"
+
+    underlyingT <- case varT of
+                    [RefType t] -> return t
+                    _ -> semanticError $ "Trying to deref a non ref type at " ++ showPos varPosn
+
+    d <- TT.closeParen
+    optionE <- optionMaybe mathOpSymbol
+    f@(KW_ASSIGNMENT posn) <- TT.kwAssingment
+    (g, expType, expValue) <- expStmt
+
+    assertTypesEq underlyingT expType posn
+
+    isRunning' <- isRunning
+    e <- if not isRunning' 
+            then return []
+            else do
+                case optionE of
+                    Nothing -> do
+                        case varV of
+                            Just v -> case v of
+                                        RefValue referencedId referencedTableId -> 
+                                            updateSymbolById (referencedId, referencedTableId) ([underlyingT], expValue)
+                                        _ -> semanticError $ "trying to deref a non ref value at " ++ showPos posn -- will not reach this
+                            Nothing -> semanticError $ "Trying to deref a null ref \"" ++ symbolId ++ "\" at " ++ showPos posn
+                        return []
+                    Just op -> do
+                            (referencedId, referencedTableId) <- 
+                                case varV of
+                                    Nothing -> semanticError $ "2trying to assign by reference to a non-reference type at " ++ showPos varPosn
+                                    Just v -> case v of
+                                                RefValue rid rtid -> return (rid, rtid)
+                                                _ -> semanticError ""
+
+                            
+                            (_, maybeValue) <- consultSymbolById (referencedId, referencedTableId) varPosn
+                            resultValue <- case op of
+                                OP_ADD _ -> handleAdd maybeValue expValue posn
+                                OP_SUB _ -> handleSub maybeValue expValue posn
+                                OP_MULT _ -> handleMult maybeValue expValue posn
+                                OP_DIV _ -> handleDiv maybeValue expValue posn
+                                OP_AND _ -> handleAnd maybeValue expValue posn
+                                OP_OR _ -> handleOr maybeValue expValue posn
+                                _ -> semanticError $ "Invalid operation on assignment operation for " ++ symbolId ++ " " ++ showPos posn
+                            castedValue <- castValueToType underlyingT resultValue posn
+                            updateSymbolById (referencedId, referencedTableId) ([underlyingT], Just castedValue)
+                            return [op]
+
+    return $ [a] ++ [b] ++ c ++ [d] ++ e ++ [f] ++ g
 
 assignStmt :: String -> [Type] -> StateType [Token]
 assignStmt symbolId typeList = do
