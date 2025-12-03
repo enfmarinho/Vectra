@@ -1235,12 +1235,15 @@ forStmt = do
     g <- TT.kwColumn
     h <- TT.newLine
     i <- TT.indent
+    openScope True
     (j, _) <- stmtList
     k <- TT.unindent
 
     let runFor = do
             endEarly <- endLoopEarly
             unless endEarly $ do
+                closeScope 
+                openScope True
                 setProgramState previousProgramState
 
                 -- Perform operation to be performed after loop
@@ -1266,6 +1269,7 @@ forStmt = do
     when condition runFor
     setProgramState previousProgramState
     setParserBlock previousParserBlock
+    closeScope
     closeScope
 
     return ([a] ++ b  ++ [c] ++ d ++ [e] ++ f ++ [g] ++ [h] ++ [i] ++ j ++ [k])
