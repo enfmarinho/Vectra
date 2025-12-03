@@ -742,6 +742,13 @@ baseExp = do
                                     Just (_refT, refV) -> return refV
 
                                 return ([a] ++ [b] ++ c ++ [d], derefType, finalV)
+                            <|> do
+                                a <- TT.kwRef
+                                b@(OPEN_PAREN posn) <- TT.openParen
+                                (c, symbolId, _symbolT, _symbolV) <- var
+                                d <- TT.closeParen
+                                (refT, maybeRefV) <- getSymbolRef symbolId posn
+                                return ([a] ++ [b] ++ c ++ [d], refT, maybeRefV)
 
     case optionUnary of
         Nothing -> return (base, baseT, baseV)
