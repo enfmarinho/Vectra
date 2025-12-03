@@ -467,6 +467,9 @@ var = do
 
 callStmt :: String -> [Type] -> StateType ([Token], Maybe Type, Maybe Value)
 callStmt symbolId symbolTypeList = do
+    previousNamespaceStack <- getNamespaceStack
+    let namespaceList = removeLast symbolId
+    pushMultipleNamespacePrefix namespaceList
     openScope True -- True because it needs access to the param values, it will be changed to false latter on
     -- TODO read a optional dot followed by var, to allow method calls
     previousProgramState <- getProgramState
@@ -516,6 +519,7 @@ callStmt symbolId symbolTypeList = do
                             _ -> semanticError $ "Trying to call type " ++ show symbolType ++ ", it must be a function or procedure "  ++ showPos posn
     setProgramState previousProgramState
     closeScope
+    setNamespaceStack previousNamespaceStack
     return (b ++ [c] ++ concat d ++ [e], maybeReturnT, maybeReturnV)
     where
         valueListFromMaybeValue :: [Maybe Value] -> AlexPosn -> StateType [Value]
@@ -527,6 +531,12 @@ callStmt symbolId symbolTypeList = do
                 Just v -> do
                     rest <- valueListFromMaybeValue t posn
                     return (v:rest)
+
+        removeLast :: String -> String
+        removeLast s =
+            case splitOn "::" s of
+                [_] -> s  -- no "::" found
+                parts -> intercalate "::" (init parts)
 
 
         instatiateArgs :: [String] -> [Type] -> ([Type], [Maybe Value]) -> AlexPosn -> StateType ()
