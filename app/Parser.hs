@@ -7,6 +7,7 @@ module Parser
 import InterpreterState
 import qualified TerminalTokens as TT
 import Utils
+import Data.List.Split (splitOn)
 import Text.Parsec.Error (newErrorMessage, Message(..))
 import Text.Parsec.Pos   (initialPos)
 import qualified Data.HashTable.IO as H
@@ -1120,6 +1121,8 @@ whileStmt = do
     g <- TT.unindent
 
     let runWhile = do
+            closeScope
+            openScope True
             endEarly <- endLoopEarly
             unless endEarly $ do
                 setProgramState previousProgramState
@@ -1216,7 +1219,7 @@ forStmt = do
     assertBooleanCompatible expType posn
 
     e <- TT.kwSemicolumn
-    setProgramState Skip -- Don't execute assignStmt yet no mater what
+    setProgramState Skip -- Don't execute loop increment yet no mater what
     optionF <- optionMaybe (do
                                 (f, _) <- loopIncrementStmt
                                 return f
@@ -1274,15 +1277,20 @@ forStmt = do
     where
         loopIncrementStmt :: StateType ([Token], InterpreterState)
         loopIncrementStmt = do
-                                (f, symbolId, typeList, _varV) <- var
-                                g <- assignStmt symbolId typeList
-                                    <|> (do
-                                            (g, _, _) <- callStmt symbolId typeList
-                                            return g
-                                        )
-                                    <?> "loop increment should be either an assignStmt or a method call"
-                                finalState <- getState
-                                return (f ++ g, finalState)
+                                (do
+                                    a <- derefAssignStmt 
+                                    finalState <- getState
+                                    return (a, finalState))
+                                <|> (do
+                                        (f, symbolId, typeList, _varV) <- var
+                                        g <- assignStmt symbolId typeList
+                                            <|> (do
+                                                    (g, _, _) <- callStmt symbolId typeList
+                                                    return g
+                                                )
+                                            <?> "loop increment should be either an assignStmt or a method call"
+                                        finalState <- getState
+                                        return (f ++ g, finalState))
 
 
 
