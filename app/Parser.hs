@@ -390,18 +390,28 @@ subprogramDecl = do
         setProgramState Finished
     setParserBlock previousParserBlock
 
-arrayDecl :: StateType [Token]
-arrayDecl = do
-    a <- TT.openBracket
-    optionB <- optionMaybe expStmt
+arrayDecl :: Type -> StateType ([Token], Type, Maybe Value)
+arrayDecl underlyingT = do
+    a@(OPEN_BRACKET posn) <- TT.openBracket
+    maybeB <- optionMaybe expStmt
     c <- TT.closeBracket
+    maybeD <- optionMaybe (arrayDecl $ ArrayType underlyingT)
 
-    let OPEN_BRACKET posn = a
-    case optionB of
-        Nothing -> return $ a:[c]
-        Just (b, t, _v) -> do
-            assertNumberType t posn
-            return ([a] ++ b ++ [c])
+    (b, size) <- 
+        case maybeB of
+            Nothing -> return ([], 1)
+            Just (b, expT, expV) -> do
+                assertNumberType expT posn
+                size <- getIntValue expV posn
+                return (b, size)
+
+
+    (d, finalT, finalV) <- case maybeD of
+                            Nothing -> do
+                                return ([], ArrayType underlyingT, Just $ ArrayValue $ V.replicate size Nothing)
+                            Just (d, t, v) -> return (d, ArrayType t, Just $ ArrayValue $ V.replicate size v)
+                        
+    return ([a] ++ b ++ [c] ++ d, finalT, finalV)
 
     where
         assertNumberType :: Type -> AlexPosn -> StateType ()
@@ -410,27 +420,30 @@ arrayDecl = do
                 IntType -> return ()
                 _ -> semanticError $ "Array size should be either empty or a int type " ++ showPos posn
 
+        getIntValue :: Maybe Value -> AlexPosn -> StateType Int
+        getIntValue (Just (IntValue v)) _ = return v
+        getIntValue _ posn = semanticError $ "Array size should be either empty or a int type " ++ showPos posn
+
 returnDecl :: StateType ([Token], Type)
 returnDecl = do
     _ <- TT.opSub
     _ <- TT.opGreater
     (a, aType) <- typeStmt
-    optionB <- optionMaybe arrayDecl
+    optionB <- optionMaybe (arrayDecl aType)
     (b, returnType) <- case optionB of
         Nothing -> return ([], aType)
-        Just b -> return (b, ArrayType aType)
+        Just (b, t, _) -> return (b, t)
     return (a ++ b, returnType)
 
 -- TODO make arrayDecl recursive to allow multiple dimension arrays
 varDecl :: StateType [Token]
 varDecl = do
     (b, bType) <- typeStmt
-    c <- TT.id
-    optionD <- optionMaybe arrayDecl
+    c@(ID posn symbolId) <- TT.id
+    optionD <- optionMaybe (arrayDecl bType)
     (d, varType) <- case optionD of
                         Nothing -> return ([], bType)
-                        Just d -> return (d, ArrayType bType)
-    let ID posn symbolId = c
+                        Just (d, t, _) -> return (d, t)
     insertSymbol (symbolId, varType, Nothing) posn
     e <- do
             e <- TT.kwAssingment
@@ -940,17 +953,15 @@ stmt = do
         when isRunning' $ setProgramState Break
         return [a]
     <|> do
-        a <- TT.kwReturn
+        a@(KW_RETURN posn) <- TT.kwReturn
         optionB <- optionMaybe expStmt
         b <- case optionB of
                 Nothing -> do
-                    let KW_RETURN posn = a
                     assertReturnType Nothing posn
                     isRunning' <- isRunning
                     when isRunning' $ setProgramState $ Return Nothing
                     return []
                 Just (b, expType, expValue) -> do
-                    let KW_RETURN posn = a
                     assertReturnType (Just expType) posn
                     isRunning' <- isRunning
                     when isRunning' $ do
@@ -1186,14 +1197,14 @@ typeStmt = do
                         Just (returnTokens, returnType) -> (returnTokens, FuncRefType templateIds paramList returnType)
 
                 return ([b] ++ c ++ [d] ++ e ++ [f] ++ gTokens, t)
-    maybeC <- optionMaybe arrayDecl
+    maybeC <- optionMaybe (arrayDecl t)
 
     (aTokens, afterConst) <- case a of
                     Nothing -> return ([], t)
                     Just aTokens -> return ([aTokens], ConstType t)
     (cTokens, finalType) <- case maybeC of
                                 Nothing -> return ([], afterConst)
-                                Just c -> return (c, ArrayType afterConst)
+                                Just (c, arrayT, _arrayV) -> return (c, arrayT)
 
     return (aTokens ++ b ++ cTokens, finalType)
     where constDecl = TT.kwConst
