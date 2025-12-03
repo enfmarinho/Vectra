@@ -134,9 +134,8 @@ structDecl = do
     _ <- TT.newLine
     _ <- TT.indent
 
-    emptyTable <- liftIO H.new
-    let publicTable = emptyTable
-        privateTable = emptyTable
+    publicTable <- liftIO H.new
+    privateTable <- liftIO H.new
     _ <- many1 (do
                     accessModifier <- option Public (do
                                             _ <- TT.kwPublic
@@ -152,8 +151,8 @@ structDecl = do
                     closeScope
 
                     case accessModifier of
-                        Public -> liftIO $ mergeTablesInPlace currScope publicTable
-                        Private -> liftIO $ mergeTablesInPlace currScope privateTable
+                        Public -> liftIO $ mergeTablesInPlace publicTable currScope
+                        Private -> liftIO $ mergeTablesInPlace privateTable currScope
                         Static -> return () -- Cannot reach this, since we don't allow static data, just to avoid warnings
                     )
     _ <- TT.unindent
