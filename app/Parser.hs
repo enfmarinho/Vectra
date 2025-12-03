@@ -1114,9 +1114,11 @@ ifElseStmt = do
 
             closeScope
             currProgramState <- getProgramState
-            if executed && currProgramState == Running
-                then setProgramState Skip
-                else setProgramState previousProgramState
+            when (executed && currProgramState == Running) $ do
+                    setProgramState Skip
+
+            when (currProgramState == Skip) $ do
+                setProgramState previousProgramState
             return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g], executed)
 
         elseIfElseRecursion :: StateType [Token]
@@ -1166,19 +1168,18 @@ whileStmt = do
     previousParserBlock <- getParserBlock
     openScope True
 
-    a <- TT.kwWhile
+    a@(KW_WHILE posn) <- TT.kwWhile
     expectedReturnT <- getExpectedReturnT
     setParserBlock $ Loop expectedReturnT
     (b, expType, expValue) <- expStmt
 
-    let KW_WHILE posn = a
-
     assertBooleanCompatible expType posn
     isRunning' <- isRunning
     condition <- if isRunning' then do
-                        getBooleanValue expValue posn
+                        condition <- getBooleanValue expValue posn
+                        unless condition (setProgramState Skip)
+                        return condition
                         else return False
-    unless condition $ setProgramState Skip
 
     c <- TT.kwColumn
     d <- TT.newLine
@@ -1206,8 +1207,14 @@ whileStmt = do
                     runWhile
 
     when condition runWhile
-    setProgramState previousProgramState
-    setParserBlock previousParserBlock
+    currProgramState <- getProgramState
+    case currProgramState of
+        Return {} -> return ()
+        _ -> do
+            setProgramState previousProgramState
+            setParserBlock previousParserBlock
+
+
     closeScope
 
     return ([a] ++ b ++ [c] ++ [d] ++ [e] ++ f ++ [g])
@@ -1273,10 +1280,8 @@ forStmt = do
     expectedReturnT <- getExpectedReturnT
     setParserBlock $ Loop expectedReturnT
     b <- option [] varDecl
-    c <- TT.kwSemicolumn
+    c@(KW_SEMICOLUMN posn) <- TT.kwSemicolumn
     optionD <- optionMaybe expStmt
-
-    let KW_SEMICOLUMN posn = c
 
     (d, expType, expValue) <- case optionD of
                 Nothing -> return ([KW_TRUE posn], BoolType, Just $ BoolValue True) -- if condition is empty True will be used
@@ -1295,9 +1300,10 @@ forStmt = do
 
     isRunning' <- isRunning
     condition <- if isRunning' then do
-                        getBooleanValue expValue posn
+                        condition <- getBooleanValue expValue posn
+                        unless condition (setProgramState Skip)
+                        return condition
                         else return False
-    unless condition $ setProgramState Skip
 
     g <- TT.kwColumn
     h <- TT.newLine
@@ -1334,8 +1340,12 @@ forStmt = do
                     runFor
 
     when condition runFor
-    setProgramState previousProgramState
-    setParserBlock previousParserBlock
+    currProgramState <- getProgramState
+    case currProgramState of
+        Return {} -> return ()
+        _ -> do
+            setProgramState previousProgramState
+            setParserBlock previousParserBlock
     closeScope
     closeScope
 
