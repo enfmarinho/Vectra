@@ -78,7 +78,6 @@ assertCustomType :: Type -> AlexPosn -> StateType ()
 assertCustomType t posn = do
     case t of
         StructType {} -> return ()
-        EnumDeclType {} -> return ()
         EnumLabelType {} -> return ()
         _ -> semanticError $ "invalid type " ++ show t ++ " " ++ showPos posn
 
@@ -118,8 +117,6 @@ assertAssignableType symbolId t posn = do
     let errMsg = "Trying to assign to " ++ symbolId ++ " which is an non-assignable type: " ++ show t ++ " " ++ showPos posn
     case t of
         ConstType _ -> semanticError errMsg
-        ArrayType {} -> semanticError errMsg
-        EnumDeclType {} -> semanticError errMsg
         FuncType {} -> semanticError errMsg
         StructType {} -> semanticError errMsg
         _ -> return ()

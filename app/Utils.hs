@@ -30,7 +30,7 @@ getBooleanValue (Just value) posn = do
 getCustomType :: [Type] -> StateType (Maybe Type)
 getCustomType (h:t) = do
     case h of
-        EnumDeclType name _list -> return $ Just $ EnumLabelType name
+        EnumLabelType name -> return $ Just $ EnumLabelType name
         StructType structId templateList publicData privateData  -> 
             return $ Just $ StructType structId templateList publicData privateData
         TemplateType s -> return $ Just $ TemplateType s
@@ -262,10 +262,10 @@ castType (ArrayType t1) (ArrayType t2) posn = do
     return (ArrayType finalT)
 
 -- EnumType target
-castType (EnumDeclType name1 labels1) (EnumDeclType name2 labels2) posn
-    | EnumDeclType name1 labels1 == EnumDeclType name2 labels2 = return (EnumDeclType name1 labels1)
+castType (EnumLabelType name1) (EnumLabelType name2) posn
+    | EnumLabelType name1 == EnumLabelType name2 = return (EnumLabelType name1)
     | otherwise =
-        semanticError $ "Incompatible enum types at " ++ showPos posn
+        semanticError $ "Incompatible enum types \"" ++ name1 ++ "\" and \" " ++ name2 ++ " at " ++ showPos posn
 
 castType target src posn =
     semanticError $ "Cannot cast from " ++ show src ++ " to " ++ show target ++ " at " ++ showPos posn
@@ -316,8 +316,6 @@ castValueToType StringType (srcT, ConstValue v) posn =
 castValueToType (ArrayType _)(_, ArrayValue array) _ = return (ArrayValue array)
 
 --- Enum Target ---
-castValueToType (EnumDeclType id1 _)(EnumLabelType id2, EnumValue label) posn = 
-    castValueToType (EnumLabelType id1) (EnumLabelType id2, EnumValue label) posn
 castValueToType (EnumLabelType id1)(EnumLabelType id2, EnumValue label) posn = do
     when (id1 /= id2) $ semanticError $ "incompatible enum types " ++ showPos posn
     return (EnumValue label)

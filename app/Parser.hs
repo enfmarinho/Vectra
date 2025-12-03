@@ -266,7 +266,6 @@ enumDecl = do
     assertNonAmbiguous enumId posn
 
     pushNamespacePrefix enumId
-    openScope False
 
     _ <- TT.kwColumn
     _ <- TT.newLine
@@ -274,11 +273,8 @@ enumDecl = do
     _ <- idList enumId posn
     _ <- TT.unindent
 
-    currScope <- topScope
-    closeScope
     popNamespacePrefix
-    mergeTableToScope currScope
-    insertSymbol (enumId, EnumDeclType enumId currScope, Nothing) posn
+    insertSymbol (enumId, EnumLabelType enumId, Nothing) posn
     where
         idList :: String -> AlexPosn -> StateType ()
         idList enumId posn = do
