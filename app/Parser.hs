@@ -164,7 +164,7 @@ implDecl = do
     openScope True
     _ <- TT.kwImpl
     (ID posn symbolId) <- TT.id
-    (typeList, _) <- consultSymbolTable symbolId posn
+    (typeList, _) <- consultSymbol symbolId posn
     structT <- getTypeFromTypeList typeList
     case structT of
         StructType _name templeteList publicTable privateTable -> do
@@ -173,7 +173,7 @@ implDecl = do
             insertTemplates templeteList posn
         _ -> semanticError $ "using impl for a non-struct type \"" ++ symbolId ++ "\" " ++ showPos posn
 
-    implMaybe <- consultSymbolTableMaybe ("impl::" ++ symbolId) 
+    implMaybe <- consultSymbolMaybe ("impl::" ++ symbolId) 
     (publicMethodTable, privateMethodTable) <- case implMaybe of
                                                     Nothing -> do
                                                         emptyTable <- liftIO H.new
@@ -441,7 +441,7 @@ varDecl = do
                     Nothing -> runtimeError $ "trying to use unitialized variable " ++ showPos posn
                     Just v -> do
                         finalValue <- castValueToType varType (expType, v) posn
-                        updateSymbolTable symbolId ([varType], Just finalValue)
+                        updateSymbol symbolId ([varType], Just finalValue)
             return $ e:f
         <|> return []
 
@@ -462,7 +462,7 @@ var = do
     (b, symbolId, posn) <- namespaceAccess
     -- (b, symbolList) <- option ([], []) memberAccess
 
-    (varTypeList, varValue) <- consultSymbolTable symbolId posn
+    (varTypeList, varValue) <- consultSymbol symbolId posn
     return (b, symbolId, varTypeList, varValue)
 
 callStmt :: String -> [Type] -> StateType ([Token], Maybe Type, Maybe Value)
@@ -542,7 +542,7 @@ callStmt symbolId symbolTypeList = do
                                                             (t, _) <- case s of
                                                                         Nothing -> semanticError $ "missing template instatiation " ++ showPos posn -- cannot reach this
                                                                         Just s' -> do
-                                                                            result <- consultSymbolTableMaybe s'
+                                                                            result <- consultSymbolMaybe s'
                                                                             case result of
                                                                                 Nothing -> semanticError $ "cannot find template instatiation " ++ showPos posn -- cannot reach this
                                                                                 Just t -> return t
@@ -645,7 +645,7 @@ literal = do
         return (a ++ [b] ++ [c] ++ [d], ArrayType at, Just $ ArrayValue $ V.replicate size Nothing))
     <|> try (do -- enum labels
         (b, symbolId, posn) <- namespaceAccess
-        (tList, v) <- consultSymbolTable symbolId posn
+        (tList, v) <- consultSymbol symbolId posn
         t <- getTypeFromTypeList tList
         case t of
             EnumLabelType _ -> return ()
@@ -722,7 +722,7 @@ baseExp = do
                                                 case varValue of
                                                     Just refValue -> do
                                                         case refValue of
-                                                            RefValue refSymbol scopeId -> consultSymbolTableByIdMaybe (refSymbol, scopeId)
+                                                            RefValue refSymbol scopeId -> consultSymbolByIdMaybe (refSymbol, scopeId)
                                                             _ -> runtimeError "trying to deref a non reference value" -- TODO will not reach this
                                                     Nothing -> runtimeError $ "using unitialized var \"" ++ varId ++ "\""
                                             else return Nothing
@@ -972,11 +972,11 @@ assignStmt symbolId typeList = do
                 when isRunning' $ do
                         case expValue of
                             Nothing -> semanticError $ "using uninitialized var " ++ showPos posn
-                            Just v -> updateSymbolTable symbolId (typeList, Just v)
+                            Just v -> updateSymbol symbolId (typeList, Just v)
                 return []
             Just op -> do
                 when isRunning' $ do
-                    maybeTV <- consultSymbolTableMaybe symbolId
+                    maybeTV <- consultSymbolMaybe symbolId
                     maybeValue <- case maybeTV of
                                 Nothing -> return Nothing
                                 Just (_, v) -> return v
@@ -989,7 +989,7 @@ assignStmt symbolId typeList = do
                         OP_OR _ -> handleOr maybeValue expValue posn
                         _ -> semanticError $ "Invalid operation on assignment operation for " ++ symbolId ++ " " ++ showPos posn
                     castedValue <- castValueToType symbolType resultValue posn
-                    updateSymbolTable symbolId ([symbolType], Just castedValue)
+                    updateSymbol symbolId ([symbolType], Just castedValue)
                     return ()
 
                 return [op]
@@ -1151,7 +1151,7 @@ typeStmt = do
                 return ([b] ++ [c] ++ d ++ [e], RefType t)
             <|> do -- customType
                 (c, symbolId, posn) <- namespaceAccess
-                (tList, _) <- consultSymbolTable symbolId posn
+                (tList, _) <- consultSymbol symbolId posn
                 t <- getTypeFromTypeList tList
                 assertCustomType t posn
                 return (c, t)

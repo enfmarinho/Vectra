@@ -319,28 +319,28 @@ walkNamespaceStack (currNamespace : namespaceTail) symbolId table action = do
         Just r -> return $ Just r
         Nothing -> walkNamespaceStack namespaceTail symbolId table action
 
-consultSymbolTableMaybe :: String -> StateType (Maybe ([Type], Maybe Value))
-consultSymbolTableMaybe symbolId = walkScopes symbolId H.lookup
+consultSymbolMaybe :: String -> StateType (Maybe ([Type], Maybe Value))
+consultSymbolMaybe symbolId = walkScopes symbolId H.lookup
 
-consultSymbolTable :: String -> AlexPosn -> StateType ([Type], Maybe Value)
-consultSymbolTable symbolId posn = do
+consultSymbol :: String -> AlexPosn -> StateType ([Type], Maybe Value)
+consultSymbol symbolId posn = do
     r <- walkScopes symbolId H.lookup
     case r of
         Nothing -> semanticError $ "using non-existing symbol \"" ++ symbolId ++ "\" at " ++ showPos posn
         Just v -> return v
 
-consultSymbolTableByIdMaybe :: (String, Int) -> StateType (Maybe([Type], Maybe Value))
-consultSymbolTableByIdMaybe (symbolId, tableId) = walkScopesById tableId symbolId H.lookup
+consultSymbolByIdMaybe :: (String, Int) -> StateType (Maybe([Type], Maybe Value))
+consultSymbolByIdMaybe (symbolId, tableId) = walkScopesById tableId symbolId H.lookup
 
-consultSymbolTableById :: (String, Int) -> AlexPosn -> StateType ([Type], Maybe Value)
-consultSymbolTableById (symbolId, tableId) posn = do
+consultSymbolById :: (String, Int) -> AlexPosn -> StateType ([Type], Maybe Value)
+consultSymbolById (symbolId, tableId) posn = do
     r <- walkScopesById tableId symbolId H.lookup
     case r of
         Nothing -> semanticError $ "\"" ++ symbolId ++ "\"" ++ "doesn't exist in this scope " ++ showPos posn
         Just v -> return v
 
-updateSymbolTable :: String -> ([Type], Maybe Value) -> StateType ()
-updateSymbolTable symbolId (typeList, value) = do
+updateSymbol :: String -> ([Type], Maybe Value) -> StateType ()
+updateSymbol symbolId (typeList, value) = do
     let helper table symbolId' = do
             found <- H.lookup table symbolId'
             case found of
@@ -355,8 +355,8 @@ updateSymbolTable symbolId (typeList, value) = do
         Nothing -> semanticError "trying to use undeclared var"
         Just _ -> return ()
 
-searchUpdateSymbolTable :: (String, Int) -> ([Type], Maybe Value) -> StateType ()
-searchUpdateSymbolTable (symbolId, tableId) (typeList, value) = do
+updateSymbolById :: (String, Int) -> ([Type], Maybe Value) -> StateType ()
+updateSymbolById (symbolId, tableId) (typeList, value) = do
     assertCorrectness typeList value
 
     let helper table symbolId' = do

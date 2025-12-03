@@ -49,7 +49,7 @@ getStructType [] = return Nothing
 
 consultType :: String -> AlexPosn -> StateType Type
 consultType symbolId posn = do
-    consultResult <- consultSymbolTable symbolId posn
+    consultResult <- consultSymbol symbolId posn
     case consultResult of
         -- improve error message
         ([], _) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
@@ -59,7 +59,7 @@ consultType symbolId posn = do
 
 consultTypeList :: String -> AlexPosn -> StateType [Type]
 consultTypeList symbolId posn = do
-    (t, _) <- consultSymbolTable symbolId posn
+    (t, _) <- consultSymbol symbolId posn
     return t
 
 

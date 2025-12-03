@@ -9,13 +9,13 @@ import Data.Maybe
 
 assertNonAmbiguous :: String -> AlexPosn -> StateType ()
 assertNonAmbiguous symbolId posn = do
-    a <- consultSymbolTableMaybe symbolId
+    a <- consultSymbolMaybe symbolId
     when (isJust a) $ semanticError $ "Ambiguous declaration for symbol " ++ symbolId ++ " " ++ showPos posn
 
 
 assertMethodDeclNotAmbiguous :: String -> [Type] -> AlexPosn -> StateType ()
 assertMethodDeclNotAmbiguous symbolId paramTypeList posn = do
-    maybeTypeList <- consultSymbolTableMaybe symbolId
+    maybeTypeList <- consultSymbolMaybe symbolId
     typeList <- case maybeTypeList of
                     Nothing -> return []
                     Just (t, _) -> return t
