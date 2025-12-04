@@ -9,10 +9,13 @@ import Debug.Trace (trace)
 }
 
 %wrapper "monadUserState"
+-- Scanners com Estado ("Stateful"): Como Vectra usa indentação para definir blocos, o scanner precisa ter memória. 
+-- Ele precisa lembrar: "Quantos espaços de indentação eu tinha na linha anterior?".
 
 $NUMBER = 0-9     
 $LETTER = [a-zA-Z]
 
+-- Regras de Regex dos tokens
 tokens :-
     "//".*\n     { \_ _ -> return Nothing }
     [\ \t]+      { \_ len -> do setCurrIndentationLevel len; return Nothing }
@@ -96,9 +99,9 @@ tokens :-
 {
 
 data AlexUserState = AlexUserState
-  { currIndentationLevel :: Int
-  , beginLine :: Bool
-  , indentationLevelStack :: [Int]
+  { currIndentationLevel :: Int     -- Quantos espaços li agora?
+  , beginLine :: Bool               -- Estou no início da linha?
+  , indentationLevelStack :: [Int]  -- A Pilha de Escopos [0, 4, 8...]
   }
 
 alexInitUserState :: AlexUserState
@@ -164,6 +167,7 @@ alexPos (pos, _, _, _) = pos
 alexInputStr :: AlexInput -> String
 alexInputStr (_, _, _, str) = str
 
+-- decide quando inserir os tokens INDENT e UNINDENT.
 handleIndentation :: Token -> Alex Token
 handleIndentation currToken = do
     pastIndentationLevel <- topIndentationLevelStack
@@ -176,12 +180,17 @@ handleIndentation currToken = do
     let posn = alexPos inp
     if not beginLine then
         return currToken
-    else if pastIndentationLevel < currIndentationLevel then do
-        pushIndentationLevel currIndentationLevel
-        return $ SPECIAL_CASE [INDENT posn, currToken]
-    else if pastIndentationLevel > currIndentationLevel then do
+
+    else if pastIndentationLevel < currIndentationLevel then do -- usuario deu TAB
+        pushIndentationLevel currIndentationLevel -- empilha novo nível
+        return $ SPECIAL_CASE [INDENT posn, currToken] -- retorna token especial
+
+    else if pastIndentationLevel > currIndentationLevel then do -- usuario desindentou (fechou bloco)
+        -- unindentLoop é necessário porque o usuário pode fechar 3 blocos de uma vez (sair de 3 ifs aninhados). 
+        -- O loop vai gerando UNINDENT até a pilha bater com o nível atual.
         unindents <- unindentLoop pastIndentationLevel currIndentationLevel posn
         return $ SPECIAL_CASE (unindents ++ [NEWLINE posn, currToken]) -- This is a workaround
+    
     else
         return currToken
 

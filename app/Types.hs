@@ -58,7 +58,7 @@ data Type = IntType
           | FuncType [String] [(String, Type)] Type [Token]          -- (template_ids, (param_ids, param_types), return_type, method_body)
           | StructType String [String] SymbolTableType SymbolTableType -- (struct_id, template_ids, public_data, private_data)
           | StructInstanceType String                                -- (struct_type_id)
-          | ImplType SymbolTableType SymbolTableType -- (public_table, private_table)
+          | ImplType SymbolTableType SymbolTableType                 -- (public_table, private_table)
           | HaskellMethod [Type] (Maybe Type) LibMethodSignature     -- (param_types, return_type, internal_method)
 
 data Value = IntValue Int
@@ -140,6 +140,9 @@ instance Eq Type where
     a == ConstType underlyingT = underlyingT == a
 
 
+-- Imagine a função swap<T>(T a, T b). O interpretador espera receber T. O usuário passa int. 
+-- O interpretador pergunta: IntType == TemplateType? 
+-- Graças a essa regra (T é igual a qualquer coisa), a resposta é SIM. O interpretador aceita a chamada sem precisar de uma lógica complexa de inferência de tipos.
     TemplateType _ == _ = True
     _ == TemplateType _  = True
 

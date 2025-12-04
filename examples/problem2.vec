@@ -1,0 +1,35 @@
+import print, println, read_int
+
+proc main():
+    bool finish = false
+    int first_interval = 0
+    int second_interval = 0
+    int third_interval = 0
+    int fourth_interval = 0
+    int x
+    while !finish:
+        print("write a number: ")
+        x = read_int()
+        if 0 <= x && x <= 25:
+            first_interval += 1
+        else if 26 <= x && x <= 50:
+            second_interval += 1
+        else if 51 <= x && x <= 75:
+            third_interval += 1
+        else if 76 <= x && x <= 100:
+            fourth_interval += 1
+        else if x < 0:
+            finish = true
+        else:
+            println("number out of intervals and non-negative")
+
+    println("=========================")
+    print("first interval: ")
+    println(first_interval)
+    print("second interval: ")
+    println(second_interval)
+    print("third interval: ")
+    println(third_interval)
+    print("fourth interval: ")
+    println(fourth_interval)
+    println("=========================")

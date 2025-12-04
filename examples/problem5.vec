@@ -1,0 +1,43 @@
+import println
+
+proc mdc(int n, int m, ref(int) r):
+
+    int quociente
+    int resto
+
+    quociente = m / n
+    resto = m - (n * quociente)
+    if resto == 0:
+        deref(r) = n
+        return
+
+    quociente = n / m
+    resto = n - (m * quociente)
+    if resto == 0:
+        deref(r) = m
+        return
+
+    if m > n:
+        quociente = m / n
+        resto = m - (n * quociente)
+        mdc(n, resto, r)
+        return
+
+    else:
+        quociente = n / m
+        resto = n - (m * quociente)
+        mdc(m, resto, r)
+
+func main() -> int:
+    int n = 4
+    int m = 5
+    
+    int resultado = 0
+
+    ref(int) r = ref(resultado)
+
+    mdc(n, m, r)
+
+    println(resultado)
+
+    return 0
