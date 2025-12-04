@@ -981,7 +981,6 @@ stmt = do
     <|> ifElseStmt
     <|> whileStmt
     <|> forStmt
-    <|> foreachStmt
     <|> do
         a <- TT.kwContinue
         let KW_CONTINUE posn = a
@@ -1398,36 +1397,6 @@ forStmt = do
                                         finalState <- getState
                                         return (f ++ g, finalState))
 
-
-
-foreachStmt :: StateType [Token]
-foreachStmt = do
-    previousParserBlock <- getParserBlock
-    openScope True
-    a <- TT.kwForeach
-    expectedReturnT <- getExpectedReturnT
-    setParserBlock $ Loop expectedReturnT
-    b <- TT.id
-    c <- TT.kwIn
-    d <- TT.id
-
-    let ID posn dSymbol = d
-    dType <- consultType dSymbol posn
-    assertIterableType dSymbol dType posn
-
-    let ArrayType underlyingType = dType
-    let ID _ bSymbol = b
-    insertSymbol (bSymbol, underlyingType, Nothing) posn
-
-    e <- TT.kwColumn
-    f <- TT.newLine
-    g <- TT.indent
-    (h, _) <- stmtList
-    i <- TT.unindent
-
-    closeScope
-    setParserBlock previousParserBlock
-    return $ [a] ++ [b] ++ [c] ++ [d] ++ [e] ++ [f] ++ [g] ++ h ++ [i]
 
 parser :: [Token] -> String -> IO (Maybe ParseError)
 parser tokenList fileName = do
