@@ -119,9 +119,24 @@ instance Eq Type where
         templates1 == templates2 && params1 == params2
     FuncType templates1 params1 r1 _ == FuncType templates2 params2 r2 _ =
         templates1 == templates2 && params1 == params2 && r1 == r2
-    StructType {} == StructType {} = False
+    StructType s1 _ _ _ == StructType s2 _ _ _ = s1 == s2
     StructInstanceType s1 == StructInstanceType s2 = s1 == s2
+    StructType s1 _ _ _ == StructInstanceType s2 = s1 == s2
+    StructInstanceType s1 == StructType s2 _ _ _ = s1 == s2
     EnumLabelType e1 == EnumLabelType e2 = e1 == e2
+
+    -- Implicit cast
+    IntType == FloatType = True
+    FloatType == IntType = True
+
+    IntType == BoolType = True
+    BoolType == IntType = True
+
+    FloatType == BoolType = True
+    BoolType == FloatType = True
+
+    ConstType underlyingT == a = underlyingT == a
+    a == ConstType underlyingT = underlyingT == a
 
 
     TemplateType _ == _ = True
