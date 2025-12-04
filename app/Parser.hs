@@ -447,23 +447,63 @@ varDecl = do
 
     return (b ++ [c] ++ d ++ e)
 
--- memberAccess :: StateType ([Token], [String])
--- memberAccess = do
+-- memberAccess :: String -> StateType ([Token], [Type], Maybe Value)
+-- memberAccess t = do
 --     a <- TT.kwDot
 --     b <- TT.id
 --     (ct, cs) <- option ([], []) memberAccess
 --
 --     let ID _posn symbolId = b
 --     return ([a] ++ [b] ++ ct, symbolId:cs)
+--
+arrayAccess :: [Type] -> Maybe Value -> StateType ([Token], [Type], Maybe Value)
+arrayAccess arrayT maybeArrayV = do
+    a@(OPEN_BRACKET posn) <- TT.openBracket
+    (b, _, expV) <- expStmt
+    c <- TT.closeBracket
+
+    isRunning' <- isRunning
+    accessedV <- if isRunning'
+                    then do
+                        case maybeArrayV of
+                            Nothing -> runtimeError $ "Trying to index a unitialized array" ++ showPos posn
+                            Just arrayV -> do
+                                case arrayV of
+                                    ArrayValue underlyingVector -> do
+                                        index <- getIntValue expV posn
+                                        let accessedV = underlyingVector V.!? index
+                                        case accessedV of
+                                            Nothing -> do
+                                                let size = V.length underlyingVector
+                                                runtimeError $
+                                                    "tried to access index " ++ show index ++ " but array size is " ++ show size ++ showPos posn
+                                            Just v -> return v
+                                    _ -> runtimeError $ "Trying to access a non array value " ++ showPos posn -- will not reach this
+                    else return Nothing
+
+    underlyingT <- case arrayT of
+        [ArrayType underlyingT] -> return underlyingT
+        _ -> semanticError $ "trying to access with [] a non-array type " ++ showPos posn
+
+    maybeD <- optionMaybe (arrayAccess [underlyingT] accessedV)
+    case maybeD of
+        Nothing -> return ([a] ++ b ++ [c], [underlyingT], accessedV)
+        Just (d, t, v) -> return ([a] ++ b ++ [c] ++ d, t, v)
+
 
 -- TODO var is incomplete, this is just a STUB
+-- TOOD call stmt should be handled here maybe, since a callstmt can return a var
 var :: StateType ([Token], String, [Type], Maybe Value)
 var = do
-    (b, symbolId, posn) <- namespaceAccess
-    -- (b, symbolList) <- option ([], []) memberAccess
+    (a, symbolId, posn) <- namespaceAccess
 
     (varTypeList, varValue) <- consultSymbol symbolId posn
-    return (b, symbolId, varTypeList, varValue)
+    -- (b, symbolList) <- option ([], []) memberAccess
+
+    maybeArrayAccess <- optionMaybe (arrayAccess varTypeList varValue)
+    case maybeArrayAccess of
+        Nothing -> return (a, symbolId, varTypeList, varValue)
+        Just (c, t, v) -> return (a ++ c, symbolId, t, v)
 
 callStmt :: String -> [Type] -> StateType ([Token], Maybe Type, Maybe Value)
 callStmt symbolId symbolTypeList = do
