@@ -1305,19 +1305,6 @@ typeStmt = do
                 t <- getTypeFromTypeList tList
                 assertCustomType t posn
                 return (c, t)
-            <|> do -- reference for subprogram
-                b <- TT.openParen
-                (c, templateIds) <- option ([], []) templateDecl
-                d <- TT.openParen
-                (e, paramList) <- optUnnamedParamDeclList
-                f <- TT.closeParen
-                optionG <- optionMaybe returnDecl
-
-                let (gTokens, t) = case optionG of
-                        Nothing -> ([], ProcRefType templateIds paramList)
-                        Just (returnTokens, returnType) -> (returnTokens, FuncRefType templateIds paramList returnType)
-
-                return ([b] ++ c ++ [d] ++ e ++ [f] ++ gTokens, t)
     maybeC <- optionMaybe (arrayDecl t)
 
     (aTokens, afterConst) <- case a of

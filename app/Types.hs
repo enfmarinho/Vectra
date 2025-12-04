@@ -46,7 +46,6 @@ data ProgramState = Starting
 
 data Type = IntType
           | FloatType
-          | CharType
           | BoolType
           | StringType
           | TemplateType (Maybe String) -- (template_symbol)
@@ -58,22 +57,17 @@ data Type = IntType
           | FuncType [String] [(String, Type)] Type [Token]          -- (template_ids, (param_ids, param_types), return_type, method_body)
           | StructType String [String] SymbolTableType SymbolTableType -- (struct_id, template_ids, public_data, private_data)
           | StructInstanceType String                                -- (struct_type_id)
-          | FuncRefType [String] [Type] Type                         -- (templates_ids, param_types, return_type)
-          | ProcRefType [String] [Type]                              -- (templates_ids, param_types)
           | ImplType SymbolTableType SymbolTableType -- (public_table, private_table)
           | HaskellMethod [Type] (Maybe Type) LibMethodSignature     -- (param_types, return_type, internal_method)
 
 data Value = IntValue Int
            | FloatValue Float
-           | CharValue Char
            | BoolValue Bool
            | StringValue String
            | ConstValue Value
            | ArrayValue (V.Vector (Maybe Value))
            | EnumValue String
            | RefValue String Int -- (referent_id, scope_id)
-           | FuncRefValue String
-           | ProcRefValue String
            | StructValue SymbolTableType    -- (internal_symbol_table)
            deriving (Show)
 
@@ -91,7 +85,6 @@ instance Eq ProgramState where
 instance Show Type where
     show IntType = "int"
     show FloatType = "float"
-    show CharType = "char"
     show BoolType = "bool"
     show StringType = "string"
     show (TemplateType Nothing) = "template"
@@ -107,12 +100,6 @@ instance Show Type where
     show (ImplType _ _) = "impl"
     show (StructInstanceType structId) = "struct " ++ structId
     show (EnumLabelType enumId) = "enum " ++ enumId
-    show (FuncRefType templates params returnT) =
-        "funcRef<" ++ show templates ++ ">" ++
-        "(" ++ show params ++ ") -> " ++ show returnT
-    show (ProcRefType templates params) =
-        "procRef<" ++ show templates ++ ">" ++
-        "(" ++ show params ++ ")"
     show (HaskellMethod paramTypes _ _) =
         "internalMethod" ++ show paramTypes
 
@@ -122,7 +109,6 @@ showParams = concatMap (\(_, t) -> show t ++ ", ")
 instance Eq Type where
     IntType == IntType = True
     FloatType == FloatType = True
-    CharType == CharType = True
     BoolType == BoolType = True
     StringType == StringType = True
     TemplateType _ == TemplateType _ = True
@@ -136,10 +122,7 @@ instance Eq Type where
     StructType {} == StructType {} = False
     StructInstanceType s1 == StructInstanceType s2 = s1 == s2
     EnumLabelType e1 == EnumLabelType e2 = e1 == e2
-    FuncRefType templates1 params1 r1 == FuncRefType templates2 params2 r2 =
-        templates1 == templates2 && params1 == params2 && r1 == r2
-    ProcRefType templates1 params1 == ProcRefType templates2 params2 =
-        templates1 == templates2 && params1 == params2
+
 
     TemplateType _ == _ = True
     _ == TemplateType _  = True

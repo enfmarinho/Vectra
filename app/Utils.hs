@@ -157,8 +157,6 @@ handleAdd (Just (FloatValue lhsV)) (Just (FloatValue rhsV)) _ =
     return (FloatType, FloatValue (lhsV + rhsV))
 handleAdd (Just (StringValue lhsV)) (Just (StringValue rhsV)) _ =
     return (StringType, StringValue (lhsV ++ rhsV))
-handleAdd (Just (StringValue lhsV)) (Just (CharValue rhsV)) _ =
-    return (StringType, StringValue (lhsV ++ [rhsV]))
 handleAdd _ _ posn = semanticError $ "Invalid operands for addition at " ++ showPos posn
 
 
@@ -338,7 +336,6 @@ resultOpType FloatType IntType _ = return FloatType
 resultOpType FloatType BoolType _ = return FloatType
 -- String 
 resultOpType StringType StringType _ = return StringType
-resultOpType StringType CharType _ = return StringType
 -- Bool
 resultOpType BoolType BoolType _ = return BoolType
 resultOpType BoolType IntType _ = return IntType
@@ -387,7 +384,6 @@ getTypeFromTypeList _ = fail "<getTypeFromTypeList> ambiguity"
 typeFromValue :: Value -> AlexPosn -> StateType Type
 typeFromValue (IntValue _) _ = return IntType
 typeFromValue (FloatValue _) _ = return FloatType
-typeFromValue (CharValue _) _ = return CharType
 typeFromValue (BoolValue _) _ = return BoolType
 typeFromValue (StringValue _) _ = return StringType
 typeFromValue (ConstValue v) posn = do
@@ -400,19 +396,6 @@ typeFromValue (EnumValue _enumId) _ = return (EnumLabelType "")
 typeFromValue (RefValue symbolId _) posn = do
     symbolType <- consultType symbolId posn
     return (RefType symbolType)
-
--- Function/procedure references
-typeFromValue (FuncRefValue symbolId) posn = do
-    t <- consultType symbolId posn
-    case t of
-        FuncType templates paramPairs ret _ -> return (FuncRefType templates (map snd paramPairs) ret)
-        _ -> semanticError $ "Invalid function reference type for symbol " ++ symbolId
-
-typeFromValue (ProcRefValue symbolId) posn = do
-    t <- consultType symbolId posn
-    case t of
-        ProcType templates paramPairs _ -> return (ProcRefType templates (map snd paramPairs))
-        _ -> semanticError $ "Invalid procedure reference type for symbol " ++ symbolId
 
 typeFromValue (StructValue _symbolTable) _ = return (StructInstanceType "")
 
