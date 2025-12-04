@@ -10,7 +10,7 @@ import Data.Maybe
 assertNonAmbiguous :: String -> AlexPosn -> StateType ()
 assertNonAmbiguous symbolId posn = do
     a <- consultSymbolMaybe symbolId
-    when (isJust a) $ semanticError $ "Ambiguous declaration for symbol " ++ symbolId ++ " " ++ showPos posn
+    when (isJust a) $ semanticError $ "Ambiguous declaration for \"" ++ symbolId ++ "\" " ++ showPos posn
 
 
 assertMethodDeclNotAmbiguous :: String -> [Type] -> AlexPosn -> StateType ()
@@ -22,7 +22,7 @@ assertMethodDeclNotAmbiguous symbolId paramTypeList posn = do
 
     when (ambiguous typeList paramTypeList) $
         semanticError $
-            "Ambiguous declaration for " ++ symbolId ++ " at " ++ showPos posn
+            "Ambiguous declaration for subprogram \"" ++ symbolId ++ "\" " ++ showPos posn
   where
     ambiguous :: [Type] -> [Type] -> Bool
     ambiguous [] _ = False
