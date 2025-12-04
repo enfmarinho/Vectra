@@ -83,7 +83,27 @@ assertCustomType t posn = do
 
 
 assertComparableTypes :: Type -> Type -> AlexPosn -> StateType ()
-assertComparableTypes _t1 _t2 _posn = return () -- TODO
+assertComparableTypes t1 t2 posn = 
+    if comparable t1 t2
+        then return ()
+        else semanticError $
+            "cannot compare values of types " 
+            ++ show t1 ++ " and " ++ show t2
+            ++ " at " ++ showPos posn
+  where
+    comparable :: Type -> Type -> Bool
+    comparable IntType  IntType  = True
+    comparable FloatType FloatType = True
+    comparable IntType  FloatType = True
+    comparable FloatType IntType  = True
+    comparable StringType StringType = True
+    comparable BoolType BoolType = True  -- optional if booleans comparable
+    comparable (ConstType ut) t = comparable ut t  -- optional if booleans comparable
+    comparable t (ConstType ut) = comparable ut t  -- optional if booleans comparable
+    comparable (EnumLabelType _) (EnumLabelType _) = True  -- optional if booleans comparable
+    comparable (TemplateType _) _ = True
+    comparable _ (TemplateType _) = True
+    comparable _ _ = False
 
 assertIterableType :: String -> Type -> AlexPosn -> StateType ()
 assertIterableType symbolId t posn = do
