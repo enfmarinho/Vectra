@@ -7,19 +7,18 @@ struct rational_t:
 func make_rational(int a, int b) -> rational_t:
     if b == 0:
         println("Erro: Denominador nao pode ser zero. Definindo como 1.")
-        return rational_t {
-            numerator = a
-            denominator = 1
-    }
+        rational_t t 
+        t.numerator = a
+        t.denominator = 1
+        return t
     
     if b < 0:
         a = 0 - a
         b = 0 - b
 
-    return rational_t {
-        numerator = a
-        denominator = b
-    }
+    rational_t t 
+    t.numerator = a
+    t.denominator = b
 
 func is_equal(rational_t r1, rational_t r2) -> bool:
     int left = r1.numerator * r2.denominator
@@ -93,7 +92,7 @@ func main() -> int:
 
     rational_t res_div = div_rational(r1, r2)
     println("Divisao (1/2 / 3/4): ")
-    print_rational(res_div) # Deve ser 4/6
+    print_rational(res_div)
 
     rational_t res_neg = negate_rational(r1)
     println("Negacao -(1/2): ")
