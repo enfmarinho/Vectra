@@ -17,7 +17,6 @@ showPos (AlexPn _ line col) =
 
 semanticError :: String -> StateType a
 semanticError msg = do
-    -- liftIO $ putStrLn msg
     fileName <- topImportStack
     parserFail ("[" ++ fileName ++  "] Semantic Error: " ++ msg)
 runtimeError :: String -> StateType a
