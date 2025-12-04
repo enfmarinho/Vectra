@@ -771,27 +771,24 @@ baseExp = do
                                 b <- TT.opSmaller
                                 (c, t) <- typeStmt
                                 d <- TT.opGreater
-                                e <- TT.openParen
-                                (f, varId, varT, varV) <- var
+                                e@(OPEN_PAREN posn) <- TT.openParen
+                                (f, varT, varV) <- expStmt
                                 g <- TT.closeParen
-                                let OPEN_PAREN posn = e
-                                varT' <- getTypeFromTypeList varT
-                                finalT <- castType t varT' posn
+                                finalT <- castType t varT posn
                                 isRunning' <- isRunning
                                 finalV <- if isRunning'
                                             then do
                                                 case varV of
-                                                    Nothing -> runtimeError $ "Using unitialized var \"" ++ varId ++ "\""
+                                                    Nothing -> runtimeError $ "Using unitialized var " ++ showPos posn
                                                     Just v -> do
-                                                        finalV <- castValueToType finalT (varT', v) posn
+                                                        finalV <- castValueToType finalT (varT, v) posn
                                                         return $ Just finalV
                                             else return Nothing
                                 return ([a] ++ [b] ++ c ++ [d] ++ [e] ++ f ++ [g], t, finalV)
                             <|> do
                                 a <- TT.kwDeref
-                                b <- TT.openParen
+                                b@(OPEN_PAREN posn) <- TT.openParen
                                 (c, varId, varType, varValue) <- var
-                                let OPEN_PAREN posn = b
                                 varType' <- getTypeFromTypeList varType
                                 derefType <- case varType' of
                                                 RefType derefType -> return derefType
