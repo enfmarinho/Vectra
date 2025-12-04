@@ -29,7 +29,6 @@ vectraPrint [value] posn = do
     case value of
         IntValue v -> liftIO $ putStr (show v)
         FloatValue v -> liftIO $ putStr (show v)
-        CharValue v -> liftIO $ putStr (show v)
         BoolValue v -> liftIO $ putStr (show v)
         StringValue v -> liftIO $ putStr v
         ConstValue v -> do
