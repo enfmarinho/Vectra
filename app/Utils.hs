@@ -34,8 +34,8 @@ getCustomType :: [Type] -> StateType (Maybe Type)
 getCustomType (h:t) = do
     case h of
         EnumLabelType name -> return $ Just $ EnumLabelType name
-        StructType structId templateList publicData privateData  -> 
-            return $ Just $ StructType structId templateList publicData privateData
+        StructType structId _templateList _publicData _privateData  -> 
+            return $ Just $ StructInstanceType structId
         TemplateType s -> return $ Just $ TemplateType s
         _ -> getCustomType t
 getCustomType [] = return Nothing
