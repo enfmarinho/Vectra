@@ -430,3 +430,7 @@ copyTable original = do
     new <- H.new
     H.mapM_ (\(k, v) -> H.insert new k v) original
     return new
+
+getIntValue :: Maybe Value -> AlexPosn -> StateType Int
+getIntValue (Just (IntValue v)) _ = return v
+getIntValue _ posn = semanticError $ "Array size should be either empty or a int type " ++ showPos posn

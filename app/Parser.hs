@@ -409,9 +409,6 @@ arrayDecl underlyingT = do
                 IntType -> return ()
                 _ -> semanticError $ "Array size should be either empty or a int type " ++ showPos posn
 
-        getIntValue :: Maybe Value -> AlexPosn -> StateType Int
-        getIntValue (Just (IntValue v)) _ = return v
-        getIntValue _ posn = semanticError $ "Array size should be either empty or a int type " ++ showPos posn
 
 returnDecl :: StateType ([Token], Type)
 returnDecl = do
