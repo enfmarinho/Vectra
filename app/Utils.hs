@@ -320,6 +320,10 @@ castValueToType (EnumLabelType id1)(EnumLabelType id2, EnumValue label) posn = d
     when (id1 /= id2) $ semanticError $ "incompatible enum types " ++ showPos posn
     return (EnumValue label)
 
+castValueToType (RefType rt1)(RefType rt2, refV) posn = do
+    when (rt1 /= rt2) $ semanticError $ "incompatible enum types " ++ showPos posn
+    return refV
+
 -- TODO what about TemplateType ? 
 --- Unsupported cast ---
 castValueToType targetType (srcT, _) posn =
