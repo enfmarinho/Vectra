@@ -26,7 +26,8 @@ getBooleanValue (Just value) posn = do
             a <- consultSymbolByIdMaybe (referenceId, tableId)
             return $ isJust a 
         ConstValue v -> getBooleanValue (Just v) posn
-        _ -> fail $ "Trying to get a bool from something that cannot be interpreted as such " ++ showPos posn -- Should not reach this, since assertBooleanCompatible should be called previously 
+        -- Should not reach this, since assertBooleanCompatible should be called previously 
+        _ -> fail $ "Trying to get a bool from something that cannot be interpreted as such " ++ showPos posn
 
 
 getCustomType :: [Type] -> StateType (Maybe Type)

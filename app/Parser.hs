@@ -22,8 +22,6 @@ import Control.Monad.IO.Class
 import VectraLib
 import Data.List (intercalate, genericLength)
 
--- TODO add file name to messages
-
 importFile :: String -> AlexPosn -> StateType ()
 importFile filePath _posn = do
     result <- searchImport filePath
@@ -520,7 +518,7 @@ callStmt symbolId symbolTypeList = do
     let OPEN_PAREN posn = c
     let runMethod templateIds paramList funcBody = do
             let (idList, expectedParamTypes) = unzip paramList
-            assertValidParamList expectedParamTypes typeList posn -- TODO check this for correctness
+            assertValidParamList expectedParamTypes typeList posn
             insertTemplateInstantiation templateTypeList templateIds posn
             instatiateArgs idList expectedParamTypes (typeList, maybeValueList) posn
             changeTopScopeVisibility False
@@ -779,7 +777,7 @@ baseExp = do
                             <|> (do
                                     (a, symbolId, typeList, varValue) <- var
                                     (do
-                                        (b, maybeType, maybeValue) <- try $ callStmt symbolId typeList -- TODO remove this try
+                                        (b, maybeType, maybeValue) <- try $ callStmt symbolId typeList
                                         expType <- case maybeType of
                                                         Nothing -> semanticError $ "called the procedure " ++ symbolId ++ " expecting a value"
                                                         Just t -> return t
