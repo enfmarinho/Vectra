@@ -1,19 +1,29 @@
 struct Matrix:
     private int height
     private int width
-    private Vector<vector<int>> m
+    private Vector<Vector<int>> m
 
 impl Matrix:
     static func new() -> Matrix:
         return Matrix {
             height = 0
             width = 0
+            // TODO maybe init m ?
+        }
+
+    static func new(int h, int w) -> Matrix:
+        return Matrix {
+            height = h
+            width = w
+            // TODO maybe init m ?
         }
     
     public func consult(int i, int j) -> int:
         return m[i][j]
 
+    public proc set(int i, int j, int v):
+        m[i][j] = v
+
 
 func main():
     Matrix a = Matrix::new()
-    a.consult(0, 0) // Out of bound, that is just an example

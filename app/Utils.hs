@@ -6,17 +6,14 @@ import InterpreterState
 import Types
 import qualified Data.HashTable.IO as H
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import Data.List (genericLength) -- TODO there are better ways
+import Data.List (genericLength)
 import Data.Foldable 
-import GHC.OldList (intercalate)
 import GHC.Base (when)
+import Data.Maybe (isJust)
 
 warningMsg :: String -> StateType ()
 warningMsg msg = liftIO $ putStrLn $ "Warning: " ++ msg
 
-showPos :: AlexPosn -> String
-showPos (AlexPn _ line col) =
-    "(Line " ++ show line ++ ", Column " ++ show col ++ ")"
 
 getBooleanValue :: Maybe Value -> AlexPosn -> StateType Bool
 getBooleanValue Nothing posn = semanticError $ "using uninitialized var " ++ showPos posn
@@ -25,16 +22,20 @@ getBooleanValue (Just value) posn = do
         BoolValue v -> return v
         IntValue v -> return $ v /= 0
         FloatValue v -> return $ v /= 0
-        -- RefValue v -> v /= 0 -- TODO return true in case ref is valid
+        RefValue referenceId tableId -> do
+            a <- consultSymbolByIdMaybe (referenceId, tableId)
+            return $ isJust a 
         ConstValue v -> getBooleanValue (Just v) posn
-        _ -> fail $ "Trying to get a bool from something that cannot be interpreted as such " ++ showPos posn -- Should not reach this, since assertBooleanCompatible should be called previously 
+        -- Should not reach this, since assertBooleanCompatible should be called previously 
+        _ -> fail $ "Trying to get a bool from something that cannot be interpreted as such " ++ showPos posn
 
 
 getCustomType :: [Type] -> StateType (Maybe Type)
 getCustomType (h:t) = do
     case h of
-        EnumDeclType name _list -> return $ Just $ EnumLabelType name
-        StructType templateList dataTable methodTable -> return $ Just $ StructType templateList dataTable methodTable
+        EnumLabelType name -> return $ Just $ EnumLabelType name
+        StructType structId templateList publicData privateData  -> 
+            return $ Just $ StructType structId templateList publicData privateData
         TemplateType s -> return $ Just $ TemplateType s
         _ -> getCustomType t
 getCustomType [] = return Nothing
@@ -43,36 +44,26 @@ getCustomType [] = return Nothing
 getStructType :: [Type] -> StateType (Maybe Type)
 getStructType (h:t) = do
     case h of
-        StructType templateList dataTable methodTable -> return $ Just $ StructType templateList dataTable methodTable
+        StructType structId templateList publicData privateData -> 
+            return $ Just $ StructType structId templateList publicData privateData
         _ -> getStructType t
 getStructType [] = return Nothing
 
 
 consultType :: String -> AlexPosn -> StateType Type
 consultType symbolId posn = do
-    consultResult <- consultSymbolTable symbolId
+    consultResult <- consultSymbol symbolId posn
     case consultResult of
-        Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
         -- improve error message
-        Just ([], _) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
-        Just ([h], _) -> return h
-        Just (_:_, _) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
+        ([], _) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
+        ([h], _) -> return h
+        (_:_, _) -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
 
 
 consultTypeList :: String -> AlexPosn -> StateType [Type]
 consultTypeList symbolId posn = do
-    consultResult <- consultSymbolTable symbolId
-    case consultResult of
-        Nothing -> semanticError $ symbolId ++ " doesn't exist in this scope " ++ showPos posn
-        Just (t, _) -> return t
-
-
-checkShadowing :: String -> AlexPosn -> StateType ()
-checkShadowing symbolId posn = do
-    consultResult <- consultSymbolTable symbolId
-    case consultResult of
-        Nothing -> return ()
-        Just _ -> warningMsg $ "Declaring " ++ symbolId ++ " shadows and exists symbol " ++ showPos posn
+    (t, _) <- consultSymbol symbolId posn
+    return t
 
 
 toBoolValue :: Value -> Value
@@ -124,7 +115,6 @@ handleUnaryMinus _ posn = semanticError $ "Invalid minus unary operation " ++ sh
 handleComparison :: Maybe Value -> Maybe Value -> Token -> AlexPosn -> StateType (Type, Value)
 handleComparison Nothing _ _ posn = semanticError $ "Invalid operands for comparision at " ++ showPos posn
 handleComparison _ Nothing _ posn = semanticError $ "Invalid operands for comparision at " ++ showPos posn
--- TODO missing handleComparison implementation, for example StructValue
 handleComparison (Just (StringValue lhs)) (Just (StringValue rhs)) compOp _ =
     case compOp of
         OP_EQ _     -> return (BoolType, BoolValue $ lhs == rhs)
@@ -169,8 +159,6 @@ handleAdd (Just (FloatValue lhsV)) (Just (FloatValue rhsV)) _ =
     return (FloatType, FloatValue (lhsV + rhsV))
 handleAdd (Just (StringValue lhsV)) (Just (StringValue rhsV)) _ =
     return (StringType, StringValue (lhsV ++ rhsV))
-handleAdd (Just (StringValue lhsV)) (Just (CharValue rhsV)) _ =
-    return (StringType, StringValue (lhsV ++ [rhsV]))
 handleAdd _ _ posn = semanticError $ "Invalid operands for addition at " ++ showPos posn
 
 
@@ -274,10 +262,10 @@ castType (ArrayType t1) (ArrayType t2) posn = do
     return (ArrayType finalT)
 
 -- EnumType target
-castType (EnumDeclType name1 labels1) (EnumDeclType name2 labels2) posn
-    | EnumDeclType name1 labels1 == EnumDeclType name2 labels2 = return (EnumDeclType name1 labels1)
+castType (EnumLabelType name1) (EnumLabelType name2) posn
+    | EnumLabelType name1 == EnumLabelType name2 = return (EnumLabelType name1)
     | otherwise =
-        semanticError $ "Incompatible enum types at " ++ showPos posn
+        semanticError $ "Incompatible enum types \"" ++ name1 ++ "\" and \" " ++ name2 ++ " at " ++ showPos posn
 
 castType target src posn =
     semanticError $ "Cannot cast from " ++ show src ++ " to " ++ show target ++ " at " ++ showPos posn
@@ -328,11 +316,13 @@ castValueToType StringType (srcT, ConstValue v) posn =
 castValueToType (ArrayType _)(_, ArrayValue array) _ = return (ArrayValue array)
 
 --- Enum Target ---
-castValueToType (EnumDeclType id1 _)(EnumLabelType id2, EnumValue label) posn = 
-    castValueToType (EnumLabelType id1) (EnumLabelType id2, EnumValue label) posn
 castValueToType (EnumLabelType id1)(EnumLabelType id2, EnumValue label) posn = do
     when (id1 /= id2) $ semanticError $ "incompatible enum types " ++ showPos posn
     return (EnumValue label)
+
+castValueToType (RefType rt1)(RefType rt2, refV) posn = do
+    when (rt1 /= rt2) $ semanticError $ "incompatible enum types " ++ showPos posn
+    return refV
 
 -- TODO what about TemplateType ? 
 --- Unsupported cast ---
@@ -352,7 +342,6 @@ resultOpType FloatType IntType _ = return FloatType
 resultOpType FloatType BoolType _ = return FloatType
 -- String 
 resultOpType StringType StringType _ = return StringType
-resultOpType StringType CharType _ = return StringType
 -- Bool
 resultOpType BoolType BoolType _ = return BoolType
 resultOpType BoolType IntType _ = return IntType
@@ -401,7 +390,6 @@ getTypeFromTypeList _ = fail "<getTypeFromTypeList> ambiguity"
 typeFromValue :: Value -> AlexPosn -> StateType Type
 typeFromValue (IntValue _) _ = return IntType
 typeFromValue (FloatValue _) _ = return FloatType
-typeFromValue (CharValue _) _ = return CharType
 typeFromValue (BoolValue _) _ = return BoolType
 typeFromValue (StringValue _) _ = return StringType
 typeFromValue (ConstValue v) posn = do
@@ -414,19 +402,6 @@ typeFromValue (EnumValue _enumId) _ = return (EnumLabelType "")
 typeFromValue (RefValue symbolId _) posn = do
     symbolType <- consultType symbolId posn
     return (RefType symbolType)
-
--- Function/procedure references
-typeFromValue (FuncRefValue symbolId) posn = do
-    t <- consultType symbolId posn
-    case t of
-        FuncType templates paramPairs ret _ -> return (FuncRefType templates (map snd paramPairs) ret)
-        _ -> semanticError $ "Invalid function reference type for symbol " ++ symbolId
-
-typeFromValue (ProcRefValue symbolId) posn = do
-    t <- consultType symbolId posn
-    case t of
-        ProcType templates paramPairs _ -> return (ProcRefType templates (map snd paramPairs))
-        _ -> semanticError $ "Invalid procedure reference type for symbol " ++ symbolId
 
 typeFromValue (StructValue _symbolTable) _ = return (StructInstanceType "")
 
@@ -450,75 +425,12 @@ searchTypeOnTable table symbolId = do
             t <- getTypeFromTypeList tList
             return $ Just t
 
+copyTable :: SymbolTableType -> IO SymbolTableType
+copyTable original = do
+    new <- H.new
+    H.mapM_ (\(k, v) -> H.insert new k v) original
+    return new
 
-searchTypeOnStruct :: SymbolTableType -> SymbolTableType -> [String] -> StateType (Maybe Type)
-searchTypeOnStruct publicTable privateTable [symbolListH] = do
-    result <- searchTypeOnTable publicTable symbolListH
-    case result of 
-        Nothing -> searchTypeOnTable privateTable symbolListH
-        Just t -> return $ Just t
-searchTypeOnStruct publicTable privateTable (symbolListH:symbolListT) = do
-    a <- searchTypeOnStruct publicTable privateTable [symbolListH]
-    case a of 
-        Nothing -> semanticError $ "member " ++ "\"" ++ symbolListH ++ "\"" ++ " doesn't exist on this context"
-        Just t -> case t of
-                    StructType _ p1 p2 -> searchTypeOnStruct p1 p2 symbolListT
-                    _ -> semanticError $ "member " ++ "\"" ++ symbolListH ++ "\"" ++ " is not a struct type"
-searchTypeOnStruct _ _ [] = return Nothing
-
-accessNamespacebaseCase :: Maybe ([Type], Maybe Value) -> String -> [String] -> AlexPosn -> StateType ([Type], Maybe Value)
-accessNamespacebaseCase result finalSymbol pastNamespace posn = do
-    case result of
-        Nothing -> do
-            semanticError $ "unknown symbol \"" ++ showNamespace pastNamespace ++ finalSymbol ++ "\"" ++ showPos posn
-        Just (t, v) -> case t of
-                        [EnumDeclType enumId _] -> return ([EnumLabelType enumId], v)
-                        [StructType {}] -> return ([StructInstanceType finalSymbol], v)
-                        _ -> return (t, v)
-
-accessNamespace :: [String] -> AlexPosn -> StateType ([Type], Maybe Value)
-accessNamespace [] posn = semanticError $ "<accessNamespace> " ++ showPos posn
-accessNamespace [finalSymbol] posn = do
-    result <- consultSymbolTable finalSymbol
-    accessNamespacebaseCase result finalSymbol [] posn
-accessNamespace (h:rest) posn = do
-    result <- consultSymbolTable h
-    case result of
-            Nothing -> do
-                semanticError $ "no existing symbol \"" ++ h ++ "\" on this context" ++ showPos posn
-            Just (tList, _value) -> do
-                t <- getTypeFromTypeList tList
-                case t of
-                    NamespaceType publicTable _privateTable ->do
-                        search rest [h] publicTable
-                    EnumDeclType _enumId labelTable -> search rest [h] labelTable
-                    ImplType _ _ staticMethodTable -> search rest [h] staticMethodTable
-                    _ -> do
-                        semanticError $ "Not a valid namespace symbol " ++ showPos posn
-    where 
-        search :: [String] -> [String] -> SymbolTableType -> StateType ([Type], Maybe Value)
-        search [finalSymbol] pastNamespace table = do
-            r <- liftIO $ H.lookup table finalSymbol
-            accessNamespacebaseCase r finalSymbol pastNamespace posn
-        search (namespaceSegment : rest') past namespaceTable = do
-            result <- liftIO $ H.lookup namespaceTable namespaceSegment
-            case result of
-                Nothing ->
-                    semanticError $
-                        "no existing symbol \"" ++ showNamespace past
-                        ++ namespaceSegment ++ "\" on this context" ++ showPos posn
-                Just (tList, _) -> do
-                    t <- getTypeFromTypeList tList 
-                    case t of
-                        NamespaceType publicTable _ ->
-                            -- Continue searching deeper
-                            search rest' (past ++ [namespaceSegment]) publicTable
-                        EnumDeclType _enumId table -> search rest' (past ++ [namespaceSegment]) table
-                        ImplType _publicTable _privateTabel staticTable -> search rest' (past ++ [namespaceSegment]) staticTable
-                        _ -> semanticError $
-                                "namespace access on a non-namespace type " ++ showPos posn
-        search _ _ _ = semanticError $ "invalid enum label " ++ showPos posn
-
-showNamespace :: [String] -> String
-showNamespace = intercalate "::"
-
+getIntValue :: Maybe Value -> AlexPosn -> StateType Int
+getIntValue (Just (IntValue v)) _ = return v
+getIntValue _ posn = semanticError $ "Array size should be either empty or a int type " ++ showPos posn

@@ -300,11 +300,6 @@ kwStatic = tokenPrim show updatePos getToken where
   getToken (KW_STATIC pos) = Just (KW_STATIC pos)
   getToken _       = Nothing
 
-kwLocal :: StateType Token
-kwLocal = tokenPrim show updatePos getToken where
-  getToken (KW_LOCAL pos) = Just (KW_LOCAL pos)
-  getToken _       = Nothing
-
 kwTrue :: StateType Token
 kwTrue = tokenPrim show updatePos getToken where
   getToken (KW_TRUE pos) = Just (KW_TRUE pos)
@@ -323,6 +318,11 @@ kwReturn = tokenPrim show updatePos getToken where
 kwImport :: StateType Token
 kwImport = tokenPrim show updatePos getToken where
   getToken (KW_IMPORT pos) = Just (KW_IMPORT pos)
+  getToken _       = Nothing
+
+kwAs :: StateType Token
+kwAs = tokenPrim show updatePos getToken where
+  getToken (KW_AS pos) = Just (KW_AS pos)
   getToken _       = Nothing
 
 kwPublic :: StateType Token

@@ -6,26 +6,23 @@ import InterpreterState
 import Types
 import Control.Monad (when, unless)
 import Data.Maybe
-import Utils
 
 assertNonAmbiguous :: String -> AlexPosn -> StateType ()
 assertNonAmbiguous symbolId posn = do
-    a <- consultSymbolTable symbolId 
-    case a of
-        Nothing -> return ()
-        Just _ -> semanticError $ "Ambiguous declaration for symbol " ++ symbolId ++ " " ++ showPos posn
+    a <- consultSymbolMaybe symbolId
+    when (isJust a) $ semanticError $ "Ambiguous declaration for \"" ++ symbolId ++ "\" " ++ showPos posn
 
 
 assertMethodDeclNotAmbiguous :: String -> [Type] -> AlexPosn -> StateType ()
 assertMethodDeclNotAmbiguous symbolId paramTypeList posn = do
-    maybeTypeList <- consultSymbolTable symbolId
+    maybeTypeList <- consultSymbolMaybe symbolId
     typeList <- case maybeTypeList of
                     Nothing -> return []
                     Just (t, _) -> return t
 
     when (ambiguous typeList paramTypeList) $
         semanticError $
-            "Ambiguous declaration for " ++ symbolId ++ " at " ++ showPos posn
+            "Ambiguous declaration for subprogram \"" ++ symbolId ++ "\" " ++ showPos posn
   where
     ambiguous :: [Type] -> [Type] -> Bool
     ambiguous [] _ = False
@@ -81,7 +78,6 @@ assertCustomType :: Type -> AlexPosn -> StateType ()
 assertCustomType t posn = do
     case t of
         StructType {} -> return ()
-        EnumDeclType {} -> return ()
         EnumLabelType {} -> return ()
         _ -> semanticError $ "invalid type " ++ show t ++ " " ++ showPos posn
 
@@ -105,14 +101,6 @@ assertStructType symbolId posn (h:t) = do
 assertStructType _ _ [] = return ()
 
 
-assertNamespaceType :: String -> Type -> AlexPosn -> StateType ()
-assertNamespaceType symbolId t posn = do
-    case t of
-        NamespaceType {} -> return ()
-        ImplType {} -> return ()
-        _ -> semanticError $ symbolId ++ " must be a namespace " ++ showPos posn
-
-
 assertBooleanCompatible :: Type -> AlexPosn -> StateType ()
 assertBooleanCompatible t posn = do
     case t of
@@ -129,8 +117,6 @@ assertAssignableType symbolId t posn = do
     let errMsg = "Trying to assign to " ++ symbolId ++ " which is an non-assignable type: " ++ show t ++ " " ++ showPos posn
     case t of
         ConstType _ -> semanticError errMsg
-        ArrayType {} -> semanticError errMsg
-        EnumDeclType {} -> semanticError errMsg
         FuncType {} -> semanticError errMsg
         StructType {} -> semanticError errMsg
         _ -> return ()

@@ -17,7 +17,7 @@ $LETTER = [a-zA-Z]
 
 -- Regras de Regex dos tokens
 tokens :-
-    "//".*       { \_ _ -> return Nothing }
+    "//".*\n     { \_ _ -> return Nothing }
     [\ \t]+      { \_ len -> do setCurrIndentationLevel len; return Nothing }
     [\n]+        { \aInp _ -> do setBeginLine True; setCurrIndentationLevel 0; return $ Just (NEWLINE (alexPos aInp))}
 
@@ -64,7 +64,6 @@ tokens :-
     cast         { \aInp _ -> do t <- handleIndentation (KW_CAST (alexPos aInp)); return $ Just t }
     impl         { \aInp _ -> do t <- handleIndentation (KW_IMPL (alexPos aInp)); return $ Just t }
     static       { \aInp _ -> do t <- handleIndentation (KW_STATIC (alexPos aInp)); return $ Just t }
-    local        { \aInp _ -> do t <- handleIndentation (KW_LOCAL (alexPos aInp)); return $ Just t }
     int          { \aInp _ -> do t <- handleIndentation (KW_INT (alexPos aInp)); return $ Just t }
     float        { \aInp _ -> do t <- handleIndentation (KW_FLOAT (alexPos aInp)); return $ Just t }
     string       { \aInp _ -> do t <- handleIndentation (KW_STRING (alexPos aInp)); return $ Just t }
@@ -87,6 +86,7 @@ tokens :-
     return       { \aInp _ -> do t <- handleIndentation (KW_RETURN (alexPos aInp)); return $ Just t }
     deref        { \aInp _ -> do t <- handleIndentation (KW_DEREF (alexPos aInp)); return $ Just t }
     import       { \aInp _ -> do t <- handleIndentation (KW_IMPORT (alexPos aInp)); return $ Just t }
+    as           { \aInp _ -> do t <- handleIndentation (KW_AS (alexPos aInp)); return $ Just t }
     false        { \aInp _ -> do t <- handleIndentation (KW_FALSE (alexPos aInp)); return $ Just t }
     true         { \aInp _ -> do t <- handleIndentation (KW_TRUE (alexPos aInp)); return $ Just t }
 
@@ -131,7 +131,7 @@ topIndentationLevelStack = do
   stack <- getIndentationLevelStack
   case stack of
     (x:_) -> return x
-    []    -> alexError "TODO write this error message"
+    []    -> alexError "<topIndentationLevelStack>"
 
 pushIndentationLevel :: Int -> Alex ()
 pushIndentationLevel lvl = do
@@ -262,11 +262,11 @@ data Token =
   KW_CONST AlexPosn |
   KW_IMPL AlexPosn |
   KW_STATIC AlexPosn |
-  KW_LOCAL AlexPosn |
   KW_TRUE AlexPosn |
   KW_FALSE AlexPosn |
   KW_RETURN AlexPosn |
   KW_IMPORT AlexPosn |
+  KW_AS AlexPosn |
   KW_PUBLIC AlexPosn |
   KW_PRIVATE AlexPosn |
   NEWLINE AlexPosn |

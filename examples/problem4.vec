@@ -1,0 +1,102 @@
+import println
+
+struct rational_t:
+    public int numerator
+    public int denominator
+
+func make_rational(int a, int b) -> rational_t:
+    if b == 0:
+        println("Erro: Denominador nao pode ser zero. Definindo como 1.")
+        return rational_t {
+            numerator = a
+            denominator = 1
+    }
+    
+    if b < 0:
+        a = 0 - a
+        b = 0 - b
+
+    return rational_t {
+        numerator = a
+        denominator = b
+    }
+
+func is_equal(rational_t r1, rational_t r2) -> bool:
+    int left = r1.numerator * r2.denominator
+    int right = r2.numerator * r1.denominator
+    return left == right
+
+func add_rational(rational_t r1, rational_t r2) -> rational_t:
+    int num = (r1.numerator * r2.denominator) + (r2.numerator * r1.denominator)
+    int den = r1.denominator * r2.denominator
+    return make_rational(num, den)
+
+func negate_rational(rational_t r) -> rational_t:
+    return make_rational(0 - r.numerator, r.denominator)
+
+func sub_rational(rational_t r1, rational_t r2) -> rational_t:
+    rational_t neg_r2 = negate_rational(r2)
+    return add_rational(r1, neg_r2)
+
+func mult_rational(rational_t r1, rational_t r2) -> rational_t:
+    int num = r1.numerator * r2.numerator
+    int den = r1.denominator * r2.denominator
+    return make_rational(num, den)
+
+func inverse_rational(rational_t r) -> rational_t:
+    return make_rational(r.denominator, r.numerator)
+
+func div_rational(rational_t r1, rational_t r2) -> rational_t:
+    rational_t inv_r2 = inverse_rational(r2)
+    return mult_rational(r1, inv_r2)
+
+proc print_rational(rational_t r):
+    println(r.numerator)
+    println("/")
+    println(r.denominator)
+
+func main() -> int:
+    println("--- Teste de Racionais ---")
+
+    rational_t r1 = make_rational(1, 2)
+    rational_t r2 = make_rational(3, 4)
+    
+    println("R1: ")
+    print_rational(r1)
+    println("R2: ")
+    print_rational(r2)
+
+    rational_t r3 = make_rational(2, 4)
+    println("R1 (1/2) == R3 (2/4)? ")
+    println(is_equal(r1, r3))
+    
+    println("R1 (1/2) == R2 (3/4)? ")
+    println(is_equal(r1, r2))
+
+    println("--- Operacoes ---")
+
+
+    rational_t res_soma = add_rational(r1, r2)
+    println("Soma (1/2 + 3/4): ")
+    print_rational(res_soma)
+
+ 
+    rational_t res_sub = sub_rational(r2, r1)
+    println("Subtracao (3/4 - 1/2): ")
+    print_rational(res_sub)
+
+
+    rational_t res_mult = mult_rational(r1, r2)
+    println("Multiplicacao (1/2 * 3/4): ")
+    print_rational(res_mult)
+
+
+    rational_t res_div = div_rational(r1, r2)
+    println("Divisao (1/2 / 3/4): ")
+    print_rational(res_div) # Deve ser 4/6
+
+    rational_t res_neg = negate_rational(r1)
+    println("Negacao -(1/2): ")
+    print_rational(res_neg)
+
+    return 0
