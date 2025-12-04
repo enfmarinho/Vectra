@@ -383,23 +383,14 @@ arrayDecl underlyingT = do
     a@(OPEN_BRACKET posn) <- TT.openBracket
     maybeB <- optionMaybe expStmt
     c <- TT.closeBracket
-    maybeD <- optionMaybe (arrayDecl $ ArrayType underlyingT)
 
-    (b, size) <-
-        case maybeB of
-            Nothing -> return ([], 1)
-            Just (b, expT, expV) -> do
-                assertNumberType expT posn
-                size <- getIntValue expV posn
-                return (b, size)
-
-
-    (d, finalT, finalV) <- case maybeD of
-                            Nothing -> do
-                                return ([], ArrayType underlyingT, Just $ ArrayValue $ V.replicate size Nothing)
-                            Just (d, t, v) -> return (d, ArrayType t, Just $ ArrayValue $ V.replicate size v)
-
-    return ([a] ++ b ++ [c] ++ d, finalT, finalV)
+    case maybeB of
+        Nothing -> do
+            return ( a:[c], ArrayType underlyingT, Nothing)
+        Just (b, expT, expV) -> do
+            assertNumberType expT posn
+            size <- getIntValue expV posn
+            return ([a] ++ b ++ [c], ArrayType underlyingT, Just $ ArrayValue $ V.replicate size Nothing)
 
     where
         assertNumberType :: Type -> AlexPosn -> StateType ()
