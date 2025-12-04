@@ -1366,9 +1366,10 @@ typeStmt = do
             <|> do -- customType
                 (c, symbolId, posn) <- namespaceAccess
                 (tList, _) <- consultSymbol symbolId posn
-                t <- getTypeFromTypeList tList
-                assertCustomType t posn
-                return (c, t)
+                maybeT <- getCustomType tList
+                case maybeT of
+                    Nothing -> semanticError $ symbolId ++ " is not a type " ++ showPos posn
+                    Just t -> return (c, t)
     maybeC <- optionMaybe (arrayDecl t)
 
     (aTokens, afterConst) <- case a of
