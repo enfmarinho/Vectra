@@ -83,6 +83,7 @@ tokens :-
     return       { \aInp _ -> do t <- handleIndentation (KW_RETURN (alexPos aInp)); return $ Just t }
     deref        { \aInp _ -> do t <- handleIndentation (KW_DEREF (alexPos aInp)); return $ Just t }
     import       { \aInp _ -> do t <- handleIndentation (KW_IMPORT (alexPos aInp)); return $ Just t }
+    as           { \aInp _ -> do t <- handleIndentation (KW_AS (alexPos aInp)); return $ Just t }
     false        { \aInp _ -> do t <- handleIndentation (KW_FALSE (alexPos aInp)); return $ Just t }
     true         { \aInp _ -> do t <- handleIndentation (KW_TRUE (alexPos aInp)); return $ Just t }
 
@@ -256,6 +257,7 @@ data Token =
   KW_FALSE AlexPosn |
   KW_RETURN AlexPosn |
   KW_IMPORT AlexPosn |
+  KW_AS AlexPosn |
   KW_PUBLIC AlexPosn |
   KW_PRIVATE AlexPosn |
   NEWLINE AlexPosn |

@@ -299,6 +299,11 @@ kwImport = tokenPrim show updatePos getToken where
   getToken (KW_IMPORT pos) = Just (KW_IMPORT pos)
   getToken _       = Nothing
 
+kwAs :: StateType Token
+kwAs = tokenPrim show updatePos getToken where
+  getToken (KW_AS pos) = Just (KW_AS pos)
+  getToken _       = Nothing
+
 kwPublic :: StateType Token
 kwPublic = tokenPrim show updatePos getToken where
   getToken (KW_PUBLIC pos) = Just (KW_PUBLIC pos)

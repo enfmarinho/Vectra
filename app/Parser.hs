@@ -55,9 +55,15 @@ vectraLanguage = do
     where
         importCommand :: StateType ()
         importCommand = do
+            importAs <- optionMaybe (do
+                        _ <- TT.kwAs
+                        (ID _ namespace) <- TT.id
+                        return namespace
+                        )
+            forM_ importAs pushNamespacePrefix
             _ <- TT.kwImport
             _ <- importList `sepEndBy1` TT.kwComma
-            return ()
+            when (isJust importAs) popNamespacePrefix
             where importList = do
                     a <- TT.id
                     let ID posn symbolId = a
@@ -172,7 +178,7 @@ implDecl = do
             insertTemplates templeteList posn
         _ -> semanticError $ "using impl for a non-struct type \"" ++ symbolId ++ "\" " ++ showPos posn
 
-    implMaybe <- consultSymbolMaybe ("impl::" ++ symbolId) 
+    implMaybe <- consultSymbolMaybe ("impl::" ++ symbolId)
     (publicMethodTable, privateMethodTable) <- case implMaybe of
                                                     Nothing -> do
                                                         emptyTable <- liftIO H.new
@@ -184,7 +190,7 @@ implDecl = do
 
     pushScope publicMethodTable True
     pushScope privateMethodTable True
-    
+
     _ <- TT.kwColumn
     _ <- TT.newLine
     _ <- TT.indent
@@ -238,7 +244,7 @@ namespaceDecl :: StateType ()
 namespaceDecl = do
     _ <- TT.kwNamespace
     (ID posn symbolId) <- TT.id
-    assertNonAmbiguous symbolId posn 
+    assertNonAmbiguous symbolId posn
     pushNamespacePrefix symbolId
     _ <- TT.kwColumn
     _ <- TT.newLine
@@ -380,7 +386,7 @@ arrayDecl underlyingT = do
     c <- TT.closeBracket
     maybeD <- optionMaybe (arrayDecl $ ArrayType underlyingT)
 
-    (b, size) <- 
+    (b, size) <-
         case maybeB of
             Nothing -> return ([], 1)
             Just (b, expT, expV) -> do
@@ -393,7 +399,7 @@ arrayDecl underlyingT = do
                             Nothing -> do
                                 return ([], ArrayType underlyingT, Just $ ArrayValue $ V.replicate size Nothing)
                             Just (d, t, v) -> return (d, ArrayType t, Just $ ArrayValue $ V.replicate size v)
-                        
+
     return ([a] ++ b ++ [c] ++ d, finalT, finalV)
 
     where
@@ -687,8 +693,8 @@ literal = do
                 case publicSearch of
                     Nothing -> do
                         privateSearch <- liftIO $ H.lookup privateTable symbolId
-                        case privateSearch of 
-                            Nothing -> semanticError $ 
+                        case privateSearch of
+                            Nothing -> semanticError $
                                 "no symbol \"" ++ symbolId ++ "\" in struct \"" ++ structSymbolId ++ "\" " ++ showPos posn'
                             Just (tList, _) -> do
                                 t <- getTypeFromTypeList tList
@@ -700,7 +706,7 @@ literal = do
                             liftIO $ H.delete publicTable symbolId
                             assertTypesEq t expT posn
                             insertSymbol (symbolId, t, expV) posn'
-                        
+
 
                 return ([f] ++ [g] ++ h ++ [i])
 
@@ -1044,27 +1050,27 @@ derefAssignStmt = do
     assertTypesEq underlyingT expType posn
 
     isRunning' <- isRunning
-    e <- if not isRunning' 
+    e <- if not isRunning'
             then return []
             else do
                 case optionE of
                     Nothing -> do
                         case varV of
                             Just v -> case v of
-                                        RefValue referencedId referencedTableId -> 
+                                        RefValue referencedId referencedTableId ->
                                             updateSymbolById (referencedId, referencedTableId) ([underlyingT], expValue)
                                         _ -> semanticError $ "trying to deref a non ref value at " ++ showPos posn -- will not reach this
                             Nothing -> semanticError $ "Trying to deref a null ref \"" ++ symbolId ++ "\" at " ++ showPos posn
                         return []
                     Just op -> do
-                            (referencedId, referencedTableId) <- 
+                            (referencedId, referencedTableId) <-
                                 case varV of
                                     Nothing -> semanticError $ "2trying to assign by reference to a non-reference type at " ++ showPos varPosn
                                     Just v -> case v of
                                                 RefValue rid rtid -> return (rid, rtid)
                                                 _ -> semanticError ""
 
-                            
+
                             (_, maybeValue) <- consultSymbolById (referencedId, referencedTableId) varPosn
                             resultValue <- case op of
                                 OP_ADD _ -> handleAdd maybeValue expValue posn
@@ -1342,7 +1348,7 @@ forStmt = do
     let runFor = do
             endEarly <- endLoopEarly
             unless endEarly $ do
-                closeScope 
+                closeScope
                 openScope True
                 setProgramState previousProgramState
 
@@ -1381,7 +1387,7 @@ forStmt = do
         loopIncrementStmt :: StateType ([Token], InterpreterState)
         loopIncrementStmt = do
                                 (do
-                                    a <- derefAssignStmt 
+                                    a <- derefAssignStmt
                                     finalState <- getState
                                     return (a, finalState))
                                 <|> (do
