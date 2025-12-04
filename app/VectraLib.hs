@@ -9,19 +9,21 @@ import Text.Read (readMaybe)
 
 import Scanner
 import Control.Monad
+import Data.Maybe (isNothing)
 
 importSpecialMethod :: String -> AlexPosn -> StateType ()
 importSpecialMethod symbolId posn = do
-    case symbolId of
-        "print" -> insertSymbol ("print", HaskellMethod [TemplateType Nothing] Nothing vectraPrint, Nothing) posn 
-        "println" -> insertSymbol ("println", HaskellMethod [TemplateType Nothing] Nothing vectraPrintln, Nothing) posn
-        "read_int" -> insertSymbol ("read_int", HaskellMethod [] (Just IntType) vectraReadInt, Nothing) posn
-        "read_float" -> insertSymbol ("read_float", HaskellMethod [] (Just FloatType) vectraReadFloat, Nothing) posn
-        "read_bool" -> insertSymbol ("read_bool", HaskellMethod [] (Just BoolType) vectraReadBool, Nothing) posn
-        "read_string" -> insertSymbol ("read_string", HaskellMethod [] (Just StringType) vectraReadString, Nothing) posn
-        "read_line" -> insertSymbol ("read_line", HaskellMethod [] (Just StringType) vectraReadLine, Nothing) posn
-        _ -> semanticError $ "Invalid import: " ++ symbolId ++ " doesn't exist " ++ showPos posn
-    return ()
+    search <- consultSymbolMaybe symbolId 
+    when (isNothing search) $ do
+        case symbolId of
+            "print" -> insertSymbol ("print", HaskellMethod [TemplateType Nothing] Nothing vectraPrint, Nothing) posn 
+            "println" -> insertSymbol ("println", HaskellMethod [TemplateType Nothing] Nothing vectraPrintln, Nothing) posn
+            "read_int" -> insertSymbol ("read_int", HaskellMethod [] (Just IntType) vectraReadInt, Nothing) posn
+            "read_float" -> insertSymbol ("read_float", HaskellMethod [] (Just FloatType) vectraReadFloat, Nothing) posn
+            "read_bool" -> insertSymbol ("read_bool", HaskellMethod [] (Just BoolType) vectraReadBool, Nothing) posn
+            "read_string" -> insertSymbol ("read_string", HaskellMethod [] (Just StringType) vectraReadString, Nothing) posn
+            "read_line" -> insertSymbol ("read_line", HaskellMethod [] (Just StringType) vectraReadLine, Nothing) posn
+            _ -> semanticError $ "Invalid import: " ++ symbolId ++ " doesn't exist " ++ showPos posn
 
 vectraPrint :: LibMethodSignature
 vectraPrint [] posn = semanticError $ "print called without arguments, it requires one " ++ showPos posn
