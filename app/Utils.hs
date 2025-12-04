@@ -6,10 +6,10 @@ import InterpreterState
 import Types
 import qualified Data.HashTable.IO as H
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import Data.List (genericLength) -- TODO there are better ways
+import Data.List (genericLength)
 import Data.Foldable 
--- import GHC.OldList (intercalate)
 import GHC.Base (when)
+import Data.Maybe (isJust)
 
 warningMsg :: String -> StateType ()
 warningMsg msg = liftIO $ putStrLn $ "Warning: " ++ msg
@@ -493,3 +493,8 @@ searchTypeOnTable table symbolId = do
 -- showNamespace :: [String] -> String
 -- showNamespace = intercalate "::"
 
+copyTable :: SymbolTableType -> IO SymbolTableType
+copyTable original = do
+    new <- H.new
+    H.mapM_ (\(k, v) -> H.insert new k v) original
+    return new
