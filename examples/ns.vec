@@ -1,13 +1,13 @@
 as std import print, println
 
-namespace na:
-    enum v:
+namespace ns:
+    enum e:
         one
         two
 
     proc what():
-        v label1 = v::one
-        v label2 = v::one
+        e label1 = e::one
+        e label2 = e::one
         if label1 != label2:
             std::println("labels differ")
         if label1 == label2:

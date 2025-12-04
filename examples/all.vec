@@ -1,0 +1,9 @@
+as std import print, println
+
+import "examples/ns.vec"
+
+proc main():
+    ns::what()
+    ns::what(1)
+    ns::what(cast<int>("1"))
+
