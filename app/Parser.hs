@@ -283,21 +283,6 @@ enumDecl = do
                 insertSymbol (labelId, EnumLabelType enumId, Just $ EnumValue labelId) posn
             return ()
 
-optUnnamedParamDeclList :: StateType ([Token], [Type])
-optUnnamedParamDeclList = do
-    option ([], []) unnamedParamDeclList
-    where
-        unnamedParamDeclList :: StateType ([Token], [Type])
-        unnamedParamDeclList = do
-            (a, aT) <- typeStmt
-            rest <- many $ do
-                b <- TT.kwComma
-                (c, cT) <- typeStmt
-                return (b:c, cT)
-            let tokenList = a ++ concatMap fst rest
-                paramList = aT : map snd rest
-            return (tokenList, paramList)
-
 optParamDeclList :: StateType ([Token], [(String, Type)])
 optParamDeclList = option ([], []) paramDeclList
 
@@ -364,8 +349,8 @@ subprogramDecl = do
     case a of
         KW_PROC _ -> do
             when (isJust optionF) $ semanticError $
-                "A procedure cannot return a value, only functions can. Considerer declaring " ++ symbolId ++
-                " as a functions instead " ++ showPos posn
+                "A procedure cannot return a value, only functions can. Considerer declaring \"" ++ symbolId ++
+                "\" as a functions instead " ++ showPos posn
 
             insertSymbol (symbolId, ProcType bIds dParams g, Nothing) posn
         KW_FUNC _ -> case optionF of
@@ -501,7 +486,7 @@ callStmt symbolId symbolTypeList = do
     let templateLen = genericLength templateTypeList
     maybeSymbolType <- searchTypeList symbolTypeList templateLen typeList
     symbolType <- case maybeSymbolType of
-        Nothing -> semanticError $ "no matching function to call \"" ++ symbolId ++ "\"" ++ showPos posn
+        Nothing -> semanticError $ "no matching function to call \"" ++ symbolId ++ "\" " ++ showPos posn
         Just t -> return t
     (maybeReturnT, maybeReturnV) <- case symbolType of
                             FuncType templateIds paramList returnT funcBody -> do
