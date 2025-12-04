@@ -1,8 +1,0 @@
-import println
-import print
-
-proc main():
-    int v[4] = {1, 2, 3, 4}
-    foreach i in v:
-        print("value is ")
-        println(i)

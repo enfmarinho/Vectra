@@ -1,0 +1,10 @@
+import print, println
+
+proc h(ref(int) asdf):
+    deref(asdf) = 10
+
+proc main():
+    int x = 4
+    h(ref(x))
+    println(x)
+

@@ -1,0 +1,18 @@
+as std import print, println
+
+namespace na:
+    enum v:
+        one
+        two
+
+    proc what():
+        v label1 = v::one
+        v label2 = v::one
+        if label1 != label2:
+            std::println("labels differ")
+        if label1 == label2:
+            std::println("labels are equal")
+
+    proc what(int i):
+        std::print("on what(int): ")
+        std::println(i)

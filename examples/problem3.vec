@@ -1,0 +1,119 @@
+import print, println, read_int
+
+struct matrix_t:
+    public int rows
+    public int cols
+    public int[] data
+
+func make_matrix(int r, int c) -> matrix_t:
+    matrix_t m
+    m.rows = r
+    m.cols = c
+    m.data = new int[r * c]
+    return m
+
+proc set(matrix_t m, int r, int c, int value):
+    m.data[r * m.cols + c] = value
+
+func get(matrix_t m, int r, int c) -> int:
+    return m.data[r * m.cols + c]
+
+func read_matrix() -> matrix_t:
+    println("Digite numero de linhas:")
+    int r = read_int()
+    println("Digite numero de columas:")
+    int c = read_int()
+    
+    matrix_t m = make_matrix(r, c)
+
+    println("Digite os elementos:")
+    int i = 0
+    while i < r:
+        int j = 0
+        while j < c:
+            int v = read_int()
+            set(m, i, j, v)
+            j = j + 1
+        i = i + 1
+
+    return m
+
+proc print_matrix(matrix_t m):
+    int i = 0
+    while i < m.rows:
+        int j = 0
+        while j < m.cols:
+            print(get(m, i, j))
+            j = j + 1
+        println("")
+        i = i + 1
+
+func add_matrix(matrix_t a, matrix_t b) -> matrix_t:
+    if a.rows != b.rows or a.cols != b.cols:
+        println("Nao eh possivel somar: dimensoes diferentes.")
+        matrix_t empty
+        empty.rows = 0
+        empty.cols = 0
+        return empty
+
+    matrix_t res = make_matrix(a.rows, a.cols)
+
+    int i = 0
+    while i < a.rows:
+        int j = 0
+        while j < a.cols:
+            int v = get(a, i, j) + get(b, i, j)
+            set(res, i, j, v)
+            j = j + 1
+        i = i + 1
+
+    return res
+
+func mult_matrix(matrix_t a, matrix_t b) -> matrix_t:
+    if a.cols != b.rows:
+        println("Nao eh possivel multiplicar: dimensoes incompativeis.")
+        matrix_t empty
+        empty.rows = 0
+        empty.cols = 0
+        return empty
+
+    matrix_t res = make_matrix(a.rows, b.cols)
+
+    int i = 0
+    while i < a.rows:
+        int j = 0
+        while j < b.cols:
+            int sum = 0
+
+            int k = 0
+            while k < a.cols:
+                int v = get(a, i, k) * get(b, k, j)
+                sum = sum + v
+                k = k + 1
+
+            set(res, i, j, sum)
+            j = j + 1
+        i = i + 1
+
+    return res
+
+func main() -> int:
+    println("=== Leitura de Matrizes ===")
+
+    println("Matriz A:")
+    matrix_t A = read_matrix()
+
+    println("Matriz B:")
+    matrix_t B = read_matrix()
+
+    println("=== Soma ===")
+    matrix_t S = add_matrix(A, B)
+    if S.rows > 0:
+        print_matrix(S)
+
+    println("=== Multiplicacao ===")
+    matrix_t M = mult_matrix(A, B)
+    if M.rows > 0:
+        print_matrix(M)
+
+    return 0
