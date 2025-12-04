@@ -292,9 +292,9 @@ walkStackById
     -> SymbolTableStackType
     -> IO (Maybe a)
 walkStackById _ _ _ [] = return Nothing
-walkStackById targetId action symbolId ((table, canAccessParent, currId) : rest)
+walkStackById targetId action symbolId ((table, _canAccessParent, currId) : rest)
     | targetId == currId = liftIO (action table symbolId)
-    | canAccessParent    = walkStackById targetId action symbolId rest
+    | not (null rest)    = walkStackById targetId action symbolId rest
     | otherwise          = return Nothing
 
 walkScopes
@@ -336,12 +336,40 @@ walkNamespaceStack (currNamespace : namespaceTail) symbolId table action = do
 
 findSymbolTableId :: String -> AlexPosn -> StateType Int
 findSymbolTableId symbolId posn = do
-    namespaceStack <- getNamespaceStack
-    return search symbolId
-    where 
-        search :: StateType Int
-        search = do
-            return 1
+    InterpreterState{..} <- getState
+    result <- liftIO $
+        walkNamespaceSearchingTableId namespaceStack symbolId symbolTableStack
+
+    case result of
+        Just tid -> return tid
+        Nothing ->
+            semanticError $
+                "using non-existing symbol \"" ++ symbolId ++ "\" at " ++ showPos posn
+    where
+        walkTablesSearchingTableId
+            :: String
+            -> SymbolTableStackType
+            -> IO (Maybe Int)
+        walkTablesSearchingTableId _ [] = return Nothing
+        walkTablesSearchingTableId symbol ((table, _canAccessParent, tableId) : rest) = do
+            r <- H.lookup table symbol
+            case r of
+                Just _  -> return (Just tableId)
+                Nothing -> walkTablesSearchingTableId symbol rest
+
+        walkNamespaceSearchingTableId
+            :: [String]
+            -> String
+            -> SymbolTableStackType
+            -> IO (Maybe Int)
+        walkNamespaceSearchingTableId  [] symbol tableStack =
+            walkTablesSearchingTableId symbol tableStack
+        walkNamespaceSearchingTableId (ns:nsRest) symbol tableStack = do
+            let sym = ns ++ "::" ++ symbol
+            r <- walkTablesSearchingTableId sym tableStack
+            case r of
+                Just tid -> return (Just tid)
+                Nothing  -> walkNamespaceSearchingTableId nsRest symbol tableStack
 
 getSymbolRef :: String -> AlexPosn -> StateType (Type, Maybe Value)
 getSymbolRef symbolId posn = do
