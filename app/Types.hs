@@ -18,6 +18,7 @@ data InterpreterState = InterpreterState
   , symbolTableStack :: SymbolTableStackType
   , globalSymbolTable :: SymbolTableType
   , imports :: H.BasicHashTable String Bool
+  , importStack :: [String]
   , nestedImportCounter :: Int
   , nextScopeId :: Int
   , namespaceStack :: [String]

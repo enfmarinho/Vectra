@@ -1445,9 +1445,9 @@ foreachStmt = do
     setParserBlock previousParserBlock
     return $ [a] ++ [b] ++ [c] ++ [d] ++ [e] ++ [f] ++ [g] ++ h ++ [i]
 
-parser :: [Token] -> IO (Maybe ParseError)
-parser tokenList = do
-    interpreterState <- initInterpreterState
+parser :: [Token] -> String -> IO (Maybe ParseError)
+parser tokenList fileName = do
+    interpreterState <- initInterpreterState fileName
     parserResult <- runParserT vectraLanguage interpreterState "Error message" tokenList
     case parserResult of
         Left a -> return $ Just a

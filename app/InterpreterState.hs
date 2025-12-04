@@ -18,12 +18,17 @@ showPos (AlexPn _ line col) =
     "(Line " ++ show line ++ ", Column " ++ show col ++ ")"
 
 semanticError :: String -> StateType a
-semanticError msg = parserFail ("Semantic Error: " ++ msg)
+semanticError msg = do
+    -- liftIO $ putStrLn msg
+    fileName <- topImportStack
+    parserFail ("[" ++ fileName ++  "] Semantic Error: " ++ msg)
 runtimeError :: String -> StateType a
-runtimeError msg = parserFail ("Error: " ++ msg)
+runtimeError msg = do
+    fileName <- topImportStack
+    parserFail ("[" ++ fileName ++ "] Error: " ++ msg)
 
-initInterpreterState :: IO InterpreterState
-initInterpreterState = do
+initInterpreterState :: String -> IO InterpreterState
+initInterpreterState fileName = do
     globalSymbolTable <- liftIO H.new
     importTable <- liftIO H.new
 
@@ -33,6 +38,7 @@ initInterpreterState = do
         , programState = Starting
         , parserBlock = GlobalScope
         , imports = importTable
+        , importStack = [fileName]
         , nestedImportCounter = 0
         , nextScopeId = 1 -- 0 is for the global scope
         , namespaceStack = []
@@ -96,13 +102,22 @@ addImport :: String -> StateType ()
 addImport fileName = do
     st@InterpreterState{..} <- getState
     liftIO $ H.insert imports fileName False
-    putState st{nestedImportCounter = nestedImportCounter + 1}
+    putState st{ nestedImportCounter = nestedImportCounter + 1
+               , importStack = fileName : importStack
+               }
 
 finishImport :: String -> StateType()
 finishImport fileName = do
     st@InterpreterState{..} <- getState
     liftIO $ H.insert imports fileName True
-    putState st{nestedImportCounter = nestedImportCounter - 1}
+    putState st{ nestedImportCounter = nestedImportCounter - 1
+               , importStack = tail importStack
+               }
+
+topImportStack :: StateType String
+topImportStack = do
+    InterpreterState{..} <- getState
+    return $ head importStack
 
 searchImport :: String -> StateType (Maybe Bool)
 searchImport fileName = do

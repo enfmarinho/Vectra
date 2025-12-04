@@ -17,7 +17,7 @@ main = do
                     exitSuccess -- End execution early since a lexical error has been found
                 Right tokenList -> return tokenList
 
-            sintaxResult <- parser tokenList
+            sintaxResult <- parser tokenList filename
             forM_ sintaxResult print
 
         _ -> putStrLn "Missing file to interprete, pass its path as a command line argument!"
