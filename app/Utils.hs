@@ -114,7 +114,6 @@ handleUnaryMinus _ posn = semanticError $ "Invalid minus unary operation " ++ sh
 handleComparison :: Maybe Value -> Maybe Value -> Token -> AlexPosn -> StateType (Type, Value)
 handleComparison Nothing _ _ posn = semanticError $ "Invalid operands for comparision at " ++ showPos posn
 handleComparison _ Nothing _ posn = semanticError $ "Invalid operands for comparision at " ++ showPos posn
--- TODO missing handleComparison implementation, for example StructValue
 handleComparison (Just (StringValue lhs)) (Just (StringValue rhs)) compOp _ =
     case compOp of
         OP_EQ _     -> return (BoolType, BoolValue $ lhs == rhs)

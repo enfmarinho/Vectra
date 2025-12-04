@@ -471,7 +471,6 @@ callStmt symbolId symbolTypeList = do
     let namespaceList = removeLast symbolId
     pushMultipleNamespacePrefix namespaceList
     openScope True -- True because it needs access to the param values, it will be changed to false latter on
-    -- TODO read a optional dot followed by var, to allow method calls
     previousProgramState <- getProgramState
     (b, templateTypeList) <- option ([], []) templateInstantiation
     c <- TT.openParen
@@ -790,7 +789,7 @@ baseExp = do
                                                     Just refValue -> do
                                                         case refValue of
                                                             RefValue refSymbol scopeId -> consultSymbolByIdMaybe (refSymbol, scopeId)
-                                                            _ -> runtimeError "trying to deref a non reference value" -- TODO will not reach this
+                                                            _ -> runtimeError "trying to deref a non reference value" -- will not reach this
                                                     Nothing -> runtimeError $ "using unitialized var \"" ++ varId ++ "\""
                                             else return Nothing
 
@@ -968,7 +967,7 @@ stmtList = do
 
 stmt :: StateType [Token]
 stmt = do
-    try varDecl -- TODO remove this try to improve errs
+    try varDecl
     <|> derefAssignStmt
     <|> (do
         (a, symbolId, typeList, _varV) <- var
@@ -1032,7 +1031,7 @@ derefAssignStmt :: StateType [Token]
 derefAssignStmt = do
     a <- TT.kwDeref
     b@(OPEN_PAREN varPosn) <- TT.openParen
-    (c, symbolId, varT, varV) <- var -- TODO maybe <|> callStmt with "try"
+    (c, symbolId, varT, varV) <- var
 
     underlyingT <- case varT of
                     [RefType t] -> return t

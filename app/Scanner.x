@@ -128,7 +128,7 @@ topIndentationLevelStack = do
   stack <- getIndentationLevelStack
   case stack of
     (x:_) -> return x
-    []    -> alexError "TODO write this error message"
+    []    -> alexError "<topIndentationLevelStack>"
 
 pushIndentationLevel :: Int -> Alex ()
 pushIndentationLevel lvl = do

@@ -10,8 +10,6 @@ import Data.List.Split (splitOn)
 import Control.Monad
 import Scanner (AlexPosn (AlexPn))
 
--- TODO check if calling putState is necessary considering that the HashTables are mutable
-
 -- Aux function to emit error messages and finish execution early with err
 showPos :: AlexPosn -> String
 showPos (AlexPn _ line col) =
