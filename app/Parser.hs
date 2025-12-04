@@ -686,11 +686,11 @@ literal = do
         return ([a] ++ bTokens ++ concatMap fst c ++ [d], ArrayType bt, Just $ ArrayValue $ V.fromList (bv : map snd c)))
     <|> try (do
         (a, at) <- typeStmt
-        b <- TT.openBracket
-        c <- TT.intLiteral
+        b@(OPEN_BRACKET posn) <- TT.openBracket
+        (c, _, expV) <- expStmt
+        size <- getIntValue expV posn
         d <- TT.closeBracket
-        let INT_LITERAL _ size = c
-        return (a ++ [b] ++ [c] ++ [d], ArrayType at, Just $ ArrayValue $ V.replicate size Nothing))
+        return (a ++ [b] ++ c ++ [d], ArrayType at, Just $ ArrayValue $ V.replicate size Nothing))
     <|> try (do -- enum labels
         (b, symbolId, posn) <- namespaceAccess
         (tList, v) <- consultSymbol symbolId posn
