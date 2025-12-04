@@ -22,30 +22,29 @@ import Control.Monad.IO.Class
 import VectraLib
 import Data.List (intercalate, genericLength)
 
--- TODO remove uses of 'try'
 -- TODO add file name to messages
 
 importFile :: String -> AlexPosn -> StateType ()
 importFile filePath _posn = do
     result <- searchImport filePath
     case result of
-        Nothing -> return ()
+        Nothing -> do
+            addImport filePath
+            currState <- getState
+
+            fileTokens <- liftIO $ getTokens filePath
+            importTokens <- case fileTokens of
+                                Left _ -> fail $ "syntax failure on file " ++ filePath
+                                Right t -> return t
+
+            parserResult <- liftIO $ runParserT vectraLanguage currState "<import>" importTokens
+            case parserResult of
+                Left _ -> fail $ "semantic failure on file " ++ filePath
+                Right finalState -> do
+                    putState finalState
+                    finishImport filePath
         Just b -> unless b $ semanticError $ "cyclic importing " ++ filePath
 
-    addImport filePath
-    currState <- getState
-
-    fileTokens <- liftIO $ getTokens filePath
-    importTokens <- case fileTokens of
-                        Left _ -> fail $ "syntax failure on file " ++ filePath
-                        Right t -> return t
-
-    parserResult <- liftIO $ runParserT vectraLanguage currState "<import>" importTokens
-    case parserResult of
-        Left _ -> fail $ "semantic failure on file " ++ filePath
-        Right finalState -> do
-            putState finalState
-            finishImport filePath
 
 vectraLanguage :: StateType InterpreterState
 vectraLanguage = do
