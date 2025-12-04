@@ -437,15 +437,6 @@ varDecl = do
 
     return (b ++ [c] ++ d ++ e)
 
--- memberAccess :: String -> StateType ([Token], [Type], Maybe Value)
--- memberAccess t = do
---     a <- TT.kwDot
---     b <- TT.id
---     (ct, cs) <- option ([], []) memberAccess
---
---     let ID _posn symbolId = b
---     return ([a] ++ [b] ++ ct, symbolId:cs)
---
 arrayAccess :: [Type] -> Maybe Value -> StateType ([Token], [Type], Maybe Value)
 arrayAccess arrayT maybeArrayV = do
     a@(OPEN_BRACKET posn) <- TT.openBracket
@@ -475,10 +466,29 @@ arrayAccess arrayT maybeArrayV = do
         [ArrayType underlyingT] -> return underlyingT
         _ -> semanticError $ "trying to access with [] a non-array type " ++ showPos posn
 
-    maybeD <- optionMaybe (arrayAccess [underlyingT] accessedV)
-    case maybeD of
-        Nothing -> return ([a] ++ b ++ [c], [underlyingT], accessedV)
-        Just (d, t, v) -> return ([a] ++ b ++ [c] ++ d, t, v)
+    return ([a] ++ b ++ [c], [underlyingT], accessedV)
+
+
+memberAccess :: [Type] -> StateType ([Token], [Type], Maybe Value)
+memberAccess typeList = do
+    a <- TT.kwDot
+    b@(ID posn symbolId) <- TT.id
+    liftIO $ putStrLn "memberAccess1"
+
+    case typeList of
+        [StructInstanceType name] -> do
+            liftIO $ putStrLn "memberAccess2"
+            (structT, _) <- consultSymbol name posn
+            case structT of
+                [StructType _ _ publicTable _] -> do
+                    accessed <- liftIO $ H.lookup publicTable symbolId
+                    case accessed of
+                        Nothing -> semanticError $ "there is no member named " ++ symbolId ++ " in struct type " ++ name ++ showPos posn
+                        Just (t, v) -> do
+                            liftIO $ putStrLn $ "memberAccess3 " ++ show t
+                            return ([a,b], t, v)
+                _ -> semanticError "<memberAccess>"
+        ty -> semanticError $ "Trying to access a non-struct type " ++ showPos posn ++ show ty
 
 
 -- TODO var is incomplete, this is just a STUB
@@ -488,12 +498,15 @@ var = do
     (a, symbolId, posn) <- namespaceAccess
 
     (varTypeList, varValue) <- consultSymbol symbolId posn
-    -- (b, symbolList) <- option ([], []) memberAccess
+    maybeMemberAccess <- optionMaybe (memberAccess varTypeList)
+    (b, finalT, finalV) <- case maybeMemberAccess of
+                                Nothing -> return ([], varTypeList, varValue)
+                                Just (b, t, v) -> return (b, t, v)
 
-    maybeArrayAccess <- optionMaybe (arrayAccess varTypeList varValue)
+    maybeArrayAccess <- optionMaybe (arrayAccess finalT finalV)
     case maybeArrayAccess of
-        Nothing -> return (a, symbolId, varTypeList, varValue)
-        Just (c, t, v) -> return (a ++ c, symbolId, t, v)
+        Nothing -> return (a ++ b, symbolId, varTypeList, varValue)
+        Just (c, t, v) -> return (a ++ b ++ c, symbolId, t, v)
 
 callStmt :: String -> [Type] -> StateType ([Token], Maybe Type, Maybe Value)
 callStmt symbolId symbolTypeList = do
