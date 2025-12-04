@@ -1,0 +1,12 @@
+import println
+
+func main() -> int:
+    float x = 5
+    float y = 6
+    float c = 2
+
+    float result = (x * x) - y + c
+
+    println(result)
+
+    return 0
